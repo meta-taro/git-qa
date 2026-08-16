@@ -180,7 +180,7 @@ if [ "$fail" -ne 0 ]; then
   note "個人情報の混入が疑われます（product-baseline §32）。"
   note "  - 追加行が原因: 当該行を修正して commit し直す"
   note "  - commit author/message が原因: history に焼き付くため rebase での書き換えが要る。"
-  note "    公開後に気づいた場合は force push の可否を含めて司令塔へ Issue で確認する"
+  note "    公開後に気づいた場合は force push の可否を含めてリポジトリのオーナーへ Issue で確認する"
   exit 1
 fi
 
