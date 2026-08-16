@@ -19,7 +19,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # commit 範囲を検査するため全履歴が要る
           fetch-depth: 0
