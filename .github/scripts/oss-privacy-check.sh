@@ -22,8 +22,12 @@ ALLOWED_DOMAINS="${OSS_ALLOWED_EMAIL_DOMAINS:-example.com example.org example.ne
 DENY_WORDS="${OSS_DENY_WORDS:-}"
 
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-# 検査スクリプト自身は正規表現やドメイン例を含むため除外する
-SELF_RE='^\.github/(scripts/oss-privacy-check\.sh|workflows/oss-privacy-check\.yml)$'
+# 追加行の検査から外すファイル。
+#   - 検査スクリプト自身とワークフロー: 正規表現やドメイン例を含む
+#   - 依存の lock ファイル: レジストリの metadata から生成される。上流メンテナの連絡先が
+#     そのまま入ることがある（例: 非推奨パッケージの案内文）。こちらが書いた行ではなく、
+#     消せば install が壊れる。§32 が守ろうとしているのは「こちらの個人情報」なので対象外。
+SKIP_RE='^(\.github/(scripts/oss-privacy-check\.sh|workflows/oss-privacy-check\.yml)|([^ ]*/)?(pnpm-lock\.yaml|Cargo\.lock|go\.sum|poetry\.lock))$'
 
 fail=0
 note() { printf '%s\n' "$*" >&2; }
@@ -148,30 +152,45 @@ added="$(printf '%s\n' "$diff_out" | awk '
   /^\+/        { print f "\t" ln "\t" substr($0, 2); ln++; next }
 ')"
 
+# 追加行 1 行ごとに grep を起こすと、lock ファイルのような数万行の差分で現実的な時間に
+# 終わらない（初回 commit で顕在化した）。先に 1 回の grep で候補行だけへ絞り、
+# そこから先は「数行しか残らない」前提で 1 行ずつ丁寧に見る。
 if [ -n "$added" ]; then
-  while IFS=$'\t' read -r f ln content; do
-    [ -z "${f:-}" ] && continue
-    printf '%s' "$f" | grep -Eq "$SELF_RE" && continue
+  email_hits="$(printf '%s\n' "$added" | grep -E "$EMAIL_RE")"
+  if [ -n "$email_hits" ]; then
+    while IFS=$'\t' read -r f ln content; do
+      [ -z "${f:-}" ] && continue
+      printf '%s' "$f" | grep -Eq "$SKIP_RE" && continue
 
-    while read -r found; do
-      [ -z "${found:-}" ] && continue
-      allowed_email "$found" && continue
-      note "NG [added-email] $f:$ln : $(printf '%s' "$found" | mask_email)"
-      fail=1
-    done < <(printf '%s' "$content" | grep -Eo "$EMAIL_RE" | sort -u)
+      while read -r found; do
+        [ -z "${found:-}" ] && continue
+        allowed_email "$found" && continue
+        note "NG [added-email] $f:$ln : $(printf '%s' "$found" | mask_email)"
+        fail=1
+      done < <(printf '%s' "$content" | grep -Eo "$EMAIL_RE" | sort -u)
+    done <<< "$email_hits"
+  fi
 
-    if [ -n "$DENY_WORDS" ]; then
-      i=0
-      while IFS= read -r w; do
-        i=$((i + 1))
-        [ -z "$w" ] && continue
-        if printf '%s' "$content" | grep -qiF -- "$w"; then
-          note "NG [added-denyword] $f:$ln : 禁止語 #$i に一致"
-          fail=1
-        fi
-      done <<< "$DENY_WORDS"
+  if [ -n "$DENY_WORDS" ]; then
+    deny_hits="$(printf '%s\n' "$added" |
+      grep -iF -f <(printf '%s\n' "$DENY_WORDS" | grep -v '^[[:space:]]*$'))"
+    if [ -n "$deny_hits" ]; then
+      while IFS=$'\t' read -r f ln content; do
+        [ -z "${f:-}" ] && continue
+        printf '%s' "$f" | grep -Eq "$SKIP_RE" && continue
+
+        i=0
+        while IFS= read -r w; do
+          i=$((i + 1))
+          [ -z "$w" ] && continue
+          if printf '%s' "$content" | grep -qiF -- "$w"; then
+            note "NG [added-denyword] $f:$ln : 禁止語 #$i に一致"
+            fail=1
+          fi
+        done <<< "$DENY_WORDS"
+      done <<< "$deny_hits"
     fi
-  done <<< "$added"
+  fi
 fi
 
 # --- 結果 -------------------------------------------------------------------
