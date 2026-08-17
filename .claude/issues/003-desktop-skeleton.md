@@ -51,8 +51,21 @@ gh run list --limit 3
 
 ## 作業ログ
 
-（着手時に追記）
+### 2026-08-17 — 作業内容 1（映像の埋め込み方式）を実測した
+
+**実機は無い**（adb / scrcpy が手元に無い）。scrcpy が吐くのは「生 H.264（Annex-B）の 1 本のストリーム」なので、**同じ形を ffmpeg で作って代役にした**。ここで確かめたいのは端末との接続ではなく、その映像を GUI の中に遅延なく出せるかだけ。
+
+- スパイク: `spikes/live-view/`（`server.mjs` が ffmpeg を起動して HTTP chunked で流し、`index.html` が WebCodecs で復号して canvas に描く）
+- 測った環境: Windows 11 / Chromium 系ブラウザ（Tauri が Windows で使う WebView2 と同じエンジン）
+- 結果（31 秒時点）: 受け取り 1892 / 描画 1891（取りこぼしなし）・60.3 fps・復号の待ち 2.9 ms・最初の絵まで 648 ms・送り手との差 3 → 9 枚
+- 途中で 1 フレームが複数スライスに割れて復号器が落ちた。`first_mb_in_slice` で先頭スライスを判定して解決（詳細は ADR）
+
+→ **方式 A（ストリームを取り込んで自前で描く）＋ Tauri** に決めた。ADR: `docs/adr/0002-live-view-embedding.md`（弱いところ 4 点・覆すべき条件 3 点も記載）
+
+CI に `verify`（format / lint / typecheck / test）を足した（`.github/workflows/verify.yml`）。それまで CI で走っていたのは個人情報チェックだけで、テストは手元でしか走っていなかった。
+
+**残り**: 作業内容 3（骨格の初期化・空の 3 カラム）/ 4（テスト）/ 5（README の起動手順）。**画面はまだ 1 枚も無い。**
 
 ## 結果
 
-（完了時に追記）
+（完了時に追記。**現時点では未完了** — 完了条件 4 つのうち満たしたのは ADR の 1 つだけ）

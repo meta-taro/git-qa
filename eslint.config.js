@@ -13,7 +13,10 @@ export default tseslint.config(
         projectService: {
           // ルート直下の設定ファイルは、どのパッケージの tsconfig にも属さない。
           // 型情報なしで見るために既定プロジェクト扱いにする。
-          allowDefaultProject: ['*.config.ts'],
+          // スパイクは使い捨てで、どのパッケージにも属さない。**検査対象から外さない**
+          // （捨てるコードでも、壊れたまま残っていれば次に読む人が信じてしまう）。
+          // `**` は許されない（既定プロジェクト扱いが広がりすぎるため）。階層を明示する。
+          allowDefaultProject: ['*.config.ts', 'spikes/*/*.mjs'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -29,7 +32,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    files: ['spikes/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', URL: 'readonly' },
+    },
   },
 );

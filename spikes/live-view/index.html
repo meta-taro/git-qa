@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>live-view spike</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111;
+        color: #eee;
+        font:
+          14px/1.6 system-ui,
+          sans-serif;
+        display: flex;
+        gap: 16px;
+        padding: 16px;
+      }
+      canvas {
+        background: #000;
+        height: 640px;
+        width: auto;
+      }
+      #stats {
+        min-width: 320px;
+      }
+      #verdict {
+        font-size: 24px;
+        font-weight: 700;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: #333;
+      }
+      #verdict.ok {
+        background: #1b5e20;
+      }
+      #verdict.ng {
+        background: #b71c1c;
+      }
+      dt {
+        color: #9e9e9e;
+      }
+      dd {
+        margin: 0 0 8px;
+        font-variant-numeric: tabular-nums;
+        font-size: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="screen" width="720" height="1280"></canvas>
+    <div id="stats">
+      <p id="verdict">待機中</p>
+      <dl>
+        <dt>受け取ったフレーム</dt>
+        <dd id="frames">0</dd>
+        <dt>描いたフレーム</dt>
+        <dd id="painted">0</dd>
+        <dt>直近 1 秒の fps</dt>
+        <dd id="fps">-</dd>
+        <dt>復号の待ち（chunk 投入 → 出力）</dt>
+        <dd id="latency">-</dd>
+        <dt>最初の絵まで</dt>
+        <dd id="firstframe">-</dd>
+        <dt>codec</dt>
+        <dd id="codec">-</dd>
+      </dl>
+      <p id="error"></p>
+    </div>
+
+    <script type="module">
+      // scrcpy が吐くのと同じ生 H.264（Annex-B）を、WebCodecs でその場で復号して canvas に描く。
+      // ここで確かめたいのは「webview の中で、外から来たライブ映像が出せるか」の 1 点。
+      const $ = (id) => document.getElementById(id);
+      const ctx = $('screen').getContext('2d');
+
+      const started = performance.now();
+      let frames = 0;
+      let painted = 0;
+      let firstPaintAt = 0;
+      let latencySum = 0;
+      let latencyCount = 0;
+      const submitted = new Map();
+
+      const fail = (message) => {
+        $('verdict').textContent = 'NG';
+        $('verdict').className = 'ng';
+        // 最初の 1 件だけを出す。後から来る「閉じた codec に decode した」で覆われると原因が消える。
+        if ($('error').textContent === '') $('error').textContent = message;
+        console.error('[live-view]', message);
+      };
+
+      const decoder = new VideoDecoder({
+        output: (frame) => {
+          const submittedAt = submitted.get(frame.timestamp);
+          if (submittedAt !== undefined) {
+            latencySum += performance.now() - submittedAt;
+            latencyCount += 1;
+            submitted.delete(frame.timestamp);
+          }
+          ctx.drawImage(frame, 0, 0);
+          frame.close();
+          painted += 1;
+          if (firstPaintAt === 0) {
+            firstPaintAt = performance.now() - started;
+            $('firstframe').textContent = `${Math.round(firstPaintAt)} ms`;
+            $('verdict').textContent = 'OK';
+            $('verdict').className = 'ok';
+          }
+        },
+        error: (error) => fail(`復号で落ちた: ${error.message}`),
+      });
+
+      // description を渡さないと Annex-B として扱われる。scrcpy の出力をそのまま食える。
+      const config = { codec: 'avc1.42E01E', optimizeForLatency: true };
+      const support = await VideoDecoder.isConfigSupported(config);
+      $('codec').textContent = `${config.codec} / ${support.supported ? '対応' : '非対応'}`;
+      if (!support.supported) {
+        fail('この webview は H.264 の WebCodecs 復号に対応していない');
+        throw new Error('unsupported');
+      }
+      decoder.configure(config);
+
+      /** Annex-B の開始コード（00 00 01）を from 以降から探す。 */
+      const startCodeAt = (buf, from) => {
+        for (let i = from; i + 3 < buf.length; i += 1) {
+          if (buf[i] === 0 && buf[i + 1] === 0 && buf[i + 2] === 1) return i;
+        }
+        return -1;
+      };
+
+      let pending = new Uint8Array(0);
+      let unit = [];
+      let unitHasSlice = false;
+      let timestamp = 0;
+
+      const flushUnit = () => {
+        if (unit.length === 0) return;
+        const size = unit.reduce((n, nal) => n + nal.length, 0);
+        const data = new Uint8Array(size);
+        let at = 0;
+        for (const nal of unit) {
+          data.set(nal, at);
+          at += nal.length;
+        }
+        const isKey = unit.some((nal) => (nal[nal[2] === 1 ? 3 : 4] & 0x1f) === 5);
+        const chunk = new EncodedVideoChunk({
+          type: isKey ? 'key' : 'delta',
+          timestamp,
+          data,
+        });
+        submitted.set(timestamp, performance.now());
+        timestamp += Math.round(1_000_000 / 60);
+        frames += 1;
+        try {
+          decoder.decode(chunk);
+        } catch (error) {
+          fail(`decode で落ちた: ${error.message}`);
+        }
+        unit = [];
+        unitHasSlice = false;
+      };
+
+      /** NAL を 1 つ受け取り、アクセスユニットの境界を判定して溜める。 */
+      const pushNal = (nal) => {
+        const headerAt = nal[2] === 1 ? 3 : 4;
+        const type = nal[headerAt] & 0x1f;
+        const isSlice = type === 1 || type === 5;
+        // 1 フレームが複数スライスに割れることがある（x264 の sliced-threads / 端末側の設定）。
+        // 「スライスが来た＝次のフレーム」と数えると、割れた数だけ枚数が水増しされ、
+        // しかも 1 枚に満たない chunk を投げるので復号器が落ちる。
+        // 先頭スライスかどうかは first_mb_in_slice（スライスヘッダ最初の ue(v)）で判る。
+        // ue(v) が 0 ＝ 最初のビットが 1。
+        const isFirstSlice = isSlice && (nal[headerAt + 1] & 0x80) !== 0;
+        if (isFirstSlice && unitHasSlice) flushUnit();
+        unit.push(nal);
+        if (isSlice) unitHasSlice = true;
+      };
+
+      const feed = (bytes) => {
+        const buf = new Uint8Array(pending.length + bytes.length);
+        buf.set(pending);
+        buf.set(bytes, pending.length);
+
+        let at = startCodeAt(buf, 0);
+        if (at < 0) {
+          pending = buf;
+          return;
+        }
+        for (;;) {
+          const next = startCodeAt(buf, at + 3);
+          if (next < 0) {
+            pending = buf.subarray(at);
+            return;
+          }
+          pushNal(buf.subarray(at, next));
+          at = next;
+        }
+      };
+
+      let lastPainted = 0;
+      let lastTick = performance.now();
+      setInterval(() => {
+        const now = performance.now();
+        const dt = (now - lastTick) / 1000;
+        $('fps').textContent = dt > 0 ? `${((painted - lastPainted) / dt).toFixed(1)} fps` : '-';
+        lastPainted = painted;
+        lastTick = now;
+        $('frames').textContent = String(frames);
+        $('painted').textContent = String(painted);
+        $('latency').textContent =
+          latencyCount > 0
+            ? `${(latencySum / latencyCount).toFixed(1)} ms（平均 ${latencyCount} 枚）`
+            : '-';
+      }, 500);
+
+      const response = await fetch('/stream.h264');
+      if (!response.ok || response.body === null) {
+        fail(`ストリームに繋がらない: ${response.status}`);
+      } else {
+        const reader = response.body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          feed(value);
+        }
+      }
+    </script>
+  </body>
+</html>
