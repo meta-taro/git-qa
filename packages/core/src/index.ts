@@ -21,7 +21,16 @@ export type {
 export { resolveCaseResult } from './run/result.js';
 export type { ResultInput } from './run/result.js';
 export { caseDir, caseDirName, runDir, runJsonPath } from './run/layout.js';
+export { CASE_NO_COLUMN, CASE_TITLE_COLUMN, executeRun, toCaseSubjects } from './run/execute.js';
+export type {
+  CaseContext,
+  CaseSubject,
+  CaseVerdict,
+  ExecuteRunOptions,
+  HumanVerdict,
+} from './run/execute.js';
 export { RUN_SCHEMA, validateRun } from './run/validate.js';
+export { writeRunJson } from './run/write.js';
 export type { ValidationResult } from './run/validate.js';
 
 export { AdapterError } from './adapter/errors.js';
