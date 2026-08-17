@@ -1,0 +1,40 @@
+name: verify
+
+# format / lint / typecheck / test を CI で回す（product-baseline §5 の品質ゲート）
+#
+# 手元の Git hooks は環境要因で動かなくなることがある（§5 の但し書き）。
+# そのとき最後に残る門はここなので、**このワークフローを無効化して通したことにしない**。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # packageManager フィールドの pnpm を使う（npm / yarn は使わない）
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      - name: format / lint / typecheck / test
+        run: pnpm verify
+
+      - name: カバレッジ
+        run: pnpm test:coverage
