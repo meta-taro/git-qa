@@ -65,8 +65,50 @@ git diff --name-only   # 実行後に TSV が出ないこと
 
 ## 作業ログ
 
-（着手時に追記）
+### 2026-08-17
+
+リポジトリの土台（pnpm workspace / TypeScript / Vitest / ESLint / Prettier）を置いたうえで、`packages/core` に 2 つを実装した。テストを先に書いてから実装している。
+
+**1. 検証シート TSV の読み込み**（`src/tsv/`）
+
+- `parseTestSpecTsv(text)` / `readTestSpecTsv(path)`。**読むだけで、書き込む口を持たせていない**（C3）
+- 対応: マジック行（行頭 0 桁）/ メタ行 `# キー: 値` / ディレクティブ `#@` / ヘッダ `名前[:型][!]` / `enum(...)` / multiline 列の `\n` 復元 / 末尾の空セルを省いた短い行
+- 知らないディレクティブは**捨てずに raw のまま持つ**。仕様は md-business 側にあるので、こちらが落とすと「あったはずの宣言が消えた」ことになる
+- 落とすもの: マジック行なし・ヘッダ行なし・列名の重複・知らない列型・列数の超過。**text に丸めない**（丸めると型注釈が無い列と区別できなくなる）
+- `.gitattributes` で `*.tsv -text`。CRLF を git の正規化から外した（C21）
+
+**2. `run.json` のスキーマ**（`schema/run.schema.json` + `src/run/`）
+
+- JSON Schema draft 2020-12 が正本、TypeScript の型は写し（C18）。検証は ajv
+- 結果の語彙を AI 側と人側で型ごと分けた（C17）。**AI は `VERIFIED` を値として持てない**
+- `resolveCaseResult` は「人の判断があればそれ、無くて AI が `PASS` なら `AUTO_PASS`」。見た人の判断が最後に来る
+- 録画は 4 状態（C20）。`failed` / `unsupported` は理由が必須、`not_requested` には理由を書けない
+- 「どの機体・どのビルドか」は TSV でなく `run.json` の `target` に持たせた（C19）。TSV には列を足していない
+- `runs/<runId>/case-NNN/`。`runId` は `^[A-Za-z0-9._-]+$` 以外を弾く（`runs/` の外へ書く口を作らない）
+
+**検証**（`pnpm verify` 全て緑）
+
+```
+prettier --check .   All matched files use Prettier code style!
+eslint .             エラーなし
+tsc --build --force  エラーなし
+vitest run           4 files / 55 tests passed
+vitest run --coverage  99.49% statements / 89.88% branch
+git diff --name-only -- '*.tsv'   （空）
+bash .github/scripts/oss-privacy-check.sh   OK
+```
 
 ## 結果
 
-（完了時に追記）
+**完了条件のうち 3 つを満たし、1 つは満たしていない。**
+
+| 完了条件 | 状態 |
+|---|---|
+| スキーマがファイルとして存在する | **満たした** — `packages/core/schema/run.schema.json`。ajv で検証、壊れた `run.json` が落ちることをテストで確認 |
+| 実行前後で TSV が書き換わらない | **満たした** — 読み込み前後の sha256 が一致するテスト。確認コマンドの出力も空 |
+| `VERIFIED` と `AUTO_PASS` が別の値として出る | **満たした** — 同じ `run.json` に両方が同居するテスト。AI 側の型に `VERIFIED` が無い |
+| **録画あり / なしの両方で走らせ、`run.json` からその区別がつく** | **満たしていない。**区別が**表せる**ところまで（4 状態 + 理由必須の検証）。**実際に走らせていない** |
+
+**満たしていない理由**: 走らせるには実行器（Adapter）が要る。Issue 002（Adapter 境界の定義）と Issue 004 が未着手で、Issue 001 / 004 / 005 は adb + scrcpy と実機が無いため止まっている。**スキーマだけ先に決めた状態**であり、実機で 1 回でも走らせるまで「録画の区別がつく」とは書けない。
+
+**この Issue は close しない。**Adapter で 1 回走らせて `run.json` が出た時点で残りの 1 条件を確かめ、そこで閉じる。
