@@ -23,3 +23,22 @@ export type { ResultInput } from './run/result.js';
 export { caseDir, caseDirName, runDir, runJsonPath } from './run/layout.js';
 export { RUN_SCHEMA, validateRun } from './run/validate.js';
 export type { ValidationResult } from './run/validate.js';
+
+export { AdapterError } from './adapter/errors.js';
+export type {
+  Action,
+  AdapterCapabilities,
+  LiveView,
+  LiveViewTransport,
+  Observation,
+  ObservationKind,
+  PointerRef,
+  RecordingControl,
+  Screenshot,
+  TargetAdapter,
+  TargetSession,
+} from './adapter/types.js';
+// Fake は本番の実行では使わないが、下流のパッケージ（実行器・デスクトップ）が
+// 対象なしでテストを書くために要る。だから輸出する。
+export { createFakeAdapter } from './adapter/fake.js';
+export type { FakeAdapter, FakeAdapterOptions } from './adapter/fake.js';

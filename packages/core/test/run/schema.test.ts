@@ -5,52 +5,9 @@ import {
   CASE_RESULTS,
   HUMAN_RESULTS,
   RUN_SCHEMA,
-  RUN_SCHEMA_VERSION,
   validateRun,
 } from '../../src/index.js';
-import type { Run } from '../../src/index.js';
-
-const COMMIT = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
-const SHA256 = '0'.repeat(64);
-
-/** 最小限だが「実際に起こりうる」実行 1 回分。個々のテストはここから 1 箇所だけ崩す。 */
-const validRun = (): Run => ({
-  schemaVersion: RUN_SCHEMA_VERSION,
-  runId: '20260817-144530',
-  startedAt: '2026-08-17T14:45:30.000Z',
-  finishedAt: '2026-08-17T14:58:02.000Z',
-  operator: { handle: 'octocat' },
-  mode: 'assisted',
-  sheet: {
-    path: 'docs/test-specs/001-sample-notes-app.tsv',
-    sha256: SHA256,
-    title: 'サンプルメモ帳アプリ 検証シート',
-    documentNumber: 'TEST-git-qa-001',
-  },
-  target: {
-    kind: 'android',
-    device: 'Pixel 7a',
-    osVersion: '15',
-    build: { source: 'example/sample-notes-app', commit: COMMIT, label: 'debug' },
-  },
-  recording: { requested: true },
-  cases: [
-    {
-      no: 1,
-      title: 'アプリが起動する',
-      startedAt: '2026-08-17T14:45:31.000Z',
-      finishedAt: '2026-08-17T14:45:52.000Z',
-      aiResult: 'PASS',
-      humanResult: 'VERIFIED',
-      result: 'VERIFIED',
-      verifiedBy: 'octocat',
-      verifiedAt: '2026-08-17T14:45:52.000Z',
-      steps: [{ index: 0, at: '2026-08-17T14:45:33.000Z', label: 'アプリアイコンをタップする' }],
-      recording: { state: 'recorded', file: 'video.mp4', durationMs: 21000 },
-    },
-  ],
-  findings: [],
-});
+import { validRun } from './fixtures.js';
 
 const expectValid = (run: unknown): void => {
   const result = validateRun(run);

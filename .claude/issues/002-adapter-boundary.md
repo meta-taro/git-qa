@@ -60,8 +60,37 @@ Adapter が扱う必要のある操作の見当（過不足はこの Issue で�
 
 ## 作業ログ
 
-（着手時に追記）
+### 2026-08-17
+
+TDD（落ちるテストから）で進めた。
+
+1. **契約テストを先に書いた** — `packages/core/test/adapter/contract.ts`。「Adapter が満たすべき約束」を実装から独立した束にしてある。実装ごとにこれを当てる
+2. Fake 向けのテストを書き、**20 件が落ちる状態を確認**（`createFakeAdapter is not a function`）
+3. インターフェースを実装して通した — `packages/core/src/adapter/{types,errors,fake}.ts`
+4. `Promise` を返す口が同期で throw していた 1 件を、テストが捕まえた（呼び出し側の `.catch` を素通りする）。`Promise.reject` へ直した
+5. run.json のフィクスチャを `test/run/fixtures.ts` へ出した（契約テストからも同じものを使うため）
+6. ADR を書いた — `docs/adr/0001-adapter-boundary.md`
+7. 決定を `.claude/decisions.md` へ追記（C24 / C25）
+
+決めたことの要点:
+
+- **`liveView` を型として必須**にした。C8 の線引きを、守るかどうかではなく**書けるかどうか**にする
+- 画面の状態は `Observation.raw: unknown` で**素通し**。共通の型へ潰さない
+- `target` は**アダプタが作って run.json へそのまま入る**（契約テストで `validateRun` に通ることを確かめている）
+- 録画は `CaseRecording` の 4 状態をそのまま返す（C20 の区別を変換で潰さない）
+- 接続先（URL・パッケージ名）は**インターフェースに持たせない**
 
 ## 結果
 
-（完了時に追記）
+| 完了条件 | 状態 |
+|---|---|
+| インターフェース定義がコードとして存在する | **満たした** — `packages/core/src/adapter/types.ts` |
+| Android 実装がそのインターフェースを満たしている | **満たしていない** |
+| Web を当てたときに足りない / 余るものが列挙されている | **満たした** — ADR の「Web を当ててみた結果」 |
+| ADR がある | **満たした** — `docs/adr/0001-adapter-boundary.md` |
+
+**Android 実装は作っていない。**adb + scrcpy と実機が手元に無いため（Issue 001 / 004 / 005 と同じ理由）。**勝手に調達しない。**
+
+代わりに `createFakeAdapter()` を置き、契約テストを Fake に当てて通している（75 件・全通過）。**これは「インターフェースが自己矛盾していない」ことの確認であって、Android で動くことの確認ではない。**
+
+**この Issue は close しない。**実機が用意できた時点で Android 実装を書き、同じ契約テストを当てて残り 1 条件を満たす。

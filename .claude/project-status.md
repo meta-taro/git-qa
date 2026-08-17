@@ -21,10 +21,18 @@ pnpm workspace / TypeScript 5.9（NodeNext・strict）/ Vitest 3 / ESLint 9 flat
 - **結果の語彙を AI 側と人側で型ごと分けた**（C17）。AI は `VERIFIED` を値として持てない
 - **録画は 4 状態**（C20）。「録画オフ」と「録画失敗」が区別できる
 
+### Adapter の境界（Issue 002 の大部分・2026-08-17）
+
+- **インターフェース定義** — `packages/core/src/adapter/`。**ライブ映像を出せることを型で必須**にした（C24）
+- **画面の状態は生データを素通し**（`Observation.raw: unknown`）。共通の型へ潰さない
+- **契約テスト** — `test/adapter/contract.ts`。実装ごとに当てる束。Android / Web を足すときの答え合わせになる
+- **Fake アダプタ**（C25）— 実機なしで芯を通しで動かすため
+- ADR — `docs/adr/0001-adapter-boundary.md`（Web を当てたときの足りない / 余るを列挙）
+
 ## 未完了の作業
 
 - **Issue 006 は close していない。**完了条件 4 つのうち「録画あり / なしの両方で**走らせ**、区別がつく」だけ未達（実行器が無いため、スキーマ上表せるところまで）
-- Issue 002（Adapter 境界の定義・Fake・ADR）— 未着手
+- **Issue 002 も close していない。**完了条件のうち「**Android 実装がそのインターフェースを満たしている**」が未達（実機・adb が無い）
 - Issue 010（既存 OSS の実地調査と「作らない」判定）— 未着手
 - Issue 003（デスクトップ骨格）— 未着手
 - Issue 007（Git LFS の試算）— 未着手
@@ -32,21 +40,21 @@ pnpm workspace / TypeScript 5.9（NodeNext・strict）/ Vitest 3 / ESLint 9 flat
 ## 次のタスク
 
 1. Issue 010 — 作る前に既存 OSS を調べる
-2. Issue 002 — Adapter 境界を決め、Fake で `run.json` を 1 本出す（Issue 006 の残り 1 条件はここで確かめる）
+2. 実行器 — 検証シートを読み、Fake アダプタで走らせて `run.json` を 1 本出す（Issue 006 の残り 1 条件はここで確かめられる）
 
 ## 技術的決定
 
-`.claude/decisions.md` を参照（C1〜C23）。2026-08-17 に C17〜C23 を追加。
+`.claude/decisions.md` を参照（C1〜C25）。2026-08-17 に C17〜C25 を追加。
 
 ## テスト状況
 
 | | |
 |---|---|
-| テスト | **55 件・全て通過**（4 ファイル） |
-| カバレッジ | statements 99.49% / branch 89.88% |
+| テスト | **75 件・全て通過**（5 ファイル） |
+| カバレッジ | statements 99.72% / branch 93.57% |
 | 個人情報チェック | `bash .github/scripts/oss-privacy-check.sh` → OK |
 
-**まだ実機で 1 回も走らせていない。**通っているのは TSV の読み込みと `run.json` の形の検証だけ。
+**まだ実機で 1 回も走らせていない。**通っているのは TSV の読み込み、`run.json` の形の検証、Fake アダプタに当てた契約テストだけ。**Fake が通ることは、Android で動くことの確認ではない。**
 
 ## 既知の問題
 
