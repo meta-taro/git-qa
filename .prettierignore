@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+
+# 検証シート TSV は 1 レコード = 1 物理行・CRLF・実タブが仕様。
+# 整形をかけると仕様どおりのファイルが壊れる（product-baseline §22）。
+*.tsv
+
+# Markdown は人が書く文書で、一部は上流から配布される（product-baseline.md / templates/）。
+# 自動整形をかけると、次の同期のたびに中身と無関係な差分が出る。
+# 整形するのはコードだけにする。
+*.md

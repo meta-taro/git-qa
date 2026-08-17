@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:git-qa:schema:run:v1",
+  "title": "git-qa run",
+  "description": "動作検証を 1 回走らせた結果。git-qa はこのファイルにだけ結果を書き、検証シート TSV には書き戻さない。",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runId",
+    "startedAt",
+    "operator",
+    "mode",
+    "sheet",
+    "target",
+    "recording",
+    "cases",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "description": "この形の版。後から形を変えたときに、古い run.json を読み違えないための目印。",
+      "const": "git-qa/run/v1"
+    },
+    "runId": {
+      "description": "runs/ の下のディレクトリ名になる。経路区切りを含めない。",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "minLength": 1
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": {
+      "description": "中断した実行では無い。無いことが「途中で止まった」の記録になる。",
+      "type": "string",
+      "format": "date-time"
+    },
+    "operator": { "$ref": "#/$defs/actor" },
+    "mode": {
+      "description": "manual = 人が全部操作 / assisted = AI が操作し人が見る / auto = AI だけ",
+      "enum": ["manual", "assisted", "auto"]
+    },
+    "sheet": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": {
+          "description": "読んだ時点のシートの中身。実行後にシートが変わったら突き合わせで分かる。",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "title": { "type": "string" },
+        "documentNumber": { "type": "string" }
+      }
+    },
+    "target": {
+      "description": "何を検証したか。同じシートを別の機体で走らせることがあるので、シート側には持たせない。",
+      "type": "object",
+      "required": ["kind", "build"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["web", "android", "desktop"] },
+        "device": { "type": "string" },
+        "osVersion": { "type": "string" },
+        "browser": { "type": "string" },
+        "build": {
+          "description": "どのビルドを見たか。分からない検証結果は後から使えないので必須。",
+          "type": "object",
+          "additionalProperties": false,
+          "anyOf": [
+            { "required": ["commit"], "properties": { "commit": { "type": "string" } } },
+            { "required": ["label"], "properties": { "label": { "type": "string" } } }
+          ],
+          "properties": {
+            "source": { "type": "string" },
+            "commit": { "type": "string", "minLength": 7 },
+            "label": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "recording": {
+      "description": "録画するかどうかは実行開始時の設定であって、モードには紐づかない。",
+      "type": "object",
+      "required": ["requested"],
+      "additionalProperties": false,
+      "properties": { "requested": { "type": "boolean" } }
+    },
+    "cases": { "type": "array", "items": { "$ref": "#/$defs/case" } },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+  "$defs": {
+    "actor": {
+      "description": "個人名・個人メールアドレスは入れない。公開リポジトリに残るのはハンドルだけ。",
+      "type": "object",
+      "required": ["handle"],
+      "additionalProperties": false,
+      "properties": { "handle": { "$ref": "#/$defs/handle" } }
+    },
+    "handle": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$" },
+    "case": {
+      "type": "object",
+      "required": ["no", "title", "startedAt", "result", "steps", "recording"],
+      "additionalProperties": false,
+      "properties": {
+        "no": {
+          "description": "検証シートの No. 列。行 ID は md-business 側のものなので持たない。",
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "finishedAt": { "type": "string", "format": "date-time" },
+        "aiResult": {
+          "description": "AI が出せる値。VERIFIED はここに無い。",
+          "enum": ["PASS", "FAIL", "BLOCKED", "SKIP"]
+        },
+        "humanResult": {
+          "description": "人が出せる値。AUTO_PASS はここに無い。",
+          "enum": ["VERIFIED", "FAIL", "BLOCKED", "SKIP"]
+        },
+        "result": {
+          "description": "最終結果。VERIFIED と AUTO_PASS を 1 つに潰さない。",
+          "enum": ["VERIFIED", "AUTO_PASS", "FAIL", "BLOCKED", "SKIP"]
+        },
+        "verifiedBy": { "$ref": "#/$defs/handle" },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "recording": { "$ref": "#/$defs/caseRecording" },
+        "note": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "result": { "const": "VERIFIED" } }, "required": ["result"] },
+          "then": { "required": ["humanResult", "verifiedBy", "verifiedAt"] }
+        },
+        {
+          "if": { "properties": { "result": { "const": "AUTO_PASS" } }, "required": ["result"] },
+          "then": {
+            "properties": { "verifiedBy": false, "verifiedAt": false, "humanResult": false }
+          }
+        }
+      ]
+    },
+    "step": {
+      "description": "動画の頭出しに使う。手順の 1 行に対応する。",
+      "type": "object",
+      "required": ["index", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "at": { "type": "string", "format": "date-time" },
+        "label": { "type": "string" }
+      }
+    },
+    "caseRecording": {
+      "description": "動画が無いとき、録画オフだったのか失敗したのかを区別できるようにする。",
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["recorded", "not_requested", "failed", "unsupported"] },
+        "file": { "type": "string", "minLength": 1 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "recorded" } }, "required": ["state"] },
+          "then": { "required": ["file", "durationMs"] }
+        },
+        {
+          "if": { "properties": { "state": { "const": "failed" } }, "required": ["state"] },
+          "then": { "required": ["reason"] }
+        },
+        {
+          "if": { "properties": { "state": { "const": "unsupported" } }, "required": ["state"] },
+          "then": { "required": ["reason"] }
+        },
+        {
+          "if": { "properties": { "state": { "const": "not_requested" } }, "required": ["state"] },
+          "then": { "properties": { "file": false, "reason": false } }
+        }
+      ]
+    },
+    "finding": {
+      "description": "ケースの合否とは別に見つけた問題。合否に混ぜると、どちらも読めなくなる。",
+      "type": "object",
+      "required": ["id", "title", "severity", "foundAt"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "foundAt": { "type": "string", "format": "date-time" },
+        "caseNo": { "type": "integer", "minimum": 1 },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}

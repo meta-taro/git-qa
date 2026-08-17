@@ -1,0 +1,9 @@
+packages:
+  - 'packages/*'
+
+# install script は既定で全て止める（サプライチェーン防御）。
+# 通すものだけをここに挙げ、通す理由を .claude/decisions.md に残す。
+allowBuilds:
+  # vitest → vite が依存する。postinstall がプラットフォーム別バイナリを配置する。
+  # 開発時のみ使い、成果物には入らない。
+  esbuild: true
