@@ -19,9 +19,17 @@ export interface RunningProcess {
   stop(): Promise<void>;
 }
 
+/** 出力を流し続けるもの（screenrecord の生 H.264）。 */
+export interface StreamingProcess extends RunningProcess {
+  /** 届いた順に。プロセスが終わると尽きる。 */
+  readonly chunks: AsyncIterable<Uint8Array>;
+}
+
 export interface CommandRunner {
   /** 終わるまで待つ。 */
   run(command: string, args: readonly string[]): Promise<CommandResult>;
   /** 起動して即座に返す。止めるのは呼んだ側。 */
   start(command: string, args: readonly string[]): RunningProcess;
+  /** 起動して、標準出力を届いた順に流す。 */
+  stream(command: string, args: readonly string[]): StreamingProcess;
 }

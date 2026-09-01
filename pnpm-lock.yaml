@@ -49,6 +49,10 @@ importers:
         version: 3.0.1(ajv@8.20.0)
 
   packages/desktop:
+    dependencies:
+      '@git-qa/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@tauri-apps/cli':
         specifier: ^2.11.4

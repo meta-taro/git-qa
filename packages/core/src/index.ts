@@ -33,6 +33,11 @@ export { RUN_SCHEMA, validateRun } from './run/validate.js';
 export { writeRunJson } from './run/write.js';
 export type { ValidationResult } from './run/validate.js';
 
+// 生 H.264 の切り出しは UI 固有ではない。映像を出す側（アダプタ）も、
+// 描く側（デスクトップ）も同じ切り方を使う。
+export { createAnnexBSplitter } from './live/annexb.js';
+export type { AccessUnit, AnnexBSplitter } from './live/annexb.js';
+
 export { AdapterError } from './adapter/errors.js';
 export type {
   Action,

@@ -163,7 +163,26 @@ pnpm workspace / TypeScript 5.9（NodeNext・strict）/ Vitest 3 / ESLint 9 flat
 - `webcodecs.ts` — 本物の WebCodecs へ繋ぐ薄い層。**ここだけは webview の中でしか動かないので
   検査していない**
 
-**送り手は繋がっていない**（D6 / ADR 0003）。
+**送り手も繋がった**（C32・下記）。
+
+### 映像の取り出し方が決まった（C32・2026-09-02）
+
+**`adb exec-out screenrecord --output-format=h264 -` から生 H.264 を取る。**
+scrcpy のサーバへ直接繋ぐ案（非目標「scrcpy の再実装」に近づく）は採らず、
+**安いほうを先に実装して測る**という順にした。
+
+| | 実測（Pixel 3a / API 31・操作を流しながら） |
+|---|---|
+| 受け取り | 1,216,253 バイト / 32 枚 / 4,793 ms |
+| **繋いでから最初の 1 枚まで** | **491 ms** |
+| 実効ビットレート | 約 2.0 Mbps |
+
+`adb` → 生 Annex-B → `createAnnexBSplitter` → **IDR を含む枚**まで一本で通った。
+
+- `--output-format=h264` は `screenrecord --help` に載っていない（AOSP の隠しオプション）。
+  **実際に叩いて確認した**
+- `LiveViewTransport` に `h264-stream` を足し、**映像を読む口は その方式のときだけ生やす**
+- **暫定である。**Issue 005 の遅延次第で scrcpy 側へ戻る（ADR 0003 に条件を明記）
 
 ## 未完了の作業
 
@@ -187,24 +206,25 @@ pnpm workspace / TypeScript 5.9（NodeNext・strict）/ Vitest 3 / ESLint 9 flat
 1. **人**: `gh auth login`（このセッションでは 120 秒で切れた。別のターミナルで実行が要る）→ push → CI が success することの確認
 2. **人**: 画面のロックを解いた状態で、空の 3 カラムが出ていることの確認（§29）
 3. **人**: 料金計算機で Git LFS の超過単価を確認（Issue 007 の残り）
-4. **人**: D6 の判断 — 端末の生 H.264 をどこから取るか（ADR 0003）。**これが決まらないと
-   ライブビューが枠の中に出ない**
-5. **Issue 004 の本体** — 一本道。判断保留の条件・キー割り当て・ケース間の遷移を決め、
+4. アダプタ（Node）と画面（webview）を繋ぐ経路を決めて実装する。**これが繋がると、
+   枠の中に実際の端末の映像が出る**
+5. Issue 005 — **上限を先に決めてから**、操作から表示までの遅延を測る
+6. **Issue 004 の本体** — 一本道。判断保留の条件・キー割り当て・ケース間の遷移を決め、
    アダプタと画面を繋ぐ。**`VERIFIED` を置く所は人が要る**
-6. Issue 010 の残り — ReportPortal（Docker 起動が要る）/ Maestro Studio・Appium Inspector（画面が要る）。
+7. Issue 010 の残り — ReportPortal（Docker 起動が要る）/ Maestro Studio・Appium Inspector（画面が要る）。
    **どれも人の手が要る。**潰してから判定を書く
-7. `DESIGN.md` を人が埋める。埋まるまで骨格に色は入れない（§11）
+8. `DESIGN.md` を人が埋める。埋まるまで骨格に色は入れない（§11）
 
 ## 技術的決定
 
-`.claude/decisions.md` を参照（C1〜C31・未解決 D6）。2026-09-02 に C29（動画は既定で Git に入れない）・C30（契約テストの輸出）・C31（Android アダプタの作り）を追加。
+`.claude/decisions.md` を参照（C1〜C32）。**D6 は C32 で解決した。**2026-09-02 に C29（動画は既定で Git に入れない）・C30（契約テストの輸出）・C31（Android アダプタの作り）を追加。
 
 ## テスト状況
 
 | | |
 |---|---|
-| テスト | **197 件・全て通過**（端末を繋ぐと **201 件**） |
-| 内訳 | コア 104 / デスクトップ 41 / Android アダプタ 52 ＋ 実機 4（既定では飛ぶ） |
+| テスト | **204 件・全て通過**（端末を繋ぐと **209 件**） |
+| 内訳 | コア 117 / デスクトップ 28 / Android アダプタ 59 ＋ 実機 5（既定では飛ぶ） |
 | カバレッジ | 未再計測（104 件時点で statements 99.42% / branch 93.65%） |
 | 個人情報チェック | `bash .github/scripts/oss-privacy-check.sh` → OK |
 
@@ -223,11 +243,14 @@ uiautomator が返さない要素・USB の切断といった実機固有の癖�
   **一本道**（判断保留の条件・キー割り当て・ケース間の遷移・5 ケース通し）で、
   **`VERIFIED` を置くのは人**なので画面と人が要る（§29）
 - **iOS（Issue 001）は依然として実機・環境の判断が要る。勝手に調達しない**
-- **ライブビューの受け手は出来たが、送り手が決まっていない**（D6 / ADR 0003）。
-  端末の生 H.264 を **scrcpy のサーバから取るか、`adb exec-out screenrecord` から取るか**が未決。
-  **PRD §2 の「scrcpy 前提」と §11 の非目標「scrcpy の再実装」が正面から当たっている**ので、
-  AI の判断だけでは決めない（§15）。**提案は「B を先に実装して遅延を測る」**
-- アダプタのライブビューは、いまも **scrcpy の別窓**（`external-window`）
+- **受け手と送り手は別々に動くが、繋がっていない。**アダプタ（Node）が流す生 H.264 を、
+  デスクトップ（webview）へ渡す経路が無い。**Tauri の Rust 側か、スパイクと同じ localhost の
+  HTTP かを決めていない**
+- **Issue 005（遅延）を測っていない。**出ている 491 ms は「繋いでから絵が出るまで」で、
+  **「操作してから画面に出るまで」ではない**。上限も決めていない（Issue は「先に決めてから測る」）
+- **180 秒ごとの繋ぎ直しを実装していない**（`screenrecord` の上限）
+- **`webcodecs.ts` の codec 文字列が固定**（`avc1.42E01E`）。端末が吐いた SPS は Level 5.0 で
+  食い違っている。**本来は SPS から組み立てるべき**
 - **Android SDK を二重に入れてしまった。**`~/Library/Android/sdk`（既存）に加えて brew で
   `/opt/homebrew/share/android-commandlinetools` を入れた。**既存を先に確認すべきだった。**
   使っているのは既存のほう。brew 側は `brew uninstall --cask android-commandlinetools` で消せる

@@ -24,12 +24,25 @@ import {
   type Point,
   type ResolvedAction,
 } from './adb.js';
-import type { CommandRunner, RunningProcess } from './command.js';
+import type { CommandRunner, RunningProcess, StreamingProcess } from './command.js';
 import { createNodeCommandRunner } from './node-runner.js';
 
 const KIND = 'android';
 const DUMP_PATH = '/sdcard/git-qa-window-dump.xml';
 const DEFAULT_SWIPE_MS = 300;
+/** `screenrecord` の上限。これより長くは指定できないので、超える運用では繋ぎ直す。 */
+const SCREENRECORD_MAX_SEC = 180;
+
+/**
+ * ライブ映像の出し方。
+ *
+ * - `external-window` — scrcpy の窓を別に出す。**人が 2 つの窓を見比べることになる**
+ * - `h264-stream` — `adb exec-out screenrecord` の生 H.264 を流す。**枠の中に描ける**（C27 の方式 A）
+ *
+ * どちらを既定にするかは D6（`docs/adr/0003-live-view-transport.md`）で保留中。
+ * **いまは呼ぶ側が選ぶ。**遅延を実測してから決める。
+ */
+export type LiveViewMode = 'external-window' | 'h264-stream';
 
 export interface AndroidAdapterOptions {
   /** 検証している対象アプリ。**端末の情報ではない**ので、こちらから渡してもらう。 */
@@ -40,6 +53,12 @@ export interface AndroidAdapterOptions {
   readonly scrcpyPath?: string;
   /** 録画するかは実行開始時の設定（C11）。保管先も一緒に受ける。 */
   readonly recording?: { readonly requested: boolean; readonly runsDir: string };
+  /** ライブ映像の出し方。既定は別窓（従来どおり）。 */
+  readonly liveView?: {
+    readonly mode?: LiveViewMode;
+    /** `h264-stream` のときの 1 回あたりの長さ。上限 180 秒。 */
+    readonly timeLimitSec?: number;
+  };
   /** 差し替え口。既定は本物のプロセス。 */
   readonly runner?: CommandRunner;
   readonly now?: () => Date;
@@ -101,7 +120,7 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
         build: options.build,
       };
 
-      return createSession({ target, serial, adbRun, runner, scrcpy, now, options });
+      return createSession({ target, serial, adb, adbRun, runner, scrcpy, now, options });
     },
   };
 }
@@ -109,6 +128,8 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
 interface SessionDeps {
   readonly target: Target;
   readonly serial: string;
+  /** adb の実行ファイル。映像を流すときは adbRun を通さず直接起動する。 */
+  readonly adb: string;
   readonly adbRun: (args: readonly string[], serial?: string) => Promise<Uint8Array>;
   readonly runner: CommandRunner;
   readonly scrcpy: string;
@@ -117,32 +138,73 @@ interface SessionDeps {
 }
 
 function createSession(deps: SessionDeps): TargetSession {
-  const { target, serial, adbRun, runner, scrcpy, now, options } = deps;
+  const { target, serial, adb, adbRun, runner, scrcpy, now, options } = deps;
   let closed = false;
 
   const ensureOpen = (): void => {
     if (closed) throw new AdapterError(KIND, 'セッションは閉じられている');
   };
 
+  const mode: LiveViewMode = options.liveView?.mode ?? 'external-window';
+  const timeLimitSec = Math.min(
+    options.liveView?.timeLimitSec ?? SCREENRECORD_MAX_SEC,
+    SCREENRECORD_MAX_SEC,
+  );
+
   let liveProcess: RunningProcess | undefined;
+  let liveStream: StreamingProcess | undefined;
+
   const liveView: LiveView = {
     get isOpen() {
       return liveProcess !== undefined;
     },
-    transport: { kind: 'external-window', label: `scrcpy ${serial}` },
+    transport:
+      mode === 'h264-stream'
+        ? { kind: 'h264-stream', label: `screenrecord ${serial}` }
+        : { kind: 'external-window', label: `scrcpy ${serial}` },
+
     open(): Promise<void> {
       ensureOpen();
       // 二重に開いても落ちない（契約テスト）。既に出ているなら何もしない。
-      if (liveProcess === undefined) {
+      if (liveProcess !== undefined) return Promise.resolve();
+
+      if (mode === 'h264-stream') {
+        // 端末に何も送り込まない。Android 標準の screenrecord に生 H.264 を吐かせる。
+        liveStream = runner.stream(adb, [
+          ...withSerial(serial, [
+            'exec-out',
+            'screenrecord',
+            '--output-format=h264',
+            `--time-limit=${String(timeLimitSec)}`,
+            '-',
+          ]),
+        ]);
+        liveProcess = liveStream;
+      } else {
         liveProcess = runner.start(scrcpy, ['-s', serial, '--window-title', `git-qa ${serial}`]);
       }
       return Promise.resolve();
     },
+
     async close() {
       const running = liveProcess;
       liveProcess = undefined;
+      liveStream = undefined;
       await running?.stop();
     },
+
+    ...(mode === 'h264-stream'
+      ? {
+          frames(): AsyncIterable<Uint8Array> {
+            const stream = liveStream;
+            if (stream === undefined) {
+              // 開く前に読もうとしている。空を返すと「映像が来ない」に化けるので落とす。
+              throw new AdapterError(KIND, 'ライブビューを開く前に映像を読もうとしている');
+            }
+            return stream.chunks;
+          },
+        }
+      : {}),
   };
 
   let recProcess: RunningProcess | undefined;

@@ -10,5 +10,6 @@
     "emitDeclarationOnly": true,
     "sourceMap": false
   },
+  "references": [{ "path": "../core" }],
   "include": ["src/**/*.ts", "test/**/*.ts", "vite.config.ts"]
 }

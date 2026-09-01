@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-import type { CommandResult, CommandRunner } from './command.js';
+import type { CommandResult, CommandRunner, StreamingProcess } from './command.js';
 
 /** 本物のプロセスを起動する実装。テストからは使わない。 */
 export function createNodeCommandRunner(): CommandRunner {
@@ -18,6 +18,53 @@ export function createNodeCommandRunner(): CommandRunner {
           resolve({ code: code ?? -1, stdout: new Uint8Array(Buffer.concat(out)), stderr: err });
         });
       });
+    },
+
+    stream(command, args): StreamingProcess {
+      const child = spawn(command, [...args], { stdio: ['ignore', 'pipe', 'ignore'] });
+      let running = true;
+      // 受け手が読むより速く届くので、溜める。捨てると映像に穴が空く。
+      const queue: Uint8Array[] = [];
+      let wake: (() => void) | undefined;
+      const bump = (): void => {
+        wake?.();
+        wake = undefined;
+      };
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        queue.push(new Uint8Array(chunk));
+        bump();
+      });
+      const finish = (): void => {
+        running = false;
+        bump();
+      };
+      child.on('close', finish);
+      child.on('error', finish);
+
+      return {
+        get isRunning() {
+          return running;
+        },
+        async stop() {
+          if (!running) return;
+          child.kill('SIGTERM');
+          await new Promise<void>((resolve) => child.on('close', () => resolve()));
+        },
+        chunks: {
+          async *[Symbol.asyncIterator]() {
+            for (;;) {
+              const next = queue.shift();
+              if (next !== undefined) {
+                yield next;
+                continue;
+              }
+              if (!running) return;
+              await new Promise<void>((resolve) => (wake = resolve));
+            }
+          },
+        },
+      };
     },
 
     start(command, args) {

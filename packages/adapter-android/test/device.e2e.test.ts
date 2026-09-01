@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { createAnnexBSplitter } from '@git-qa/core';
+
 import { createAndroidAdapter } from '../src/index.js';
 
 /**
@@ -59,4 +61,65 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
     expect(after).not.toBe(before);
     await session.close();
   }, 60000);
+  it('screenrecord の生 H.264 が流れてきて、アクセスユニットに切れる', async () => {
+    // D6 の選択肢 B（ADR 0003）が実際に成立するかを見る。
+    // ここが通らなければ、scrcpy のサーバへ繋ぐ側（選択肢 A）へ進む根拠になる。
+    const session = await createAndroidAdapter({
+      build,
+      liveView: { mode: 'h264-stream', timeLimitSec: 30 },
+    }).connect();
+    await session.liveView.open();
+
+    // **画面が変化しないとフレームが出ない**（scrcpy も screenrecord も同じ）。
+    // 静止した画面を読んでも「流れていない」のか「変化が無い」のか区別できないので、
+    // 読みながら操作を流す。
+    let stirring = true;
+    const stir = (async () => {
+      while (stirring) {
+        await session.act({
+          kind: 'swipe',
+          from: { at: 'point', x: 540, y: 1400 },
+          to: { at: 'point', x: 540, y: 500 },
+        });
+      }
+    })();
+
+    const splitter = createAnnexBSplitter();
+    const startedAt = Date.now();
+    let bytes = 0;
+    let firstUnitMs: number | undefined;
+    const units: { isKey: boolean }[] = [];
+
+    try {
+      for await (const chunk of session.liveView.frames?.() ?? []) {
+        bytes += chunk.byteLength;
+        for (const unit of splitter.push(chunk)) {
+          firstUnitMs ??= Date.now() - startedAt;
+          units.push(unit);
+        }
+        // 30 枚あれば「流れて切れている」ことは言える。長く回さない。
+        if (units.length >= 30) break;
+      }
+    } finally {
+      stirring = false;
+      await stir;
+    }
+    units.push(...splitter.flush());
+    const elapsedMs = Date.now() - startedAt;
+    await session.liveView.close();
+    await session.close();
+
+    // 実測値をログへ出す。テストの合否とは別に、Issue 005 / 007 の材料になる。
+    console.log(
+      `[screenrecord] ${String(bytes)} バイト / ${String(units.length)} 枚 / ` +
+        `${String(elapsedMs)} ms / 最初の 1 枚まで ${String(firstUnitMs)} ms`,
+    );
+
+    expect(bytes).toBeGreaterThan(0);
+    expect(units.length).toBeGreaterThanOrEqual(30);
+    // 先頭には必ず IDR が来る。来なければ、途中から拾っていて復号を始められない。
+    expect(units.some((u) => u.isKey)).toBe(true);
+    // 最初の 1 枚が出るまでが遅いと、人は「固まった」と思う（PRD §2）。
+    expect(firstUnitMs).toBeLessThan(5000);
+  }, 90000);
 });

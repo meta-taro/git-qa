@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createAnnexBSplitter } from '../../src/live/annexb.js';
+import { createAnnexBSplitter } from '../../src/index.js';
 
 /**
  * NAL を 1 つ組み立てる。

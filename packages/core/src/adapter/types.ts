@@ -47,10 +47,25 @@ export interface LiveView {
   readonly transport: LiveViewTransport;
   open(): Promise<void>;
   close(): Promise<void>;
+  /**
+   * 映像そのものを読む口。**`transport.kind` が `'h264-stream'` のときだけ持つ。**
+   *
+   * 別窓で出す方式では映像はここを通らないので、無いのが正しい。
+   * 「必ずある」ことにすると、別窓の実装が空の口を返すことになり、
+   * **映像が来ないのか、そもそも通らない方式なのかが区別できなくなる。**
+   */
+  frames?(): AsyncIterable<Uint8Array>;
 }
 
-/** 映像の出し方。対応する対象を足すときにここへ増やす（今あるのは 1 つだけ）。 */
-export type LiveViewTransport = { readonly kind: 'external-window'; readonly label: string };
+/** 映像の出し方。対応する対象を足すときにここへ増やす。 */
+export type LiveViewTransport =
+  /** 別の窓で出す。人が 2 つの窓を見比べることになるので、C4 とは噛み合わない。 */
+  | { readonly kind: 'external-window'; readonly label: string }
+  /**
+   * 生 H.264（Annex-B）を流す。**アプリの枠の中に描ける**方式（C27 の方式 A）。
+   * 受け手は `createAnnexBSplitter` で切って復号する。
+   */
+  | { readonly kind: 'h264-stream'; readonly label: string };
 
 export interface Observation {
   readonly kind: Target['kind'];

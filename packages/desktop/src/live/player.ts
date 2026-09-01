@@ -1,4 +1,4 @@
-import { createAnnexBSplitter } from './annexb.js';
+import { createAnnexBSplitter } from '@git-qa/core';
 
 /**
  * ライブ映像の再生。**方式 A**（ストリームを取り込んで自前で描く・C27）の中身。

@@ -5,6 +5,9 @@
   "type": "module",
   "description": "検証中の画面をライブで見て、その場で判定を置くためのデスクトップ画面",
   "license": "MIT",
+  "dependencies": {
+    "@git-qa/core": "workspace:*"
+  },
   "scripts": {
     "build": "tsc --build && vite build",
     "dev": "vite",

@@ -4,7 +4,12 @@ import { describeAdapterContract } from '@git-qa/core/testing';
 import type { TargetAdapter } from '@git-qa/core';
 
 import { createAndroidAdapter } from '../src/index.js';
-import type { CommandResult, CommandRunner, RunningProcess } from '../src/index.js';
+import type {
+  CommandResult,
+  CommandRunner,
+  RunningProcess,
+  StreamingProcess,
+} from '../src/index.js';
 
 const DUMP = `<?xml version='1.0' encoding='UTF-8'?>
 <hierarchy rotation="0">
@@ -16,7 +21,10 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 interface Recorded {
   readonly ran: string[][];
   readonly started: string[][];
+  readonly streamed: string[][];
   readonly processes: FakeProcess[];
+  /** `stream()` が流すもの。テストごとに差し替える。 */
+  chunks: Uint8Array[];
 }
 
 class FakeProcess implements RunningProcess {
@@ -34,7 +42,9 @@ class FakeProcess implements RunningProcess {
 function fakeRunner(overrides: Record<string, CommandResult> = {}): CommandRunner & Recorded {
   const ran: string[][] = [];
   const started: string[][] = [];
+  const streamed: string[][] = [];
   const processes: FakeProcess[] = [];
+  const state = { chunks: [] as Uint8Array[] };
 
   const ok = (stdout: string | Uint8Array = ''): CommandResult => ({
     code: 0,
@@ -53,7 +63,14 @@ function fakeRunner(overrides: Record<string, CommandResult> = {}): CommandRunne
   return {
     ran,
     started,
+    streamed,
     processes,
+    get chunks() {
+      return state.chunks;
+    },
+    set chunks(value: Uint8Array[]) {
+      state.chunks = value;
+    },
     run(_command, args) {
       ran.push([...args]);
       // -s <serial> は呼び分けの本質ではないので、突き合わせる前に落とす。
@@ -65,6 +82,20 @@ function fakeRunner(overrides: Record<string, CommandResult> = {}): CommandRunne
       const p = new FakeProcess();
       processes.push(p);
       return p;
+    },
+    stream(_command, args): StreamingProcess {
+      streamed.push([...args]);
+      const p = new FakeProcess();
+      processes.push(p);
+      const queued = state.chunks;
+      return Object.assign(p, {
+        chunks: {
+          // eslint-disable-next-line @typescript-eslint/require-await -- 非同期の口に同期の中身を流す
+          async *[Symbol.asyncIterator]() {
+            for (const c of queued) yield c;
+          },
+        },
+      });
     },
   };
 }
@@ -241,6 +272,82 @@ describe('ライブビュー', () => {
     await session.close();
     expect(runner.processes[0]?.isRunning).toBe(false);
     expect(session.liveView.isOpen).toBe(false);
+  });
+});
+
+describe('ライブビュー（生 H.264 を流す方式）', () => {
+  const streaming = (runner: CommandRunner) =>
+    createAndroidAdapter({ build, runner, liveView: { mode: 'h264-stream' } });
+
+  it('transport が h264-stream になる', async () => {
+    // 受け手は transport の種類を見て、枠の中に描くか別窓かを決める。
+    const session = await streaming(fakeRunner()).connect();
+    expect(session.liveView.transport.kind).toBe('h264-stream');
+  });
+
+  it('端末に何も送り込まず、screenrecord の生 H.264 を流す', async () => {
+    const runner = fakeRunner();
+    const session = await streaming(runner).connect();
+    await session.liveView.open();
+
+    expect(runner.streamed.at(-1)).toEqual([
+      '-s',
+      'emulator-5554',
+      'exec-out',
+      'screenrecord',
+      '--output-format=h264',
+      '--time-limit=180',
+      '-',
+    ]);
+    // scrcpy は起動しない。
+    expect(runner.started).toHaveLength(0);
+  });
+
+  it('1 回の長さは 180 秒を超えられない', async () => {
+    // screenrecord 側の上限。超える値を渡されたら黙って丸める。
+    const runner = fakeRunner();
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      liveView: { mode: 'h264-stream', timeLimitSec: 600 },
+    }).connect();
+    await session.liveView.open();
+
+    expect(runner.streamed.at(-1)).toContain('--time-limit=180');
+  });
+
+  it('流れてきたものを、そのまま読める', async () => {
+    const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([0, 0, 1, 0x67]), new Uint8Array([0, 0, 1, 0x65])];
+    const session = await streaming(runner).connect();
+    await session.liveView.open();
+
+    const got: Uint8Array[] = [];
+    for await (const chunk of session.liveView.frames?.() ?? []) got.push(chunk);
+    expect(got).toEqual(runner.chunks);
+  });
+
+  it('開く前に読もうとしたら、空を返さずに落ちる', async () => {
+    // 空を返すと「映像が来ない」に化けて、原因が分からなくなる。
+    const session = await streaming(fakeRunner()).connect();
+    expect(() => session.liveView.frames?.()).toThrow(/開く前に/);
+  });
+
+  it('別窓の方式では、映像を読む口を持たない', async () => {
+    // 持たせると、別窓なのに映像が来ないのか、来ないだけなのかが区別できない。
+    const session = await makeAdapter().connect();
+    expect(session.liveView.transport.kind).toBe('external-window');
+    // 口そのものが生えていないこと（undefined を返す口がある、ではない）。
+    expect('frames' in session.liveView).toBe(false);
+  });
+
+  it('閉じると screenrecord も止まる', async () => {
+    const runner = fakeRunner();
+    const session = await streaming(runner).connect();
+    await session.liveView.open();
+    await session.liveView.close();
+
+    expect(runner.processes.at(-1)?.isRunning).toBe(false);
   });
 });
 

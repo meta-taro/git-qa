@@ -1,7 +1,7 @@
 export { createAndroidAdapter } from './adapter.js';
-export type { AndroidAdapterOptions } from './adapter.js';
+export type { AndroidAdapterOptions, LiveViewMode } from './adapter.js';
 export { createNodeCommandRunner } from './node-runner.js';
-export type { CommandResult, CommandRunner, RunningProcess } from './command.js';
+export type { CommandResult, CommandRunner, RunningProcess, StreamingProcess } from './command.js';
 export {
   boundsCenter,
   escapeInputText,
