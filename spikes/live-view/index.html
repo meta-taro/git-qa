@@ -79,6 +79,12 @@
       let firstPaintAt = 0;
       let latencySum = 0;
       let latencyCount = 0;
+      // 累積平均は一度跳ねると戻らない。「いま遅いのか」を見るには直近だけの平均が要る。
+      const RECENT = 60;
+      const recentLatency = [];
+      // ウィンドウが隠れると webview はタイマーを間引く。測っている値が自分の遅延でなくなるので、
+      // 隠れていた事実を数字と一緒に持ち出す。
+      let hiddenTicks = 0;
       const submitted = new Map();
 
       const fail = (message) => {
@@ -93,8 +99,11 @@
         output: (frame) => {
           const submittedAt = submitted.get(frame.timestamp);
           if (submittedAt !== undefined) {
-            latencySum += performance.now() - submittedAt;
+            const waited = performance.now() - submittedAt;
+            latencySum += waited;
             latencyCount += 1;
+            recentLatency.push(waited);
+            if (recentLatency.length > RECENT) recentLatency.shift();
             submitted.delete(frame.timestamp);
           }
           ctx.drawImage(frame, 0, 0);
@@ -171,7 +180,13 @@
         // 先頭スライスかどうかは first_mb_in_slice（スライスヘッダ最初の ue(v)）で判る。
         // ue(v) が 0 ＝ 最初のビットが 1。
         const isFirstSlice = isSlice && (nal[headerAt + 1] & 0x80) !== 0;
-        if (isFirstSlice && unitHasSlice) flushUnit();
+        // パラメータセット等（AUD 9 / SEI 6 / SPS 7 / PPS 8）は「次のフレームのもの」。
+        // スライスの後にこれが来たら、そこがアクセスユニットの境界。
+        // ここで切らないと [前フレームの slice][SPS][PPS] が 1 つの chunk になり、
+        // 末尾にパラメータセットがぶら下がった塊を復号器へ渡すことになる。
+        // Chromium は通したが、WebKit は Decoder failure で落ちた（macOS で実測）。
+        const startsNextUnit = type === 6 || type === 7 || type === 8 || type === 9;
+        if ((isFirstSlice || startsNextUnit) && unitHasSlice) flushUnit();
         unit.push(nal);
         if (isSlice) unitHasSlice = true;
       };
@@ -207,11 +222,51 @@
         lastTick = now;
         $('frames').textContent = String(frames);
         $('painted').textContent = String(painted);
+        const recentAvg =
+          recentLatency.length > 0
+            ? recentLatency.reduce((a, b) => a + b, 0) / recentLatency.length
+            : 0;
         $('latency').textContent =
           latencyCount > 0
-            ? `${(latencySum / latencyCount).toFixed(1)} ms（平均 ${latencyCount} 枚）`
+            ? `直近 ${recentAvg.toFixed(1)} ms / 通算 ${(latencySum / latencyCount).toFixed(1)} ms（${latencyCount} 枚）`
             : '-';
       }, 500);
+
+      // 画面の数字は、Tauri のウィンドウの中では読み出せない（人が見るしかない）。
+      // 1 秒ごとにサーバへ投げて、ログから読めるようにする。webview を跨いで値を並べるため。
+      const engine = navigator.userAgent;
+      setInterval(() => {
+        if (document.hidden) hiddenTicks += 1;
+        const elapsed = (performance.now() - started) / 1000;
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            engine,
+            elapsedSec: Number(elapsed.toFixed(1)),
+            // received: ストリームから取り出したアクセスユニット数（送り手が届けた枚数）
+            // painted: 実際に描けた枚数。expected: 60fps で理想的に流れていた場合の枚数
+            received: frames,
+            painted,
+            expected: Math.round(elapsed * 60),
+            firstPaintMs: Math.round(firstPaintAt),
+            decodeLatencyMs:
+              latencyCount > 0 ? Number((latencySum / latencyCount).toFixed(1)) : null,
+            recentLatencyMs:
+              recentLatency.length > 0
+                ? Number(
+                    (recentLatency.reduce((a, b) => a + b, 0) / recentLatency.length).toFixed(1),
+                  )
+                : null,
+            hidden: document.hidden,
+            hiddenTicks,
+            codec: $('codec').textContent,
+            error: $('error').textContent || null,
+          }),
+        }).catch(() => {
+          // 投げ先が落ちていても映像の検証は続ける（計測の持ち出しは副次）。
+        });
+      }, 1000);
 
       const response = await fetch('/stream.h264');
       if (!response.ok || response.body === null) {

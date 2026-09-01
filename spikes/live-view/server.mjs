@@ -89,6 +89,22 @@ const server = createServer((req, res) => {
     return;
   }
 
+  // 測った値の持ち出し口。
+  // 画面に出ている数字は、Tauri のウィンドウの中では人が見る以外に読み出せない。
+  // ページ側から投げさせて、ここへ 1 行で出す（webview ごとの値を並べて比べるため）。
+  if (req.url === '/report' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      console.log(`[report] ${body}`);
+      res.writeHead(204);
+      res.end();
+    });
+    return;
+  }
+
   res.writeHead(404);
   res.end('not found');
 });
