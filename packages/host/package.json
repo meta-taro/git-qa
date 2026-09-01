@@ -1,0 +1,18 @@
+{
+  "name": "@git-qa/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "アダプタを繋ぎ、橋を起こし、画面へ渡すところ",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@git-qa/core": "workspace:*",
+    "@git-qa/live-bridge": "workspace:*"
+  }
+}

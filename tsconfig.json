@@ -4,6 +4,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/adapter-android" },
     { "path": "./packages/live-bridge" },
+    { "path": "./packages/host" },
     { "path": "./packages/desktop" }
   ]
 }
