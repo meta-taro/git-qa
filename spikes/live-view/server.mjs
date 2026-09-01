@@ -21,8 +21,38 @@ const FPS = 60;
 
 const INDEX = fileURLToPath(new URL('./index.html', import.meta.url));
 
+// 既定は ffmpeg で作った代役の映像。
+// LIVE_VIEW_SOURCE に動画を渡すと、そちらを生 H.264（Annex-B）に詰め替えて流す。
+// scrcpy で実機（またはエミュレータ）から録ったものを渡せば、**端末のエンコーダが実際に吐いた
+// NAL の並び**で受け手を試せる。代役の ffmpeg では出ない癖がここで出る。
+const SOURCE = process.env['LIVE_VIEW_SOURCE'] ?? '';
+
+/** 録っておいた動画を、再エンコードせずに Annex-B へ詰め替えて実時間で流す。 */
+const spawnFromFile = () =>
+  spawn(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-re',
+      '-i',
+      SOURCE,
+      // 再エンコードしない。端末が吐いた H.264 をそのまま受け手へ渡すのが目的。
+      '-c:v',
+      'copy',
+      '-bsf:v',
+      'h264_mp4toannexb',
+      '-an',
+      '-f',
+      'h264',
+      'pipe:1',
+    ],
+    { stdio: ['ignore', 'pipe', 'inherit'] },
+  );
+
 /** scrcpy の出力に似せた生 H.264（Annex-B）を作る。`-re` で実時間に合わせて流す。 */
-const spawnFfmpeg = () =>
+const spawnGenerated = () =>
   spawn(
     'ffmpeg',
     [
@@ -56,6 +86,8 @@ const spawnFfmpeg = () =>
     ],
     { stdio: ['ignore', 'pipe', 'inherit'] },
   );
+
+const spawnFfmpeg = () => (SOURCE === '' ? spawnGenerated() : spawnFromFile());
 
 const server = createServer((req, res) => {
   // クエリ文字列は落として見る。同じ計測を別タブで開き直すために ?run=... を付けるので、
@@ -115,4 +147,5 @@ const server = createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`[live-view spike] http://127.0.0.1:${PORT}/`);
+  console.log(SOURCE === '' ? '[source] ffmpeg で作った代役の映像' : `[source] ${SOURCE}`);
 });

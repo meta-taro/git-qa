@@ -14,6 +14,7 @@ SECRETS.local.md
 .claude/rules/product-baseline.full.md
 
 # 実行の証跡。動画は既定で Git に入れない（C29 / Issue 007）。
-# scrcpy 既定の 8 Mbps だと 20 ケース × 20 営業日で月 24 GB になり、
-# GitHub の Git LFS 無料枠 10 GiB を 9 営業日で超える。しかも履歴に入る以上は累積する。
+# 実測で 20 ケース × 20 営業日 = 月 2.12 GB。Git の履歴に入る以上ずっと累積するので、
+# Free / Pro の LFS 無料枠 10 GiB は 5 か月で尽きる。帯域はもっと早く、
+# 溜まった履歴を 1 回 clone しただけで月間 10 GiB を超える。
 runs/

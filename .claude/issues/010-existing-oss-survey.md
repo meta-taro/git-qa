@@ -55,8 +55,65 @@
 
 ## 作業ログ
 
-（着手時に追記）
+### 2026-09-02 — 5 製品のうち 2 つを実際に触った（途中）
+
+**触った 2 つ**
+
+#### Playwright Trace Viewer（`@playwright/test` 1.62.1）
+
+使い捨てのプロジェクトを作り、3 ケース（うち 1 件はわざと落とす）を `trace: 'on'` /
+`video: 'on'` / `screenshot: 'on'` で実行した。落ちたケースの trace.zip・動画・
+スクリーンショット・HTML レポートが実際に出る。**証跡としては十分に厚い。**
+
+**結果の語彙（型の実物）**
+
+```
+TestStatus = 'passed' | 'failed' | 'timedout' | 'interrupted'
+outcome    = 'skipped' | 'expected' | 'unexpected' | 'flaky'
+```
+
+結果 1 件が持つキー: `annotations` `attachments` `duration` `errors` `parallelIndex`
+`retry` `startTime` `status` `stderr` `stdout` `workerIndex`
+
+**誰が見たかを持つ項目が無い。**`playwright test --help` に verify / human / approve /
+sign / manual に類するオプションは無く、reporter の型にも該当する項目が無い。
+
+#### scrcpy 4.1
+
+Android エミュレータ（Pixel 3a / API 31）に対して `--record` で 60 秒録画した。
+**ライブで見ることについては、この製品が既に前提として採用している**（C4 / PRD §2）。
+
+- 実測: 5.05 MB（実時間 60 秒ぶん）/ 1080x2220 / 平均 10 fps
+- **画面が変化したときしかフレームを作らない。**スクロールを止めると映像も止まる
+
+**触っていない 3 つ**: Maestro Studio / Appium Inspector / Allure・ReportPortal。
+**エミュレータは動く状態になったので、次のセッションで触れる。**
+
+### 3 つの観点
+
+| | Playwright Trace Viewer | scrcpy 単体 + 手動記録 | Maestro Studio | Appium Inspector | Allure / ReportPortal |
+|---|---|---|---|---|---|
+| 1. ライブで見ながら 1 打鍵で合否 | **満たさない** | **半分**（見るのは満たす。合否を置く口が無い） | | | |
+| 2. `VERIFIED` と `AUTO_PASS` が別の値 | **満たさない** | **満たさない**（結果という概念が無い） | | | |
+| 3. 手作業より明確に速い | **比較対象が違う** | **満たさない**（人が別途シートに書くので手作業のまま） | | | |
+
+### 満たさない理由は「思想の違い」か「機能が無いだけ」か
+
+- **Playwright Trace Viewer — 思想の違い。**自動テストランナーであり、**誰も見ていないことが前提**。
+  `status` は固定の列挙で、人の判定を入れる場所は `annotations`（自由記述）しか無い。
+  そこへ書いてもレポートや CI が読む値にはならない。**「人が見た」を一級の値にするには、
+  結果の語彙そのものを変えることになる**ので、この製品への機能追加では収まらない
+- **scrcpy — 機能が無いだけ、ですらない。**ミラーリングと録画の道具であって、判定の概念を持たない。
+  **持たないのが正しい**（この製品も scrcpy を置き換えない・非目標に明記）。
+  組み合わせて使う相手であって、比較の対象ではない
 
 ## 結果
 
-（完了時に追記）
+（完了時に追記。**現時点では未完了** — 5 製品のうち触ったのは 2 つ。
+Maestro Studio / Appium Inspector / Allure・ReportPortal が未着手のため、
+「作る / 作らない / 既存へ貢献する」の判定はまだ書かない。
+
+**現時点で言えるのは、触った 2 つでは観点 2（`VERIFIED` と `AUTO_PASS` を別の値として残す）が
+満たされない、ということだけ。**Maestro / Appium / Allure が満たす可能性は残っている。
+特に Allure は「人が結果に注釈を付ける」方向の機能を持つので、そこで埋まるなら
+**「既存へ貢献する」**が答えになりうる。**先に結論を書かない。**）

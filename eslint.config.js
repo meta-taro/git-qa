@@ -45,7 +45,7 @@ export default tseslint.config(
   {
     files: ['spikes/**/*.mjs'],
     languageOptions: {
-      globals: { console: 'readonly', URL: 'readonly' },
+      globals: { console: 'readonly', URL: 'readonly', process: 'readonly' },
     },
   },
 );
