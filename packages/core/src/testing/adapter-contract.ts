@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { type TargetAdapter, validateRun } from '../../src/index.js';
-import { validRun } from '../run/fixtures.js';
+import { type TargetAdapter, validateRun } from '../index.js';
+import { validRun } from './fixtures.js';
 
 /**
  * Adapter が満たすべき約束。**実装ごとにこの束を当てる。**
  *
  * Android を作るとき・Web を足すとき（Phase 5）に、ここが通ることが答え合わせになる。
+ *
+ * **`@git-qa/core/testing` から輸出している。**下流のアダプタは別パッケージになるので、
+ * ここが test/ の下にあると当てられない（Fake を輸出しているのと同じ理由）。
  * 通らない実装が出たら、境界の引き方が間違っていたということ（Issue 002 の注意書き）。
  */
 export function describeAdapterContract(name: string, makeAdapter: () => TargetAdapter): void {

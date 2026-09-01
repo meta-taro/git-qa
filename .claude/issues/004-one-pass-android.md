@@ -51,7 +51,64 @@ git diff --name-only   # TSV が出ないこと
 
 ## 作業ログ
 
-（着手時に追記）
+### 2026-09-02 — Android アダプタを置いた（一本道はまだ通っていない）
+
+**この Mac に Android Studio の SDK と AVD が既にあった。**Pixel 3a / API 31 を `-no-window` で
+起動し（14 秒）、scrcpy 4.1 と adb を入れて繋いだ。**実機ではないが、adb と scrcpy の相手としては
+本物。**
+
+#### 置いたもの: `packages/adapter-android`
+
+**Adapter は差し替える前提なので別パッケージにした**（product-baseline §9）。
+
+- `command.ts` — adb / scrcpy を呼ぶ口を**注入できる形**にした。本物の起動は
+  `node-runner.ts` の向こう側だけに置く
+- `adb.ts` — **プロセスを起動しない純粋な部分**（引数の組み立て・端末一覧の解析・
+  `input text` の escape・uiautomator の dump から座標を出す）
+- `adapter.ts` — `TargetAdapter` の実装。connect / act / observe / screenshot /
+  liveView（scrcpy の窓）/ recording（scrcpy の `--record`）
+
+#### 検査
+
+| | 件数 | 端末 |
+|---|---|---|
+| 純粋なロジック（`adb.test.ts`） | 22 | 不要 |
+| アダプタ（`adapter.test.ts`・**契約テストを含む**） | 30 | 不要（adb / scrcpy を差し替え） |
+| 実機（`device.e2e.test.ts`） | 4 | **要**（`GIT_QA_ANDROID_E2E=1` のときだけ走る） |
+
+**全体で 173 件・全て通過。**端末が無い環境では実機の 4 件が飛んで 169 件が通る
+（product-baseline §4「繋がらない環境でも走る形にする」）。
+
+実機の 4 件で確かめたこと: 繋いで型番と OS の版が取れる / uiautomator の XML が取れる /
+PNG が取れる（署名とサイズを確認）/ **操作すると画面が実際に変わる**。
+
+#### テストが実装のバグを 1 つ捕まえた
+
+`findElementCenter` に空文字を渡すと、`resource-id=""` のノード（画面上に多数ある）に
+当たってしまっていた。**しかも「最初に見つかった何か」を掴むので間違いに気づけない。**
+空の参照を弾くようにした。
+
+#### 決めたこと（Issue の「決めること」のうち 1 つ）
+
+- **要素の指定は完全一致のみ**（`resource-id` → `text` → `content-desc` の順）。
+  部分一致にすると、画面が変わったときに別の要素を掴んで、しかも気づけない
+- **非 ASCII の `input text` は落とす。**端末の `input text` は IME を経由しないので日本語を
+  送れない。黙って化けた文字を打つより、送れないと言うほうがよい
+- **ライブビューと録画は別プロセス。**人が窓を閉じても録画は続くべきで、逆も同じ
+- **端末が複数見えていて serial の指定が無ければ、選ばずに落とす。**黙って 1 台目を選ぶと、
+  証跡に書いた相手と実際に触った相手がずれる
+
+#### まだ通っていないもの（この Issue の本体）
+
+**一本道はまだ通っていない。**残っているのは、この Issue が本来やろうとしている所。
+
+- AI が「判断保留」を出す条件 — **未決**
+- 人が押すキーの割り当て — **未決**
+- ケース間の遷移 — **未決**
+- **5 ケース以上を通し、`run.json` に `VERIFIED` と `AUTO_PASS` が混在した状態で出す** — 未達。
+  **`VERIFIED` を置くのは人**なので、画面と人が要る（§29）
+
+TSV は書き換わっていない（`git diff --name-only` に TSV は出ない）。
 
 ## 結果
 

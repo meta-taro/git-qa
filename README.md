@@ -131,6 +131,18 @@ pnpm test:run          # テスト
 pnpm test:coverage     # カバレッジ
 ```
 
+### Android 実機・エミュレータに当てるテスト
+
+`packages/adapter-android` のテストのうち、実機に繋ぐ 4 件は**既定では走りません**。
+`adb devices` で端末が見えている状態で、次のように実行します。
+
+```bash
+GIT_QA_ANDROID_E2E=1 pnpm test:run
+```
+
+端末が無い環境では、この 4 件は自動的に飛びます（残りはすべて adb / scrcpy を差し替えて走ります）。
+別途 `adb` と `scrcpy` が PATH に要ります。
+
 ### デスクトップ画面を起動する
 
 ```bash

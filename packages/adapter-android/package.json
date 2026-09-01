@@ -1,0 +1,17 @@
+{
+  "name": "@git-qa/adapter-android",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Android 実機・エミュレータを adb と scrcpy で見て触るアダプタ",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@git-qa/core": "workspace:*"
+  }
+}

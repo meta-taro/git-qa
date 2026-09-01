@@ -7,7 +7,7 @@ import {
   RUN_SCHEMA,
   validateRun,
 } from '../../src/index.js';
-import { validRun } from './fixtures.js';
+import { validRun } from '../../src/testing/index.js';
 
 const expectValid = (run: unknown): void => {
   const result = validateRun(run);

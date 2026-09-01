@@ -1,5 +1,5 @@
-import { RUN_SCHEMA_VERSION } from '../../src/index.js';
-import type { Run } from '../../src/index.js';
+import { RUN_SCHEMA_VERSION } from '../index.js';
+import type { Run } from '../index.js';
 
 export const COMMIT = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 export const SHA256 = '0'.repeat(64);

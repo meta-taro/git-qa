@@ -6,7 +6,8 @@
   "description": "テストケース TSV の読み取りと、実行結果 run.json の型・スキーマ",
   "license": "MIT",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "scripts": {
     "build": "tsc --build"

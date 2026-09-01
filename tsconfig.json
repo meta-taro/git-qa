@@ -1,4 +1,8 @@
 {
   "files": [],
-  "references": [{ "path": "./packages/core" }, { "path": "./packages/desktop" }]
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/adapter-android" },
+    { "path": "./packages/desktop" }
+  ]
 }

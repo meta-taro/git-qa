@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createFakeAdapter } from '../../src/index.js';
-import { describeAdapterContract } from './contract.js';
+import { describeAdapterContract } from '../../src/testing/index.js';
 
 describeAdapterContract('Fake', () => createFakeAdapter());
 

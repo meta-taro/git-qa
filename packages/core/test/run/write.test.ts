@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { type Run, runJsonPath, validateRun, writeRunJson } from '../../src/index.js';
-import { validRun } from './fixtures.js';
+import { validRun } from '../../src/testing/index.js';
 
 let runsRoot = '';
 
