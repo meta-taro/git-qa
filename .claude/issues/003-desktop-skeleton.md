@@ -66,6 +66,43 @@ CI に `verify`（format / lint / typecheck / test）を足した（`.github/wor
 
 **残り**: 作業内容 3（骨格の初期化・空の 3 カラム）/ 4（テスト）/ 5（README の起動手順）。**画面はまだ 1 枚も無い。**
 
+### 2026-09-01 — 作業内容 3・4・5（骨格の初期化・テスト・README）
+
+**開発機（Apple Silicon の Mac mini）が未構築だったので、先に環境を作った。**
+
+- Node 20.5.0 → **22.23.2**（`package.json` の `engines` は `>=22`）／ pnpm 11.1.1 を corepack で有効化／ rustup で stable
+- **ターミナルが Rosetta 下だった**（`sysctl.proc_translated = 1`）。nodebrew が Node を x64 で取得し、rustup は arm64 を入れたため CPU が食い違っていた。**Node を arm64 で入れ直した**（結果、`@tauri-apps/cli-darwin-arm64` が解決された）。README に確認手順を書いた
+- `pnpm install` → `pnpm verify` で**既存の 104 件が手元でも通ることを確認**した
+
+**置いたもの**: `packages/desktop`（Vite + Tauri 2.11.4 / tauri 2.11.3）
+
+- `src/columns.ts` — 3 カラムの構成。中央がライブビュー（C4 / PRD §2）
+- `src/render.ts` — DOM へ描く。幅は `--column-flex` で CSS へ渡し、**CSS に数字を書かない**
+- `src-tauri/` — Tauri シェル。`identifier` は `dev.gitqa.desktop`、`authors` は置かない（§25）、CSP を `default-src 'self'` 基点で設定
+- テスト **13 件**（`columns.test.ts` 7 / `render.test.ts` 6・happy-dom）。**中央が左右より広いことをテストで固定した**
+
+**通ったもの**（実測）
+
+| | 結果 |
+|---|---|
+| `pnpm verify` | format / lint / typecheck **OK**、テスト **117 件全て通過**（既存 104 + 新規 13） |
+| `cargo check`（src-tauri） | **exit 0**・1m 16s |
+| `pnpm --filter @git-qa/desktop build` | `dist/web` を出力（index.html 0.50 kB / css 0.53 kB / js 1.60 kB） |
+| `bash .github/scripts/oss-privacy-check.sh` | **OK**（個人情報の混入なし） |
+
+**副次の修正 2 件**
+
+- prettier と eslint が `src-tauri/target/` を歩いて落ちたので、両方の除外に加えた
+- **Tauri 既定の 2 倍解像度アイコン（ファイル名にアットマークを含む）を、個人情報チェックがメールとして誤検出した。**ファイル名がメールの正規表現に一致する。ハイフン区切りへ改名し、`tauri.conf.json` を追随させた。**検査スクリプトは共通雛形の正本なので触っていない。**`tauri icon` でアイコンを再生成すると同じ名前が復活するので、そのときは再度改名すること
+
+**決めていないこと**: 色・タイポグラフィ・アイコン。`DESIGN.md` が全項目空で、見た目は人が決める領域（§11）。骨格は OS の既定の配色で出る。
+
+**まだ満たしていない完了条件**
+
+- `gh run list --limit 3` で CI が success — **未確認。**`gh` は入れたが**未ログイン**（認証情報の投入は人の作業・§14）。かつ **push は人間**（§6）なので、CI はまだ 1 度も走っていない
+- README の手順どおりに**別の PC で起動できる** — **この 1 台でしか確認していない**
+- 空の 3 カラムが実際に出ているかの**画面の確認は人が行う**（§29）
+
 ## 結果
 
-（完了時に追記。**現時点では未完了** — 完了条件 4 つのうち満たしたのは ADR の 1 つだけ）
+（完了時に追記。**現時点では未完了** — 完了条件 4 つのうち満たしたのは ADR とテストの 2 つ。CI の success と別 PC での起動が未確認）

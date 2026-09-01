@@ -11,3 +11,7 @@ pnpm-lock.yaml
 # 自動整形をかけると、次の同期のたびに中身と無関係な差分が出る。
 # 整形するのはコードだけにする。
 *.md
+
+# Rust のビルド成果物と、Tauri が生成する権限スキーマ。人が書くものではない。
+packages/*/src-tauri/target/
+packages/*/src-tauri/gen/

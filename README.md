@@ -6,7 +6,10 @@ AI に検証を丸投げして「全部通りました」と言わせる道具�
 
 git-qa がやるのは、**人が責任を持つ前提のまま、その責任を果たすコストを下げる**こと。AI は代わりに判断せず、**見るための準備をして、見る場所を絞ります。**
 
-> ⚠️ このリポジトリは着手前の設計段階です。実装はまだありません。方向性は `PRD.md`、進め方は `.claude/roadmap.md` にあります。
+> ⚠️ このリポジトリは開発中です。**まだ実機で 1 回も走らせていません。**
+> 現時点であるのは、検証シート TSV の読み取り・`run.json` の型とスキーマ・Adapter の境界と Fake 実装・
+> デスクトップ画面の骨格（空の 3 カラム）までです。
+> 方向性は `PRD.md`、進め方は `.claude/roadmap.md`、いま何がどこまでかは `.claude/project-status.md` にあります。
 
 ## 考え方
 
@@ -76,6 +79,41 @@ UI の中心は録画プレイヤーではなく、いま動いている画面�
 - 不正防止機構
 - 全ケースの人間確認を強制する仕組み
 
+## 必要なもの
+
+| | 版 | 用途 |
+|---|---|---|
+| Node.js | **22 以上** | フロントのビルドとテスト |
+| pnpm | `package.json` の `packageManager` に従う | **pnpm のみ。npm / yarn は使わない** |
+| Rust (stable) | 1.77.2 以上 | デスクトップ画面（Tauri）のビルド |
+
+pnpm は corepack で入れます（別途 install しない）。
+
+```bash
+corepack enable
+```
+
+Rust は rustup で入れます。
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+OS ごとに Tauri の前提が別途あります（macOS は Xcode Command Line Tools、Windows は WebView2 と MSVC build tools、
+Linux は webkit2gtk）。詳細は [Tauri の前提条件](https://v2.tauri.app/start/prerequisites/) を参照してください。
+
+### Apple Silicon の Mac で作業する場合
+
+**ターミナルが Rosetta で起動していないことを確認してください。**
+
+```bash
+uname -m      # arm64 であること（x86_64 なら Rosetta 下にいる）
+node -p process.arch   # arm64 であること
+```
+
+Rosetta 下だと Node が x64 で入り、Rust は arm64 で入るため、Tauri CLI のネイティブモジュールと
+cargo のビルドで CPU が食い違います。ターミナルの「情報を見る」で「Rosetta を使用して開く」を外してください。
+
 ## セットアップ
 
 ```bash
@@ -86,11 +124,36 @@ cp .env.example .env   # 必要な値を設定
 ## 開発
 
 ```bash
-pnpm dev               # ローカル起動
+pnpm verify            # format:check → lint → typecheck → test（commit 前に通す門）
 pnpm lint              # Lint
 pnpm typecheck         # 型チェック
 pnpm test:run          # テスト
+pnpm test:coverage     # カバレッジ
 ```
+
+### デスクトップ画面を起動する
+
+```bash
+pnpm --filter @git-qa/desktop tauri dev
+```
+
+初回は Rust の依存をまとめてビルドするため数分かかります。**空の 3 カラム（ケース / ライブビュー / 判定）が出れば成功です。**
+中身はまだありません。
+
+ブラウザだけで画面を見る場合（Rust 不要）:
+
+```bash
+pnpm --filter @git-qa/desktop dev   # http://localhost:1420
+```
+
+配布物を作る場合:
+
+```bash
+pnpm --filter @git-qa/desktop tauri build
+```
+
+> 画面の色・タイポグラフィは**まだ決めていません**。`DESIGN.md` が空のままなので、骨格は OS の既定の配色で出ます。
+> アイコンも Tauri の既定のままです。
 
 ## ルール
 

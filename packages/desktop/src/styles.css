@@ -1,0 +1,58 @@
+/*
+ * 骨格のスタイル。**色・字面はまだ決めていない。**
+ *
+ * DESIGN.md が全項目空で、見た目の方向性は人が決める領域（product-baseline §11）。
+ * ここで既定値を埋めると、それがそのまま既成事実になる。
+ * だから独自の色は置かず、枠線は currentColor から作り、配色は OS の設定に従う。
+ * DESIGN.md が埋まったら、ここを差し替える。
+ */
+
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font: menu;
+}
+
+#app {
+  display: flex;
+  height: 100%;
+  gap: 1px;
+}
+
+.column {
+  flex: var(--column-flex, 1);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* カラムの区切り。色は決めていないので、文字色から作る。 */
+  outline: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.column-heading {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.column-placeholder {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  /* 中身ではなく「まだ無い」の説明なので、本文より弱く見せる。 */
+  opacity: 0.6;
+}
