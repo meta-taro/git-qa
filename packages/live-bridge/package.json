@@ -1,0 +1,20 @@
+{
+  "name": "@git-qa/live-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "アダプタが流す生 H.264 を、画面（webview）へ渡すための localhost の橋",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@git-qa/adapter-android": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@git-qa/core": "workspace:*"
+  }
+}

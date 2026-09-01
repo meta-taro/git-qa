@@ -54,6 +54,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@git-qa/live-bridge':
+        specifier: workspace:*
+        version: link:../live-bridge
       '@tauri-apps/cli':
         specifier: ^2.11.4
         version: 2.11.4
@@ -63,6 +66,16 @@ importers:
       vite:
         specifier: ^7.3.6
         version: 7.3.6(@types/node@22.20.1)
+
+  packages/live-bridge:
+    dependencies:
+      '@git-qa/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@git-qa/adapter-android':
+        specifier: workspace:*
+        version: link:../adapter-android
 
 packages:
 

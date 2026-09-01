@@ -41,6 +41,14 @@ export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions):
   return {
     canvas,
     draw(frame) {
+      // 端末の実寸に合わせる。**引き伸ばすと、人が見て判断する材料が歪む。**
+      // 実寸は最初の絵が来るまで分からないので、来た時点で合わせ直す。
+      const w = frame.displayWidth;
+      const h = frame.displayHeight;
+      if (w !== undefined && h !== undefined && (canvas.width !== w || canvas.height !== h)) {
+        canvas.width = w;
+        canvas.height = h;
+      }
       // 2d コンテキストが取れない環境（テスト用の DOM 等）では描かない。
       // ここで落とすと、画面の組み立てそのものを検査できなくなる。
       context?.drawImage(frame as unknown as Drawable, 0, 0, canvas.width, canvas.height);

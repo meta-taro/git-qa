@@ -47,6 +47,23 @@ describe('mountLiveView', () => {
     expect(root.querySelector('[data-column-id="live"] .column-placeholder')).not.toBeNull();
   });
 
+  it('最初の絵が来たら、端末の実寸に合わせ直す', () => {
+    // 引き伸ばすと、人が見て判断する材料が歪む。実寸は絵が来るまで分からない。
+    const surface = mountLiveView(root, { width: 1080, height: 2220 });
+    surface.draw({ close: () => {}, displayWidth: 1080, displayHeight: 2340 });
+
+    expect(surface.canvas.width).toBe(1080);
+    expect(surface.canvas.height).toBe(2340);
+  });
+
+  it('実寸を持たない絵では、大きさを変えない', () => {
+    const surface = mountLiveView(root, { width: 720, height: 1280 });
+    surface.draw({ close: () => {} });
+
+    expect(surface.canvas.width).toBe(720);
+    expect(surface.canvas.height).toBe(1280);
+  });
+
   it('カラムが無い画面へ置こうとしたら、黙って諦めず落ちる', () => {
     // 構成を変えたときに、静かに映らなくなるのを防ぐ。
     const empty = document.createElement('div');

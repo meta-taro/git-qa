@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/adapter-android" },
+    { "path": "./packages/live-bridge" },
     { "path": "./packages/desktop" }
   ]
 }

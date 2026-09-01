@@ -1,4 +1,4 @@
-import { createAnnexBSplitter } from '@git-qa/core';
+import { createAnnexBSplitter } from '@git-qa/core/live';
 
 /**
  * ライブ映像の再生。**方式 A**（ストリームを取り込んで自前で描く・C27）の中身。
@@ -18,6 +18,9 @@ export interface EncodedUnit {
 /** 復号して出てきた絵。使い終わったら必ず close する（しないと復号器が詰まる）。 */
 export interface DecodedFrame {
   close(): void;
+  /** 実寸。WebCodecs の VideoFrame が持っている。無い実装もあるので任意。 */
+  readonly displayWidth?: number;
+  readonly displayHeight?: number;
 }
 
 export interface DecoderLike {

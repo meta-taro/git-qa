@@ -10,6 +10,6 @@
     "emitDeclarationOnly": true,
     "sourceMap": false
   },
-  "references": [{ "path": "../core" }],
+  "references": [{ "path": "../core" }, { "path": "../live-bridge" }],
   "include": ["src/**/*.ts", "test/**/*.ts", "vite.config.ts"]
 }
