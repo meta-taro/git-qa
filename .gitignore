@@ -12,3 +12,8 @@ SECRETS.local.md
 
 # ベースルール完全版（内部事例を含むため公開しない）— commit 禁止
 .claude/rules/product-baseline.full.md
+
+# 実行の証跡。動画は既定で Git に入れない（C29 / Issue 007）。
+# scrcpy 既定の 8 Mbps だと 20 ケース × 20 営業日で月 24 GB になり、
+# GitHub の Git LFS 無料枠 10 GiB を 9 営業日で超える。しかも履歴に入る以上は累積する。
+runs/
