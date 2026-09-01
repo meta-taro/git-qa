@@ -103,22 +103,44 @@ pnpm workspace / TypeScript 5.9（NodeNext・strict）/ Vitest 3 / ESLint 9 flat
 
 ### 既存 OSS の調査（Issue 010・2026-09-02・途中）
 
-**5 製品のうち 2 つを実際に触った。**
+**触った 5 つのいずれも、観点 2（`VERIFIED` と `AUTO_PASS` を別の値として残す）を満たさない。**
+結果の語彙はどれも「通った / 落ちた」で、**誰が見たかを持つ項目が無い。**
 
-- **Playwright Trace Viewer** — 証跡は厚い。**が、結果の語彙に人が入らない**
-  （`'passed' | 'failed' | 'timedout' | 'interrupted'`。結果レコードのキーにも該当項目が無い）。
-  **思想の違い**（誰も見ていない前提の自動テストランナー）
-- **scrcpy** — ミラーリングと録画の道具で、判定の概念を持たない。**持たないのが正しい**。
-  比較対象ではなく組み合わせる相手
-- **未着手**: Maestro Studio / Appium Inspector / Allure・ReportPortal。**判定はまだ書かない**
+| | 結果の語彙（実物） |
+|---|---|
+| Playwright | `'passed' \| 'failed' \| 'timedout' \| 'interrupted'` |
+| Maestro CLI | `SUCCESS` / `ERROR`（JUnit 出力） |
+| Allure Report | `status` ＋ 自由な `labels`（メタデータであって結果の値ではない） |
+| scrcpy | 結果という概念を持たない（持たないのが正しい） |
+| Appium | WebDriver のサーバで結果の概念を持たない（層が違う） |
+
+**判定はまだ書かない。**未検証が 3 つあり、うち 2 つは「人の判定」を持つ可能性が残っている。
+
+- **ReportPortal** — Docker のデーモンが動かず未検証（起動は GUI 操作＝画面ロック中は不可）
+- **Allure TestOps（商用）** — 手動テストと人の判定を持つ側。OSS の Report しか触っていない
+- **Maestro Studio / Appium Inspector** — どちらも GUI アプリで、画面がロックされていて起動できない
+  （**`maestro studio` は CLI から消え、独立したデスクトップアプリになっていた。調査対象リストが古い**）
+
+**Appium は部分的にしか触れていない。**サーバ 3.7.0 は動くが、driver の導入が pnpm 管理下で失敗する
+（Appium が内部で npm を呼ぶため）。セッションを張るところまで行っていない。
+
+### 提案（決定ではない）— Phase 4 の `device.*` を自作しない
+
+**`maestro mcp` が `list_devices` / `take_screenshot` / `run` / `inspect_screen` /
+`open_maestro_viewer` を MCP で出している。**`.claude/roadmap.md` の Phase 4 で git-qa が
+自分で出そうとしている **`device.*` とほぼ同じ**。**そして `human.*` に当たるものは無い。**
+
+→ **端末操作の MCP を自作せず Maestro に寄せることを検討したい。**自作すると非目標に挙げた
+「Maestro の再実装」に近づく。**これは提案であって決定の変更ではない**（§15）。
+**Issue 010 の未検証 3 つを潰してから、判定と一緒に出すのが順当。**
 
 ## 未完了の作業
 
 - **Issue 006 は close していない。**残り 1 条件は Fake アダプタ上で確認できたが、**実機で 1 回も走らせていない**
 - **Issue 002 も close していない。**完了条件のうち「**Android 実装がそのインターフェースを満たしている**」が未達（実機・adb が無い）
-- **Issue 010 は途中。**5 製品のうち 2 つ（Playwright / scrcpy）しか触っていないので、
-  「作る / 作らない / 既存へ貢献する」の判定を書いていない。**エミュレータは動く状態になった**ので
-  Maestro / Appium は次で触れる
+- **Issue 010 は途中。**5 つ触ったが 3 つが未検証（ReportPortal は Docker、Maestro Studio と
+  Appium Inspector は GUI）。**そのうち ReportPortal と Allure TestOps は「人の判定」を持つ
+  可能性が残っている**ので、「作る / 作らない / 既存へ貢献する」の判定を書いていない
 - **Issue 003 も close していない。**骨格は出たが、完了条件のうち 2 つが未確認
   - `gh run list --limit 3` で CI が success — **`gh` が未ログイン**（認証情報の投入は人・§14）。かつ **push は人間**（§6）なので CI はまだ 1 度も走っていない
   - README の手順どおり**別の PC で起動できる** — **この 1 台でしか確認していない**
@@ -133,7 +155,8 @@ pnpm workspace / TypeScript 5.9（NodeNext・strict）/ Vitest 3 / ESLint 9 flat
 1. **人**: `gh auth login`（このセッションでは 120 秒で切れた。別のターミナルで実行が要る）→ push → CI が success することの確認
 2. **人**: 画面のロックを解いた状態で、空の 3 カラムが出ていることの確認（§29）
 3. **人**: 料金計算機で Git LFS の超過単価を確認（Issue 007 の残り）
-4. Issue 010 の残り — Maestro Studio / Appium Inspector / Allure をエミュレータに当てる
+4. Issue 010 の残り — ReportPortal（Docker 起動が要る）/ Maestro Studio・Appium Inspector（画面が要る）。
+   **どれも人の手が要る。**潰してから判定を書く
 5. `DESIGN.md` を人が埋める。埋まるまで骨格に色は入れない（§11）
 
 ## 技術的決定

@@ -86,16 +86,79 @@ Android エミュレータ（Pixel 3a / API 31）に対して `--record` で 60 
 - 実測: 5.05 MB（実時間 60 秒ぶん）/ 1080x2220 / 平均 10 fps
 - **画面が変化したときしかフレームを作らない。**スクロールを止めると映像も止まる
 
-**触っていない 3 つ**: Maestro Studio / Appium Inspector / Allure・ReportPortal。
-**エミュレータは動く状態になったので、次のセッションで触れる。**
+#### Allure Report 2.46.0（`allure-playwright` 3.11.0）
+
+同じ 3 ケースを Allure のレポータ付きで走らせ、`allure-results/*.json` を読んだ。
+
+結果 1 件のキー: `attachments` `fullName` `historyId` `labels` `links` `name` `parameters`
+`stage` `start` `status` `statusDetails` `steps` `stop` `testCaseId` `titlePath` `uuid`
+
+**人の判定を持つ項目が無い。**`labels` は自由な key/value なので「誰が見たか」を**書ける**が、
+それはメタデータであって結果の値ではない。集計もレポートの合否も `status` を見る。
+
+**注: 触ったのは OSS の Allure Report。**手動テストと人の判定を持つのは商用の Allure TestOps 側で、
+**そちらは触っていない。**
+
+#### Maestro 2.10.0
+
+エミュレータに対してフローを 2 本（通る / 落ちる）実行した。JUnit 出力の実物:
+
+```xml
+<testcase id="pass" ... status="SUCCESS"/>
+<testcase id="fail" ... status="ERROR"><failure>Assertion is false: ...</failure></testcase>
+```
+
+**`SUCCESS` / `ERROR` の 2 値。人の判定は無い。**
+
+**調査対象リストが古くなっていた。**`maestro studio` は CLI から消えている。
+
+> Maestro Studio is no longer bundled with the CLI.
+> Download the new Maestro Studio desktop app instead:
+
+**Studio は独立したデスクトップアプリになった。**GUI なので画面が要る。**今回は触れていない。**
+
+##### 重要 — Maestro は MCP サーバを持っている
+
+`maestro mcp` が **10 個の道具**を MCP で出す（実際に叩いて一覧を取った）。
+
+| 道具 | 内容 |
+|---|---|
+| `list_devices` | 起動できる端末の一覧 |
+| `take_screenshot` | 画面の撮影 |
+| `run` | Maestro のコマンドを直接流して端末を操作 |
+| `inspect_screen` | 画面の階層を JSON で取得 |
+| `cheat_sheet` | コマンドの早見表 |
+| `open_maestro_viewer` | ビューアの URL を返す |
+| `list_cloud_devices` / `run_on_cloud` / `get_cloud_run_status` / `describe_cloud_run` | Maestro Cloud 側 |
+
+**これは git-qa が Phase 4 で計画している `device.*` とほぼ重なる。**
+**そして `human.*` に当たるものが 1 つも無い。**
+
+#### Appium 3.7.0（部分的にしか触れていない）
+
+サーバは入って起動する。**driver（uiautomator2）の導入に失敗した** — Appium は内部で npm を
+呼ぶが、pnpm 管理下のディレクトリで `Cannot read properties of null (reading 'matches')` で落ちる。
+**そのためエミュレータへセッションを張るところまで行っていない。**
+
+**Appium Inspector（調査対象）はデスクトップの GUI アプリ**で、画面が要る。**触れていない。**
+
+構造としては、**Appium は WebDriver のサーバであってテスト結果の概念を持たない**（結果は
+それを叩くランナー側にある）ので、観点 2 はそもそも Appium 単体には当てはまらない。
+
+#### ReportPortal — 触れなかった
+
+**Docker が必要だが、デーモンが動いていない**（Docker Desktop の起動は GUI 操作で、
+画面がロックされていて実行できなかった）。**未検証。**
 
 ### 3 つの観点
 
-| | Playwright Trace Viewer | scrcpy 単体 + 手動記録 | Maestro Studio | Appium Inspector | Allure / ReportPortal |
-|---|---|---|---|---|---|
-| 1. ライブで見ながら 1 打鍵で合否 | **満たさない** | **半分**（見るのは満たす。合否を置く口が無い） | | | |
-| 2. `VERIFIED` と `AUTO_PASS` が別の値 | **満たさない** | **満たさない**（結果という概念が無い） | | | |
-| 3. 手作業より明確に速い | **比較対象が違う** | **満たさない**（人が別途シートに書くので手作業のまま） | | | |
+空欄は**触れていないので書かない**（推測で埋めない）。
+
+| | Playwright Trace Viewer | scrcpy 単体 + 手動記録 | Maestro CLI | Maestro Studio (app) | Appium Inspector | Allure Report | ReportPortal |
+|---|---|---|---|---|---|---|---|
+| 1. ライブで見ながら 1 打鍵で合否 | **満たさない** | **半分**（見るのは満たす。合否を置く口が無い） | **満たさない**（無人実行が前提） | | | **満たさない**（実行後のレポート） | |
+| 2. `VERIFIED` と `AUTO_PASS` が別の値 | **満たさない** | **満たさない**（結果の概念が無い） | **満たさない**（`SUCCESS` / `ERROR`） | | | **満たさない**（`labels` に書けるがメタデータ） | |
+| 3. 手作業より明確に速い | **比較対象が違う** | **満たさない**（人が別途シートに書くので手作業のまま） | **比較対象が違う** | | | **該当しない** | |
 
 ### 満たさない理由は「思想の違い」か「機能が無いだけ」か
 
@@ -106,14 +169,50 @@ Android エミュレータ（Pixel 3a / API 31）に対して `--record` で 60 
 - **scrcpy — 機能が無いだけ、ですらない。**ミラーリングと録画の道具であって、判定の概念を持たない。
   **持たないのが正しい**（この製品も scrcpy を置き換えない・非目標に明記）。
   組み合わせて使う相手であって、比較の対象ではない
+- **Allure Report — 守備範囲の違い。**実行後のレポート層であって、実行中の人の関与を扱わない。
+  `labels` という自由な入れ物はあるので「書ける」が、**結果の値にはならない**（合否は `status` を見る）。
+  **人の判定を一級に扱うのは商用の Allure TestOps 側で、そこは触っていない**
+- **Maestro CLI — 思想の違い。**`SUCCESS` / `ERROR` の 2 値で、**無人で流すことが前提**。
+  ただし**端末を操作する部分は MCP として既に出ている**（下記）
+- **Appium — 層が違う。**WebDriver のサーバで、結果という概念を持たない。比較の対象ではなく、
+  Adapter の実装候補
 
 ## 結果
 
-（完了時に追記。**現時点では未完了** — 5 製品のうち触ったのは 2 つ。
-Maestro Studio / Appium Inspector / Allure・ReportPortal が未着手のため、
-「作る / 作らない / 既存へ貢献する」の判定はまだ書かない。
+（**現時点では未完了。**判定は書かない。理由は下記）
 
-**現時点で言えるのは、触った 2 つでは観点 2（`VERIFIED` と `AUTO_PASS` を別の値として残す）が
-満たされない、ということだけ。**Maestro / Appium / Allure が満たす可能性は残っている。
-特に Allure は「人が結果に注釈を付ける」方向の機能を持つので、そこで埋まるなら
-**「既存へ貢献する」**が答えになりうる。**先に結論を書かない。**）
+### 触った範囲で言えること
+
+**触った 5 つ（Playwright / scrcpy / Maestro CLI / Allure Report / Appium 部分的）のいずれも、
+観点 2（`VERIFIED` と `AUTO_PASS` を別の値として残す）を満たさない。**
+結果の語彙はどれも「通った / 落ちた」で、**誰が見たかを持つ項目が無い**。
+
+これは機能の欠落というより**思想の違い**で、いずれも**無人で流すことを前提に作られている**。
+
+### なぜ判定を書かないか
+
+**3 つが未検証で、そのうち 2 つは「人の判定」を持つ可能性が残っている。**
+
+- **ReportPortal** — Docker が動かず未検証。**欠陥の分類や「要調査 / 調査済み」といった、
+  人が結果へ手を入れる仕組みを持つ**とされる層なので、ここが埋まるなら判定が変わりうる
+- **Allure TestOps（商用）** — 手動テストと人の判定を持つ側。OSS の Report しか触っていない
+- **Maestro Studio（デスクトップアプリ）/ Appium Inspector** — どちらも GUI で、
+  **画面がロックされていて起動できなかった**
+
+**先に「作る」と書かない。**未検証の 3 つを潰してから書く。
+
+### 判定とは別に出た、ロードマップに関わる発見（提案）
+
+**`maestro mcp` が `list_devices` / `take_screenshot` / `run` / `inspect_screen` /
+`open_maestro_viewer` を MCP で出している。**これは `.claude/roadmap.md` の Phase 4 で
+git-qa が自分で出そうとしている **`device.*` とほぼ同じ**。
+
+**提案: Phase 4 の `device.*` を自作せず、Maestro の MCP に寄せることを検討する。**
+
+- git-qa が主張する価値は `human.*`（人が見た、という値を残すこと）に集中している。
+  **Maestro の MCP にはそこが無い**
+- 端末を操作する部分を自作すると、**非目標に挙げた「Maestro の再実装」に近づく**
+
+**これは提案であって、決定の変更ではない**（product-baseline §15）。
+`roadmap.md` の Phase 4 と C8 に関わるので、人の判断を仰ぐ。
+**未検証の 3 つを潰してから、判定と一緒に出すのが順当。**
