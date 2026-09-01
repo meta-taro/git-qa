@@ -58,7 +58,11 @@ const spawnFfmpeg = () =>
   );
 
 const server = createServer((req, res) => {
-  if (req.url === '/' || req.url === '/index.html') {
+  // クエリ文字列は落として見る。同じ計測を別タブで開き直すために ?run=... を付けるので、
+  // 付けた途端に 404 になると測り直しができない。
+  const path = (req.url ?? '/').split('?')[0];
+
+  if (path === '/' || path === '/index.html') {
     readFile(INDEX)
       .then((html) => {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -71,7 +75,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  if (req.url === '/stream.h264') {
+  if (path === '/stream.h264') {
     const ff = spawnFfmpeg();
     res.writeHead(200, {
       'content-type': 'application/octet-stream',
@@ -92,7 +96,7 @@ const server = createServer((req, res) => {
   // 測った値の持ち出し口。
   // 画面に出ている数字は、Tauri のウィンドウの中では人が見る以外に読み出せない。
   // ページ側から投げさせて、ここへ 1 行で出す（webview ごとの値を並べて比べるため）。
-  if (req.url === '/report' && req.method === 'POST') {
+  if (path === '/report' && req.method === 'POST') {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
