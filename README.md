@@ -167,6 +167,20 @@ pnpm --filter @git-qa/desktop tauri build
 > 画面の色・タイポグラフィは**まだ決めていません**。`DESIGN.md` が空のままなので、骨格は OS の既定の配色で出ます。
 > アイコンも Tauri の既定のままです。
 
+### エミュレータを起こす
+
+```bash
+~/Library/Android/sdk/emulator/emulator -avd <AVD 名> -no-window -no-audio -gpu host
+```
+
+**`-gpu host` を必ず付けてください。**付けないと GPU が SwiftShader（CPU での描画）になり、
+**操作から画面に出るまでが 1.1 秒**まで落ちます（`-gpu host` なら 136〜221 ms・2026-09-02 実測）。
+
+```bash
+# いま何で描いているかの確認
+adb shell dumpsys SurfaceFlinger | grep GLES:
+```
+
 ### 端末に繋いで、画面に映す
 
 ```bash
