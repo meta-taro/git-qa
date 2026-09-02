@@ -11,10 +11,11 @@ import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { commandForKey } from './session/keys.js';
+import type { KeyCommand } from './session/keys.js';
 import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics.js';
 import { startMenuActions } from './session/menu-actions.js';
 import { installDeviceTouch } from './session/touch.js';
-import { renderSession, showSessionError } from './session/view.js';
+import { installVerdictButtons, renderSession, showSessionError } from './session/view.js';
 import { createLivePlayer } from './live/player.js';
 import { liveStreamUrlFromLocation, openLiveStream, pumpLiveStream } from './live/stream.js';
 import { mountLiveView, showLiveViewError } from './live/view.js';
@@ -219,14 +220,11 @@ if (controlUrl !== undefined) {
     },
   });
 
-  window.addEventListener('keydown', (event) => {
-    const command = commandForKey(event);
-    if (command === undefined) return;
-
+  /** 打鍵とクリックで、まったく同じ道を通す。 */
+  const place = (command: KeyCommand): void => {
     const caseNo = latest?.awaiting;
-    // 待っていないときは何も送らない。**押した打鍵が別のケースへ付くのが一番まずい。**
+    // 待っていないときは何も送らない。**押した判定が別のケースへ付くのが一番まずい。**
     if (caseNo === undefined) return;
-    event.preventDefault();
 
     const input: HumanInput =
       command.kind === 'advance'
@@ -236,5 +234,18 @@ if (controlUrl !== undefined) {
     sendHumanInput(controlUrl, input).catch((error: unknown) => {
       showSessionError(root, error instanceof Error ? error.message : String(error));
     });
+  };
+
+  window.addEventListener('keydown', (event) => {
+    const command = commandForKey(event);
+    if (command === undefined) return;
+    event.preventDefault();
+    place(command);
+  });
+
+  // **打鍵だけにしない。**初めて触る人は、どのキーが何をするか知らない。
+  installVerdictButtons(root, (key) => {
+    const command = commandForKey({ key });
+    if (command !== undefined) place(command);
   });
 }

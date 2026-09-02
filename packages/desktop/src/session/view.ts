@@ -66,19 +66,63 @@ function renderCases(root: HTMLElement, state: SessionState): void {
   target.append(list);
 }
 
-function renderKeyHelp(doc: Document): HTMLElement {
-  const list = doc.createElement('dl');
+/**
+ * 押せる判定の一覧。**打鍵だけにしない。**
+ *
+ * 初めて触る人は、どのキーが何をするか知らない。見えているものを押せるほうが早い。
+ * 押した結果は打鍵とまったく同じ道を通る（`data-key` に割り当てを持たせる）。
+ */
+function renderKeyHelp(doc: Document, enabled: boolean): HTMLElement {
+  const list = doc.createElement('div');
   list.className = 'key-help';
+
   for (const binding of KEY_BINDINGS) {
-    const key = doc.createElement('dt');
-    key.className = 'key-binding';
-    key.textContent = binding.key === ' ' ? 'Space' : binding.key;
-    const label = doc.createElement('dd');
+    const action = doc.createElement('button');
+    action.type = 'button';
+    action.className = 'key-action';
+    action.dataset['key'] = binding.key;
+    // **人の番でなければ押せない。**AI が操作している最中に判定を置かせない。
+    action.disabled = !enabled;
+
+    const cap = doc.createElement('span');
+    cap.className = 'key-binding';
+    cap.textContent = binding.key === ' ' ? 'Space' : binding.key;
+
+    const text = doc.createElement('span');
+    text.className = 'key-text';
+
+    const label = doc.createElement('span');
     label.className = 'key-label';
     label.textContent = t(binding.labelKey);
-    list.append(key, label);
+
+    const note = doc.createElement('span');
+    note.className = 'key-note';
+    // 押す前に、証跡にどう残るかが分かるようにする。
+    note.textContent = t(binding.noteKey);
+
+    text.append(label, note);
+    action.append(cap, text);
+    list.append(action);
   }
   return list;
+}
+
+/**
+ * 判定のボタンを押せるようにする。**描き直しても付け直さなくてよい**ように、
+ * 根元で受ける（ボタンは状態が来るたびに作り直される）。
+ */
+export function installVerdictButtons(root: HTMLElement, onKey: (key: string) => void): () => void {
+  const onClick = (event: Event): void => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const action = target.closest<HTMLElement>('.key-action');
+    const key = action?.dataset['key'];
+    if (key === undefined) return;
+    onKey(key);
+  };
+
+  root.addEventListener('click', onClick);
+  return () => root.removeEventListener('click', onClick);
 }
 
 function renderVerdict(root: HTMLElement, state: SessionState): void {
@@ -93,7 +137,7 @@ function renderVerdict(root: HTMLElement, state: SessionState): void {
   if (awaiting === undefined) {
     headline.textContent = t(state.phase === 'finished' ? 'verdict.finished' : 'verdict.running');
     target.append(headline);
-    if (state.phase !== 'finished') target.append(renderKeyHelp(doc));
+    if (state.phase !== 'finished') target.append(renderKeyHelp(doc, false));
     return;
   }
 
@@ -108,7 +152,7 @@ function renderVerdict(root: HTMLElement, state: SessionState): void {
   note.className = 'verdict-note';
   note.textContent = awaiting.note ?? '';
 
-  target.append(headline, ai, note, renderKeyHelp(doc));
+  target.append(headline, ai, note, renderKeyHelp(doc, true));
 }
 
 /**

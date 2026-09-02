@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { SessionState } from '@git-qa/core/session';
 
 import { renderColumns } from '../../src/render.js';
-import { renderSession, showSessionError } from '../../src/session/view.js';
+import { installVerdictButtons, renderSession, showSessionError } from '../../src/session/view.js';
 
 /**
  * 左にケース、右に判定。**中央は映像のまま触らない**（主媒体・C4）。
@@ -122,5 +122,49 @@ describe('renderSession', () => {
 
     expect(column('cases').querySelectorAll('.case-item[aria-current="true"]')).toHaveLength(0);
     expect(column('verdict').textContent).toContain('終わ');
+  });
+});
+
+describe('判定はクリックでも置ける', () => {
+  /**
+   * **打鍵だけにしない。**初めて触る人は、どのキーが何をするか知らない。
+   * 見えているものを押せるほうが早い。
+   */
+  it('キーの一覧が、押せるボタンとして出る', () => {
+    renderSession(root, state);
+
+    const buttons = root.querySelectorAll<HTMLButtonElement>('.key-action');
+    expect(buttons.length).toBeGreaterThanOrEqual(5);
+    expect([...buttons].map((b) => b.dataset['key'])).toContain('v');
+  });
+
+  it('押すと、同じ打鍵として扱われる', () => {
+    const pressed: string[] = [];
+    renderSession(root, state);
+    installVerdictButtons(root, (key) => pressed.push(key));
+
+    root.querySelector<HTMLButtonElement>('.key-action[data-key="v"]')?.click();
+
+    expect(pressed).toEqual(['v']);
+  });
+
+  it('人の番でないときは押せない（AI の操作中に判定を置かせない）', () => {
+    const { awaiting: _awaiting, ...rest } = state;
+    renderSession(root, { ...rest, phase: 'running' });
+
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('.key-action')];
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+  });
+
+  it('描き直しても、押す口は増えない', () => {
+    renderSession(root, state);
+    installVerdictButtons(root, () => {});
+    renderSession(root, state);
+
+    const pressed: string[] = [];
+    installVerdictButtons(root, (key) => pressed.push(key));
+    root.querySelector<HTMLButtonElement>('.key-action[data-key="f"]')?.click();
+
+    expect(pressed).toEqual(['f']);
   });
 });

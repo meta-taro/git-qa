@@ -24,12 +24,19 @@ export type KeyCommand =
   | { readonly kind: 'advance' };
 
 /** 割り当ての正本。**画面へ出す説明もここから作る**ので、説明と実装がずれない。 */
-export const KEY_BINDINGS: readonly { readonly key: string; readonly labelKey: MessageKey }[] = [
-  { key: 'v', labelKey: 'key.verified' },
-  { key: 'f', labelKey: 'key.fail' },
-  { key: 'b', labelKey: 'key.blocked' },
-  { key: 's', labelKey: 'key.skip' },
-  { key: ' ', labelKey: 'key.advance' },
+export interface KeyBinding {
+  readonly key: string;
+  readonly labelKey: MessageKey;
+  /** 証跡にどう残るか。**押す前に分かるようにする。** */
+  readonly noteKey: MessageKey;
+}
+
+export const KEY_BINDINGS: readonly KeyBinding[] = [
+  { key: 'v', labelKey: 'key.verified', noteKey: 'key.verified.note' },
+  { key: 'f', labelKey: 'key.fail', noteKey: 'key.fail.note' },
+  { key: 'b', labelKey: 'key.blocked', noteKey: 'key.blocked.note' },
+  { key: 's', labelKey: 'key.skip', noteKey: 'key.skip.note' },
+  { key: ' ', labelKey: 'key.advance', noteKey: 'key.advance.note' },
 ];
 
 const VERDICTS: Readonly<Record<string, HumanResult>> = {
