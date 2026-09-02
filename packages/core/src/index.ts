@@ -29,6 +29,22 @@ export type {
   ExecuteRunOptions,
   HumanVerdict,
 } from './run/execute.js';
+export {
+  EXPECTATION_COLUMN,
+  STEPS_COLUMN,
+  assertRunnableSheet,
+  createSheetCaseRunner,
+} from './run/case-runner.js';
+export type { SheetCaseRunnerOptions } from './run/case-runner.js';
+export { judgeExpectation, planExpectation, planSteps } from './run/steps.js';
+export type {
+  ExpectationCheck,
+  ExpectationContains,
+  ExpectationHold,
+  PlannedAction,
+  PlannedHold,
+  PlannedStep,
+} from './run/steps.js';
 export { RUN_SCHEMA, validateRun } from './run/validate.js';
 export { writeRunJson } from './run/write.js';
 export type { ValidationResult } from './run/validate.js';
