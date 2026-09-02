@@ -154,6 +154,20 @@ function createSession(deps: SessionDeps): TargetSession {
 
   let liveProcess: RunningProcess | undefined;
   let liveStream: StreamingProcess | undefined;
+  /** 開いている間だけ繋ぎ直す。閉じた後に起こさないための印。 */
+  let liveOpen = false;
+
+  /** `screenrecord` を 1 本起こす。**端末に何も送り込まない**（Android 標準のものを使う）。 */
+  const startScreenrecord = (): StreamingProcess =>
+    runner.stream(adb, [
+      ...withSerial(serial, [
+        'exec-out',
+        'screenrecord',
+        '--output-format=h264',
+        `--time-limit=${String(timeLimitSec)}`,
+        '-',
+      ]),
+    ]);
 
   const liveView: LiveView = {
     get isOpen() {
@@ -169,17 +183,9 @@ function createSession(deps: SessionDeps): TargetSession {
       // 二重に開いても落ちない（契約テスト）。既に出ているなら何もしない。
       if (liveProcess !== undefined) return Promise.resolve();
 
+      liveOpen = true;
       if (mode === 'h264-stream') {
-        // 端末に何も送り込まない。Android 標準の screenrecord に生 H.264 を吐かせる。
-        liveStream = runner.stream(adb, [
-          ...withSerial(serial, [
-            'exec-out',
-            'screenrecord',
-            '--output-format=h264',
-            `--time-limit=${String(timeLimitSec)}`,
-            '-',
-          ]),
-        ]);
+        liveStream = startScreenrecord();
         liveProcess = liveStream;
       } else {
         liveProcess = runner.start(scrcpy, ['-s', serial, '--window-title', `git-qa ${serial}`]);
@@ -189,6 +195,7 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async close() {
       const running = liveProcess;
+      liveOpen = false;
       liveProcess = undefined;
       liveStream = undefined;
       await running?.stop();
@@ -197,12 +204,40 @@ function createSession(deps: SessionDeps): TargetSession {
     ...(mode === 'h264-stream'
       ? {
           frames(): AsyncIterable<Uint8Array> {
-            const stream = liveStream;
-            if (stream === undefined) {
+            if (liveStream === undefined) {
               // 開く前に読もうとしている。空を返すと「映像が来ない」に化けるので落とす。
               throw new AdapterError(KIND, 'ライブビューを開く前に映像を読もうとしている');
             }
-            return stream.chunks;
+            return {
+              /**
+               * **`screenrecord` には 180 秒の上限がある。**尽きたら繋ぎ直す。
+               * 人は窓を開けっぱなしにするので、切れたまま黙ると画面が固まったように見える
+               * （実機で 3 時間半後に 0 バイトになった）。
+               *
+               * 繋ぎ直しの前後で数フレーム落ちる。**止まったまま黙るよりはよい。**
+               */
+              async *[Symbol.asyncIterator]() {
+                while (liveOpen) {
+                  const stream = liveStream ?? startScreenrecord();
+                  liveStream = stream;
+                  liveProcess = stream;
+
+                  let seen = 0;
+                  for await (const chunk of stream.chunks) {
+                    seen += 1;
+                    yield chunk;
+                  }
+
+                  // 尽きた。閉じられたのなら起こし直さない（端末を掴んだままにしない）。
+                  if (!liveOpen) return;
+                  if (seen === 0) {
+                    // 1 枚も来ずに終わった。**繋ぎ直しを繰り返すと、黙ったまま回り続ける。**
+                    throw new AdapterError(KIND, 'screenrecord が映像を 1 枚も返さずに終わった');
+                  }
+                  liveStream = undefined;
+                }
+              },
+            };
           },
         }
       : {}),

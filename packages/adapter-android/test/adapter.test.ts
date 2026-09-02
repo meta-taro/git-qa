@@ -322,8 +322,13 @@ describe('ライブビュー（生 H.264 を流す方式）', () => {
     const session = await streaming(runner).connect();
     await session.liveView.open();
 
+    // **繋ぎ直すので、勝手には尽きない**（screenrecord の 180 秒上限があるため）。
+    // 流したぶんだけ読んで、中身が変わっていないことを見る。
     const got: Uint8Array[] = [];
-    for await (const chunk of session.liveView.frames?.() ?? []) got.push(chunk);
+    for await (const chunk of session.liveView.frames?.() ?? []) {
+      got.push(chunk);
+      if (got.length === runner.chunks.length) break;
+    }
     expect(got).toEqual(runner.chunks);
   });
 
@@ -411,5 +416,51 @@ describe('readAndroidScreenText — セッションから画面の文字を取�
 
     // 期待結果（「〜と表示される」）との突き合わせに使う所。
     await expect(readAndroidScreenText(session)).resolves.toContain('保存');
+  });
+});
+
+describe('ライブ映像の繋ぎ直し', () => {
+  /**
+   * `screenrecord` には 180 秒の上限がある。**人は窓を開けっぱなしにする**ので、
+   * 上限で切れたまま黙ると、画面が固まったように見える（実機で 3 時間半後に 0 バイトになった）。
+   */
+  const take = async (frames: AsyncIterable<Uint8Array>, count: number): Promise<number> => {
+    let seen = 0;
+    for await (const _chunk of frames) {
+      seen += 1;
+      if (seen >= count) break;
+    }
+    return seen;
+  };
+
+  it('上限で切れても、繋ぎ直して映像が続く', async () => {
+    const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([1]), new Uint8Array([2])];
+    const adapter = createAndroidAdapter({ build, runner, liveView: { mode: 'h264-stream' } });
+    const session = await adapter.connect();
+    await session.liveView.open();
+
+    const seen = await take(session.liveView.frames!(), 5);
+
+    expect(seen).toBe(5);
+    // 1 本 2 枚しか流れないので、5 枚読むには繋ぎ直しが要る。
+    expect(runner.streamed.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('閉じたら繋ぎ直さない（端末を掴んだままにしない）', async () => {
+    const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([1])];
+    const adapter = createAndroidAdapter({ build, runner, liveView: { mode: 'h264-stream' } });
+    const session = await adapter.connect();
+    await session.liveView.open();
+
+    const frames = session.liveView.frames!();
+    for await (const _chunk of frames) {
+      await session.liveView.close();
+      break;
+    }
+    const after = runner.streamed.length;
+    // 閉じた後に読み直しても、新しい screenrecord は起きない。
+    expect(after).toBe(1);
   });
 });

@@ -136,3 +136,75 @@ describe('制御チャネル', () => {
     }
   });
 });
+
+/**
+ * **画面と橋は別オリジン**（画面は localhost:1420、橋は 127.0.0.1:<port>）。
+ * ブラウザは、許可を返さない相手からの読み取りを弾く。**実機でここが落ちた**
+ * （中央に「ライブ映像を出せない: Load failed」と出た）。
+ * `curl` と Node の fetch は CORS を課さないので、検査を全部通ったまま壊れていた。
+ */
+describe('画面から読めること（CORS）', () => {
+  const ORIGIN = 'http://localhost:1420';
+
+  it('映像に、画面のオリジンからの読み取りを許す', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(bridge.url, { headers: { origin: ORIGIN } });
+    expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+    await res.body?.cancel();
+  });
+
+  it('状態の受け口にも許す', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(`${bridge.controlUrl}/events`, { headers: { origin: ORIGIN } });
+    expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+    await res.body?.cancel();
+  });
+
+  it('打鍵の前問い合わせ（preflight）に応える', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(`${bridge.controlUrl}/input`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+    expect(res.headers.get('access-control-allow-methods')).toContain('POST');
+    expect(res.headers.get('access-control-allow-headers')).toContain('content-type');
+  });
+
+  it('Tauri が本番で使うオリジンも許す（開発だけ通る、にしない）', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    for (const origin of ['tauri://localhost', 'https://tauri.localhost']) {
+      const res = await fetch(`${bridge.controlUrl}/events`, { headers: { origin } });
+      expect(res.headers.get('access-control-allow-origin'), origin).toBe(origin);
+      await res.body?.cancel();
+    }
+  });
+
+  it('知らないオリジンには許しを返さない', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(`${bridge.controlUrl}/events`, {
+      headers: { origin: 'https://example.com' },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+    await res.body?.cancel();
+  });
+
+  it('オリジンを名乗らない相手（Node や curl）は、これまでどおり読める', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(bridge.url);
+    expect(res.ok).toBe(true);
+    await res.body?.cancel();
+  });
+});

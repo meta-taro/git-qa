@@ -17,6 +17,13 @@ import type { AddressInfo } from 'node:net';
  *
  * **なぜ制御チャネルを同じ橋に相乗りさせるか**: 口を 2 つに分けると、上の守りを 2 箇所で
  * 維持することになり、**片方だけ緩んでも気づけない。**
+ *
+ * **なぜ CORS の許しを返すか**: 画面（`localhost:1420` / `tauri://localhost`）と橋
+ * （`127.0.0.1:<port>`）は**別オリジン**で、許しが無いとブラウザが読み取りを弾く。
+ * **実機でここが落ちた**（画面に「Load failed」と出た）。`curl` と Node の `fetch` は
+ * CORS を課さないので、検査を全部通ったまま壊れていた。
+ * **許すのは画面のオリジンだけ。**`*` にすると、同じ PC で開いている任意の web ページから
+ * 読める口になる（token を知られた場合に、検証中の端末の画面が漏れる）。
  */
 
 export interface LiveBridge {
@@ -42,12 +49,39 @@ export interface LiveBridgeOptions {
 /** 打鍵 1 回分。これより大きい本文は、この口へ来るものではない。 */
 const MAX_INPUT_BYTES = 64 * 1024;
 
-function writeVideo(res: ServerResponse, source: () => AsyncIterable<Uint8Array>): void {
+/**
+ * 読み取りを許す画面のオリジン。
+ *
+ * - `http://localhost:1420` / `http://127.0.0.1:1420` — 開発中（vite）
+ * - `tauri://localhost` — macOS / Linux の配布物
+ * - `https://tauri.localhost` — Windows の配布物
+ *
+ * **開発だけ通る形にしない。**配布物で落ちるのは、いちばん気づくのが遅れる壊れ方。
+ */
+const ALLOWED_ORIGINS: readonly string[] = [
+  'http://localhost:1420',
+  'http://127.0.0.1:1420',
+  'tauri://localhost',
+  'https://tauri.localhost',
+];
+
+/** 名乗ってきたオリジンが許せるものなら、そのまま返す。**`*` は返さない。** */
+function corsHeaders(origin: string | undefined): Record<string, string> {
+  if (origin === undefined || !ALLOWED_ORIGINS.includes(origin)) return {};
+  return { 'access-control-allow-origin': origin, vary: 'origin' };
+}
+
+function writeVideo(
+  res: ServerResponse,
+  source: () => AsyncIterable<Uint8Array>,
+  cors: Record<string, string>,
+): void {
   res.writeHead(200, {
     'content-type': 'application/octet-stream',
     'cache-control': 'no-store',
     // 途中で溜め込ませない。溜まると、測っているのが自分の遅延でなくなる。
     'x-accel-buffering': 'no',
+    ...cors,
   });
 
   void (async () => {
@@ -68,6 +102,7 @@ function writeVideo(res: ServerResponse, source: () => AsyncIterable<Uint8Array>
 function readInput(
   req: IncomingMessage,
   res: ServerResponse,
+  cors: Record<string, string>,
   accept: (input: unknown) => void,
 ): void {
   const chunks: Buffer[] = [];
@@ -77,7 +112,7 @@ function readInput(
     size += chunk.length;
     if (size > MAX_INPUT_BYTES) {
       if (!res.writableEnded) {
-        res.writeHead(413).end();
+        res.writeHead(413, cors).end();
       }
       // 溜めるのをやめる。読み捨てないと、送り手が書き終われない。
       chunks.length = 0;
@@ -93,10 +128,10 @@ function readInput(
       accept(JSON.parse(Buffer.concat(chunks).toString('utf8')));
     } catch {
       // 握り潰さない。読めない打鍵を「無かったこと」にすると、人は押したつもりで待ち続ける。
-      res.writeHead(400).end();
+      res.writeHead(400, cors).end();
       return;
     }
-    res.writeHead(202).end();
+    res.writeHead(202, cors).end();
   });
 }
 
@@ -109,11 +144,12 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
   const handlers = new Set<(input: unknown) => void>();
   let latest: string | undefined;
 
-  const openEvents = (res: ServerResponse): void => {
+  const openEvents = (res: ServerResponse, cors: Record<string, string>): void => {
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-store',
       connection: 'keep-alive',
+      ...cors,
     });
     // **ヘッダを先に送り出す。**書くものが無いうちは Node が溜めるので、
     // 画面側の `fetch` が返らず「繋がらない」ように見える（実際に検査で詰まった）。
@@ -126,20 +162,34 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
   };
 
   const server: Server = createServer((req, res) => {
+    const cors = corsHeaders(req.headers.origin);
+
     if (req.url === videoPath) {
-      writeVideo(res, options.source);
+      writeVideo(res, options.source, cors);
       return;
     }
     if (req.url === `${controlPath}/events`) {
-      openEvents(res);
+      openEvents(res, cors);
       return;
     }
     if (req.url === `${controlPath}/input`) {
-      if (req.method !== 'POST') {
-        res.writeHead(405).end();
+      if (req.method === 'OPTIONS') {
+        // 打鍵は content-type を付けて送るので、ブラウザが先に許しを聞きに来る。
+        res
+          .writeHead(204, {
+            ...cors,
+            'access-control-allow-methods': 'POST, OPTIONS',
+            'access-control-allow-headers': 'content-type',
+            'access-control-max-age': '600',
+          })
+          .end();
         return;
       }
-      readInput(req, res, (input) => {
+      if (req.method !== 'POST') {
+        res.writeHead(405, cors).end();
+        return;
+      }
+      readInput(req, res, cors, (input) => {
         for (const handler of handlers) handler(input);
       });
       return;
