@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "git-qa": {
+      "command": "pnpm",
+      "args": ["--filter", "@git-qa/mcp", "exec", "vite-node", "src/cli.ts"],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@git-qa/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "端末を触り、画面を取るための MCP サーバ（判定は置けない）",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@git-qa/adapter-android": "workspace:*",
+    "@git-qa/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "vite-node": "^3.2.4"
+  }
+}

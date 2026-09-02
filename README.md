@@ -222,6 +222,26 @@ pnpm run:sheet packages/core/test/fixtures/sample-notes-app.tsv
 > **実機・エミュレータで通した実績はまだありません。**代役の端末（テスト用のアダプタ）で
 > 5 ケースを通し、`run.json` に `VERIFIED` と `AUTO_PASS` が混ざることまでは検査で確認しています。
 
+### AI に端末を触らせる（MCP）
+
+```bash
+pnpm mcp
+```
+
+Claude Code などの MCP クライアントから、端末を触って画面を取れます（`.mcp.json` に登録済み）。
+
+| 道具 | できること |
+|---|---|
+| `device_tap` | 1 点タップする |
+| `device_swipe` | なぞる（速さでフリックになる） |
+| `device_key` | HOME / BACK / APP_SWITCH などを送る |
+| `device_screenshot` | いまの画面を PNG で取る |
+| `device_screen_text` | 画面で読める文字を取る |
+| `device_screen_size` | 端末の実寸（座標を決めるのに使う） |
+
+> **判定を置く道具はありません。**`VERIFIED` を AI が置けるようにした瞬間、この製品の芯
+> （人が見て保証したことが証跡に残る）が壊れます。**AI にできるのは操作と取得まで。合否は人だけ。**
+
 ## ルール
 
 このリポジトリは AI エージェント開発のベースルールに従います。詳細は `.claude/rules/product-baseline.md` と `CLAUDE.md` を参照してください。
