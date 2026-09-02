@@ -328,3 +328,37 @@ describe('executeRun — 走らせる前に弾く', () => {
     ).rejects.toThrow(/auto/);
   });
 });
+
+describe('executeRun — 既に繋いだセッションで走らせる', () => {
+  /**
+   * 宿主（`@git-qa/host`）は、映像を出すために先に繋いでいる。
+   * **そこで繋ぎ直すと、端末を二重に掴む。**
+   */
+  it('セッションを渡したら、繋ぎ直さない', async () => {
+    const adapter = createFakeAdapter({ recording: { requested: false } });
+    const session = await adapter.connect();
+    await session.liveView.open();
+
+    const { adapter: _unused, ...rest } = options({ mode: 'auto' });
+    const run = await executeRun({ ...rest, session });
+
+    expect(run.cases).toHaveLength(2);
+    // 持ち主（宿主）が閉じる。ここで閉じると、まだ映している最中に映像が切れる。
+    expect(session.isClosed).toBe(false);
+    await session.close();
+  });
+
+  it('アダプタとセッションの両方を渡したら、走らせる前に落とす', async () => {
+    const adapter = createFakeAdapter({ recording: { requested: false } });
+    const session = await adapter.connect();
+
+    await expect(executeRun({ ...options(), session })).rejects.toThrow(/どちらか/);
+    await session.close();
+  });
+
+  it('どちらも渡さなければ落とす', async () => {
+    const { adapter: _unused, ...rest } = options();
+
+    await expect(executeRun(rest as ExecuteRunOptions)).rejects.toThrow(/どちらか/);
+  });
+});

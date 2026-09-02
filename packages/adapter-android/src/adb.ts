@@ -138,3 +138,31 @@ export function findElementCenter(xml: string, ref: string): Point | undefined {
   }
   return undefined;
 }
+
+/** XML の実体参照を戻す。そのままだと、シートの期待結果と突き合わない。 */
+function unescapeXml(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#10;/g, '\n')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * uiautomator の dump から、**画面で読める文字**を集める。
+ *
+ * 期待結果（「〜と表示される」）との突き合わせに使う。`text` と `content-desc` の両方を見る。
+ * 読み上げ用の説明しか持たない要素（アイコンだけのボタン）があるので、片方では足りない。
+ */
+export function screenText(xml: string): string {
+  const found: string[] = [];
+  for (const node of xml.match(/<node\b[^>]*\/?>/g) ?? []) {
+    for (const name of ['text', 'content-desc']) {
+      const value = unescapeXml(ATTR(node, name)).trim();
+      if (value !== '') found.push(value);
+    }
+  }
+  return found.join('\n');
+}

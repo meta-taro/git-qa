@@ -27,8 +27,30 @@ describe('tauriDevArgs', () => {
     expect(parsed.searchParams.get('live')).toBe(live);
   });
 
+  it('打鍵を返す口も、同じクエリに載せる', () => {
+    // 映像だけ渡しても、人が置いた判定を返す先が無い。**画面は 2 本の線で成り立つ。**
+    const control = 'http://127.0.0.1:9000/live/abc/control';
+    const args = tauriDevArgs('http://127.0.0.1:9000/live/abc.h264', { controlUrl: control });
+    const config = JSON.parse(args[args.indexOf('--config') + 1] ?? '') as {
+      build: { devUrl: string };
+    };
+
+    expect(new URL(config.build.devUrl).searchParams.get('control')).toBe(control);
+  });
+
+  it('打鍵を返す口が無ければ、クエリにも載せない（繋いでいないのに口があるように見せない）', () => {
+    const args = tauriDevArgs('http://127.0.0.1:9000/live/abc.h264');
+    const config = JSON.parse(args[args.indexOf('--config') + 1] ?? '') as {
+      build: { devUrl: string };
+    };
+
+    expect(new URL(config.build.devUrl).searchParams.has('control')).toBe(false);
+  });
+
   it('devUrl を差し替えられる', () => {
-    const args = tauriDevArgs('http://127.0.0.1:1/live/a.h264', 'http://localhost:5173');
+    const args = tauriDevArgs('http://127.0.0.1:1/live/a.h264', {
+      devUrl: 'http://localhost:5173',
+    });
     const config = JSON.parse(args[args.indexOf('--config') + 1] ?? '') as {
       build: { devUrl: string };
     };

@@ -14,6 +14,8 @@ export interface LiveSession {
   readonly session: TargetSession;
   /** 画面（webview）が読む URL。`?live=` に渡す。 */
   readonly liveUrl: string;
+  /** 状態を流し、打鍵を受ける口。実行器（`run-session.ts`）が使う。 */
+  readonly bridge: LiveBridge;
   close(): Promise<void>;
 }
 
@@ -49,6 +51,7 @@ export async function startLiveSession(options: StartLiveSessionOptions): Promis
     return {
       session,
       liveUrl: bridge.url,
+      bridge,
       async close() {
         if (closed) return;
         closed = true;

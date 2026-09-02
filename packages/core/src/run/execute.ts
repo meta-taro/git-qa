@@ -62,7 +62,13 @@ export interface ExecuteRunOptions {
   sheet: TestSpecSheet;
   /** 読んだシートの出どころ。ハッシュは読み込んだ側が持っている。 */
   sheetRef: SheetRef;
-  adapter: TargetAdapter;
+  /** ここで繋ぐ場合。**{@link ExecuteRunOptions.session} とはどちらか一方。** */
+  adapter?: TargetAdapter;
+  /**
+   * 既に繋いであるセッション。**宿主は映像を出すために先に繋いでいる**ので、
+   * ここで繋ぎ直すと端末を二重に掴む。渡された場合は**閉じない**（持ち主が閉じる）。
+   */
+  session?: TargetSession;
   operator: Actor;
   mode: RunMode;
   /** ケース 1 件を実際に動かす。操作は `ctx.session` 経由。 */
@@ -200,24 +206,35 @@ async function runOneCase(
   };
 }
 
+/** 繋ぐ相手は 1 つ。**両方渡されたら、どちらで走ったのか証跡から読めなくなる。** */
+function assertOneTarget(options: ExecuteRunOptions): void {
+  const given = [options.adapter, options.session].filter((v) => v !== undefined).length;
+  if (given !== 1) {
+    throw new Error('adapter と session のどちらか一方を渡すこと');
+  }
+}
+
 export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
   const now = options.now ?? ((): Date => new Date());
+  assertOneTarget(options);
   assertModeMatchesAskHuman(options.mode, options.askHuman !== undefined);
   const subjects = toCaseSubjects(options.sheet);
 
   const startedAt = now().toISOString();
-  const session = await options.adapter.connect();
+  // 渡されたセッションは、ここで開け閉めしない。**持ち主が開けて、持ち主が閉じる。**
+  const borrowed = options.session;
+  const session = borrowed ?? (await (options.adapter as TargetAdapter).connect());
   const cases: RunCase[] = [];
   const findings: Finding[] = [];
 
   try {
     // 人が横で見られる状態にしてから走らせる（C4）。開けずに走ると、見る先が無い。
-    await session.liveView.open();
+    if (borrowed === undefined) await session.liveView.open();
     for (const subject of subjects) {
       cases.push(await runOneCase(subject, session, options, now));
     }
   } finally {
-    await session.close();
+    if (borrowed === undefined) await session.close();
   }
 
   return {

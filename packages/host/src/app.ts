@@ -33,15 +33,23 @@ export async function runWithLiveView(options: RunWithLiveViewOptions): Promise<
 /** Tauri の既定の開発サーバ。`packages/desktop/vite.config.ts` と揃えている。 */
 const DEFAULT_DEV_URL = 'http://localhost:1420';
 
+export interface TauriDevArgsOptions {
+  readonly devUrl?: string;
+  /** 打鍵を返す口。**実行を伴わない `pnpm live` では渡さない。** */
+  readonly controlUrl?: string;
+}
+
 /**
  * `tauri dev` へ渡す引数。
  *
  * **Tauri は devUrl を開く。**起動時の値を webview へ渡す口はここしか無いので、
- * 映像の URL をクエリに載せる。生で埋めるとクエリが壊れるので `URL` に組ませる。
+ * 映像と制御の URL をクエリに載せる。生で埋めるとクエリが壊れるので `URL` に組ませる。
  */
-export function tauriDevArgs(liveUrl: string, devUrl: string = DEFAULT_DEV_URL): string[] {
-  const target = new URL(devUrl);
+export function tauriDevArgs(liveUrl: string, options: TauriDevArgsOptions = {}): string[] {
+  const target = new URL(options.devUrl ?? DEFAULT_DEV_URL);
   target.searchParams.set('live', liveUrl);
+  // 繋いでいないのに口があるように見せない。画面側は `?control=` の有無で振る舞いを変える。
+  if (options.controlUrl !== undefined) target.searchParams.set('control', options.controlUrl);
 
   return ['dev', '--config', JSON.stringify({ build: { devUrl: target.toString() } })];
 }

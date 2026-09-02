@@ -20,6 +20,7 @@ import {
   findElementCenter,
   inputCommands,
   parseDeviceList,
+  screenText,
   withSerial,
   type Point,
   type ResolvedAction,
@@ -322,4 +323,19 @@ function createSession(deps: SessionDeps): TargetSession {
       recProcess = undefined;
     },
   };
+}
+
+/**
+ * 繋いだセッションから、**画面で読める文字**を取る。
+ *
+ * 期待結果（「〜と表示される」）との突き合わせに使う（`createSheetCaseRunner`）。
+ * **生データの形を知っているのはアダプタだけ**なので、ここに置く（コアは解釈しない・C8）。
+ */
+export async function readAndroidScreenText(session: TargetSession): Promise<string> {
+  const observation = await session.observe();
+  if (typeof observation.raw !== 'string') {
+    // 握り潰さない。読めないまま空文字を返すと、期待結果が「無い」ことになり FAIL が積む。
+    throw new Error('画面の生データが uiautomator の XML ではない');
+  }
+  return screenText(observation.raw);
 }

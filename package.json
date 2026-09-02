@@ -13,6 +13,7 @@
     "build": "pnpm -r build",
     "dev": "pnpm -r --parallel dev",
     "live": "pnpm --filter @git-qa/host exec vite-node src/cli.ts",
+    "run:sheet": "pnpm --filter @git-qa/host exec vite-node src/run-cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

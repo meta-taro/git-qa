@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { describeAdapterContract } from '@git-qa/core/testing';
 import type { TargetAdapter } from '@git-qa/core';
 
-import { createAndroidAdapter } from '../src/index.js';
+import { createAndroidAdapter, readAndroidScreenText } from '../src/index.js';
 import type {
   CommandResult,
   CommandRunner,
@@ -402,5 +402,14 @@ describe('録画', () => {
     expect(runner.started).toHaveLength(2);
     await session.liveView.close();
     expect(runner.processes[1]?.isRunning).toBe(true);
+  });
+});
+
+describe('readAndroidScreenText — セッションから画面の文字を取る', () => {
+  it('uiautomator の dump から、画面で読める文字を集める', async () => {
+    const session = await makeAdapter().connect();
+
+    // 期待結果（「〜と表示される」）との突き合わせに使う所。
+    await expect(readAndroidScreenText(session)).resolves.toContain('保存');
   });
 });

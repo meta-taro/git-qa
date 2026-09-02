@@ -7,6 +7,7 @@ import {
   inputCommands,
   keycode,
   parseDeviceList,
+  screenText,
   withSerial,
 } from '../src/index.js';
 
@@ -144,5 +145,39 @@ describe('findElementCenter', () => {
 
   it('見つからなければ undefined', () => {
     expect(findElementCenter(DUMP, 'com.example:id/nope')).toBeUndefined();
+  });
+});
+
+describe('screenText — 画面から読める文字を集める', () => {
+  const xml = [
+    '<hierarchy>',
+    '<node text="メモ一覧" content-desc="" resource-id="jp.example:id/title" bounds="[0,0][100,50]" />',
+    '<node text="" content-desc="追加" resource-id="jp.example:id/add" bounds="[0,60][100,110]" />',
+    '<node text="保存しました" content-desc="" bounds="[0,120][100,170]" />',
+    '</hierarchy>',
+  ].join('\n');
+
+  it('text と content-desc を拾う', () => {
+    const text = screenText(xml);
+
+    expect(text).toContain('メモ一覧');
+    expect(text).toContain('追加');
+    expect(text).toContain('保存しました');
+  });
+
+  it('空の値は入れない（空行だけが並ばないように）', () => {
+    expect(
+      screenText(xml)
+        .split('\n')
+        .filter((line) => line === ''),
+    ).toHaveLength(0);
+  });
+
+  it('実体参照を戻す（そのままだと期待結果と突き合わない）', () => {
+    expect(screenText('<node text="A &amp; B &lt;C&gt;" />')).toBe('A & B <C>');
+  });
+
+  it('要素が無ければ空', () => {
+    expect(screenText('<hierarchy></hierarchy>')).toBe('');
   });
 });

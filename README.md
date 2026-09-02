@@ -167,6 +167,47 @@ pnpm --filter @git-qa/desktop tauri build
 > 画面の色・タイポグラフィは**まだ決めていません**。`DESIGN.md` が空のままなので、骨格は OS の既定の配色で出ます。
 > アイコンも Tauri の既定のままです。
 
+### 端末に繋いで、画面に映す
+
+```bash
+pnpm live
+```
+
+Android 端末（またはエミュレータ）へ `adb` で繋ぎ、`screenrecord` の生 H.264 を localhost の橋に流し、
+その URL を付けて Tauri を起動します。**中央のカラムに端末の画面が出れば成功です。**
+
+- 端末を選ぶ: `GIT_QA_ANDROID_SERIAL=emulator-5554 pnpm live`
+- 映らない場合は、その理由が中央のカラムに出ます（console だけには出しません）
+
+> **枠の中に映像が描かれるところは、まだ人の目で確認できていません。**橋が映像を流すところまでは
+> 実測済みです（6 秒で 2.8 MB）。
+
+### 検証シートを 1 本走らせる
+
+```bash
+pnpm run:sheet packages/core/test/fixtures/sample-notes-app.tsv
+```
+
+シートを読み、AI が端末を操作し、**人が横で見て 1 打鍵で判定を置く**までを 1 本で走らせます。
+終わると `runs/<runId>/run.json` が出ます（`runs/` は Git に入れません）。
+
+| キー | 置くもの |
+|---|---|
+| `v` | `VERIFIED`（見た。合格） |
+| `f` | `FAIL`（見た。不合格） |
+| `b` | `BLOCKED`（人にも判断できない） |
+| `s` | `SKIP`（今回は見ない） |
+| `Space` | 置かずに次へ（`AUTO_PASS` のまま残る） |
+
+**人が押すまで次のケースへ進みません。**時間で勝手に進めると、見ようとしていたケースを
+見逃したまま `AUTO_PASS` が積み上がるためです。
+
+- 置いた人の名前: `GIT_QA_OPERATOR=<handle> pnpm run:sheet ...`（個人名ではなくハンドル）
+- **押し間違いは取り消せません**（`u` は未実装）。確定した判定を直すには、その行を走らせ直します
+
+> **実機・エミュレータで通した実績はまだありません。**代役の端末（テスト用のアダプタ）で
+> 5 ケースを通し、`run.json` に `VERIFIED` と `AUTO_PASS` が混ざることまでは検査で確認しています。
+
 ## ルール
 
 このリポジトリは AI エージェント開発のベースルールに従います。詳細は `.claude/rules/product-baseline.md` と `CLAUDE.md` を参照してください。
