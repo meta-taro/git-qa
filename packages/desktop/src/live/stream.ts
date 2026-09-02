@@ -1,3 +1,4 @@
+import { localHttpUrlFromLocation } from '../local-url.js';
 import type { LivePlayer } from './player.js';
 
 /**
@@ -9,19 +10,7 @@ import type { LivePlayer } from './player.js';
 
 /** `?live=<url>` から読む。無ければ undefined（端末に繋いでいない状態）。 */
 export function liveStreamUrlFromLocation(search: string): string | undefined {
-  const raw = new URLSearchParams(search).get('live');
-  if (raw === null || raw === '') return undefined;
-
-  // 受け取った文字列をそのまま fetch しない。**localhost 以外へは繋がない**
-  // （ここを流れるのは検証中の端末の画面・PRD §10）。
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return undefined;
-  }
-  const local = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
-  return local && url.protocol === 'http:' ? url.toString() : undefined;
+  return localHttpUrlFromLocation(search, 'live');
 }
 
 /** 届いた順に再生へ渡す。ストリームが尽きたら `end()` する。 */

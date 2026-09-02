@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./live": "./src/live/index.ts",
-    "./testing": "./src/testing/index.ts"
+    "./testing": "./src/testing/index.ts",
+    "./session": "./src/session/index.ts"
   },
   "scripts": {
     "build": "tsc --build"
