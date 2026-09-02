@@ -28,6 +28,7 @@ export function stubAdapter(options: {
   mode?: 'h264-stream' | 'external-window';
   chunks?: Uint8Array[];
   failOpen?: boolean;
+  screen?: { width: number; height: number };
 }): TargetAdapter & StubTrace {
   const opened: string[] = [];
   const closed: string[] = [];
@@ -80,6 +81,9 @@ export function stubAdapter(options: {
       stop: () => Promise.resolve({ state: 'not_requested' as const }),
     },
     isClosed: false,
+    ...(options.screen === undefined
+      ? {}
+      : { screenSize: () => Promise.resolve(options.screen as { width: number; height: number }) }),
     act: (action: Action) => {
       actions.push(action);
       return Promise.resolve();

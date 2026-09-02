@@ -20,6 +20,7 @@ import {
   findElementCenter,
   inputCommands,
   parseDeviceList,
+  parseScreenSize,
   screenText,
   withSerial,
   type Point,
@@ -275,6 +276,9 @@ function createSession(deps: SessionDeps): TargetSession {
       : {}),
   };
 
+  /** 端末の実寸。読み直しが要らないので覚えておく。 */
+  let cachedScreen: { width: number; height: number } | undefined;
+
   let recProcess: RunningProcess | undefined;
   let recFile: string | undefined;
   let recStartedAt: number | undefined;
@@ -365,6 +369,26 @@ function createSession(deps: SessionDeps): TargetSession {
       for (const args of inputCommands(await resolveAction(action))) {
         await adbRun(args, serial);
       }
+    },
+
+    /**
+     * 端末の画面の実寸。**映像を縮めて流しているので、人が触った座標を戻すのに要る。**
+     * 一度読んだら覚えておく（回転しない前提。回るなら読み直しが要る）。
+     */
+    async screenSize(): Promise<{ width: number; height: number }> {
+      ensureOpen();
+      if (cachedScreen !== undefined) return cachedScreen;
+      const stdout = await adbRun(['shell', 'wm', 'size'], serial);
+      const size = parseScreenSize(new TextDecoder().decode(stdout));
+      if (size === undefined) {
+        // 握り潰さない。**勝手な既定を返すと、見当違いの所を触る。**
+        throw new AdapterError(
+          KIND,
+          `端末の画面の大きさを読めない: ${new TextDecoder().decode(stdout)}`,
+        );
+      }
+      cachedScreen = { width: size.x, height: size.y };
+      return cachedScreen;
     },
 
     async observe(): Promise<Observation> {

@@ -274,3 +274,40 @@ describe('人がなぞる（スワイプ / フリック）', () => {
     await session.close();
   });
 });
+
+describe('小さく流した映像の座標を、端末の実寸へ戻す', () => {
+  /**
+   * **映像は端末より小さく流している**（720x1480 等）。そのままの数値を渡すと、
+   * 3 分の 2 の位置を触ることになる（実機で押しても反応しなかった）。
+   */
+  it('送り手の画面の大きさから、実寸へ直して送る', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-220000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'tap', caseNo: 1, x: 360, y: 740, screen: { x: 720, y: 1480 } });
+    // AI 自身の操作（要素を指したもの）と混ざるので、人の操作＝座標指定を待つ。
+    await waitFor(
+      () => adapter.actions.some((a) => a.kind === 'tap' && a.target.at === 'point'),
+      '人が押した座標',
+    );
+
+    expect(adapter.actions.at(-1)).toEqual({
+      kind: 'tap',
+      target: { at: 'point', x: 540, y: 1110 },
+    });
+
+    session.abort('検査の後始末');
+    await session.done;
+    await session.close();
+  });
+});

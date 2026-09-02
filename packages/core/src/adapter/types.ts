@@ -34,6 +34,11 @@ export interface TargetSession {
   readonly recording: RecordingControl;
   readonly isClosed: boolean;
   act(action: Action): Promise<void>;
+  /**
+   * 端末の画面の実寸。**映像を縮めて流している場合に、座標を戻すために要る。**
+   * 取れない対象（Web など）は持たない。
+   */
+  screenSize?(): Promise<{ readonly width: number; readonly height: number }>;
   observe(): Promise<Observation>;
   screenshot(): Promise<Screenshot>;
   close(): Promise<void>;

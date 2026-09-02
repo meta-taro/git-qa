@@ -7,6 +7,7 @@ import {
   inputCommands,
   keycode,
   parseDeviceList,
+  parseScreenSize,
   screenText,
   withSerial,
 } from '../src/index.js';
@@ -179,5 +180,22 @@ describe('screenText — 画面から読める文字を集める', () => {
 
   it('要素が無ければ空', () => {
     expect(screenText('<hierarchy></hierarchy>')).toBe('');
+  });
+});
+
+describe('parseScreenSize — 端末の実寸', () => {
+  it('Physical size を読む', () => {
+    expect(parseScreenSize('Physical size: 1080x2220\n')).toEqual({ x: 1080, y: 2220 });
+  });
+
+  it('Override size があればそちらを採る（実際に使われているのはこちら）', () => {
+    expect(parseScreenSize('Physical size: 1080x2220\nOverride size: 720x1480\n')).toEqual({
+      x: 720,
+      y: 1480,
+    });
+  });
+
+  it('読めなければ undefined（勝手に決めない）', () => {
+    expect(parseScreenSize('なにか')).toBeUndefined();
   });
 });

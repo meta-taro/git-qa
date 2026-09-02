@@ -105,18 +105,34 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     if (!waiting.has(input.caseNo)) return;
 
     if (input.kind === 'tap' || input.kind === 'swipe') {
+      // **映像は端末より小さく流している。**送られてきた座標を実寸へ戻さないと、
+      // 違う所を触る（実機で押しても反応しなかった）。
+      const scale = async (x: number, y: number): Promise<{ x: number; y: number }> => {
+        const screen = input.screen;
+        const size = await live.session.screenSize?.();
+        if (screen === undefined || size === undefined || screen.x <= 0 || screen.y <= 0) {
+          return { x, y };
+        }
+        return {
+          x: Math.round((x * size.width) / screen.x),
+          y: Math.round((y * size.height) / screen.y),
+        };
+      };
+
       // **人の番のときだけ端末へ送る**（待っている＝AI の操作は終わっている）。
       // AI の操作中に人の操作が割り込むと、どちらがやったのか証跡から読めなくなる。
-      const action: Action =
-        input.kind === 'tap'
-          ? { kind: 'tap', target: { at: 'point', x: input.x, y: input.y } }
-          : {
-              kind: 'swipe',
-              from: { at: 'point', x: input.from.x, y: input.from.y },
-              to: { at: 'point', x: input.to.x, y: input.to.y },
-              durationMs: input.durationMs,
-            };
-      void live.session.act(action).catch((error: unknown) => {
+      void (async () => {
+        const action: Action =
+          input.kind === 'tap'
+            ? { kind: 'tap', target: { at: 'point', ...(await scale(input.x, input.y)) } }
+            : {
+                kind: 'swipe',
+                from: { at: 'point', ...(await scale(input.from.x, input.from.y)) },
+                to: { at: 'point', ...(await scale(input.to.x, input.to.y)) },
+                durationMs: input.durationMs,
+              };
+        await live.session.act(action);
+      })().catch((error: unknown) => {
         // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
         console.error('[git-qa] 人の操作を端末へ送れない', error);
       });

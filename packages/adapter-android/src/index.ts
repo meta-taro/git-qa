@@ -9,6 +9,7 @@ export {
   inputCommands,
   keycode,
   parseDeviceList,
+  parseScreenSize,
   screenText,
   withSerial,
 } from './adb.js';

@@ -47,7 +47,19 @@ export type HumanInput =
    * **AI が判断保留にして止まった後、人が自分で触って確かめる**のが中心の動き。
    * 見えるが触れない画面は、判断の材料にならない。
    */
-  | { readonly kind: 'tap'; readonly caseNo: number; readonly x: number; readonly y: number }
+  | {
+      readonly kind: 'tap';
+      readonly caseNo: number;
+      readonly x: number;
+      readonly y: number;
+      /**
+       * 座標がどの大きさの画面上のものか。
+       *
+       * **映像は端末より小さく流している**（720x1480 等）ので、
+       * そのままの数値を端末へ渡すと違う所を触る（実機で押しても反応しなかった）。
+       */
+      readonly screen?: Point;
+    }
   /**
    * 人がなぞった（スワイプ / フリック）。
    *
@@ -61,6 +73,8 @@ export type HumanInput =
       readonly to: Point;
       /** なぞるのにかけた時間。**速さがそのまま端末へ伝わる**（フリックか、ゆっくりかの差）。 */
       readonly durationMs: number;
+      /** 座標がどの大きさの画面上のものか。 */
+      readonly screen?: Point;
     };
 
 /** 画面上の位置。 */
@@ -104,7 +118,15 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
     if (from === undefined || to === undefined) return undefined;
     // 1 ms 未満は端末が受け取らない。長すぎるものは、押しっぱなしの取りこぼし。
     if (!isPixel(durationMs) || durationMs < 1 || durationMs > 10_000) return undefined;
-    return { kind: 'swipe', caseNo, from, to, durationMs };
+    const screen = parsePoint(raw['screen']);
+    return {
+      kind: 'swipe',
+      caseNo,
+      from,
+      to,
+      durationMs,
+      ...(screen === undefined ? {} : { screen }),
+    };
   }
 
   if (raw['kind'] === 'tap') {
@@ -112,7 +134,8 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
     // 端末は画素の位置しか受け取らない。**丸めずに捨てる**（どこを押したのかが曖昧なまま
     // 端末を触ると、証跡と実際がずれる）。
     if (!isPixel(x) || !isPixel(y)) return undefined;
-    return { kind: 'tap', caseNo, x, y };
+    const screen = parsePoint(raw['screen']);
+    return { kind: 'tap', caseNo, x, y, ...(screen === undefined ? {} : { screen }) };
   }
 
   if (raw['kind'] === 'verdict' && isOneOf(HUMAN_RESULTS, raw['humanResult'])) {

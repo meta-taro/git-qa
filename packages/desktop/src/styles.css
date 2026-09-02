@@ -169,6 +169,37 @@ body {
   opacity: 0.45;
 }
 
+/*
+ * キートップ。**実物のキーに見えるほうが、押すものだと分かる。**
+ * 1 文字のキーは正方形、Space だけ横長。色は決めず（DESIGN.md が空・§11）、
+ * 面も影も currentColor から作るので、ライトでもダークでも同じに見える。
+ */
+.key-binding {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.875rem;
+  height: 1.875rem;
+  padding: 0 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 5px;
+  /* 厚みと落ち影で浮かせる。 */
+  box-shadow:
+    0 2px 0 color-mix(in srgb, currentColor 28%, transparent),
+    0 3px 5px color-mix(in srgb, currentColor 18%, transparent);
+  transform: translateY(-1px);
+}
+
+/* 押している間は沈ませる。実物のキーと同じ手触りにする。 */
+.key-action:active:not(:disabled) .key-binding {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 color-mix(in srgb, currentColor 28%, transparent);
+}
+
 .key-text {
   display: grid;
   gap: 0.125rem;

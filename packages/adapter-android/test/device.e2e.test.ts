@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createAnnexBSplitter } from '@git-qa/core';
+import { codecFromAnnexB, createAnnexBSplitter } from '@git-qa/core/live';
 
 import { createAndroidAdapter } from '../src/index.js';
 
@@ -122,4 +122,49 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
     // 最初の 1 枚が出るまでが遅いと、人は「固まった」と思う（PRD §2）。
     expect(firstUnitMs).toBeLessThan(5000);
   }, 90000);
+
+  describe('実機の映像から、復号の材料が取れる', () => {
+    /**
+     * **ここが抜けていたせいで、実機だけで真っ黒になった。**
+     * codec を決め打ちにしていて、端末が名乗る level と食い違っていた。
+     * 端末が実際に吐くものから取れることを、実機の検査で押さえる。
+     */
+    it('端末が名乗った codec を、流れてくるものから組み立てられる', async () => {
+      const session = await createAndroidAdapter({
+        build,
+        liveView: { mode: 'h264-stream' },
+      }).connect();
+      try {
+        await session.liveView.open();
+
+        let bytes = new Uint8Array();
+        for await (const chunk of session.liveView.frames?.() ?? []) {
+          const next = new Uint8Array(bytes.length + chunk.length);
+          next.set(bytes);
+          next.set(chunk, bytes.length);
+          bytes = next;
+          if (bytes.length > 8000) break;
+        }
+
+        const codec = codecFromAnnexB(bytes);
+        // 形は avc1.PPCCLL。**決め打ちの値と一致するとは限らない**のが、この検査の要点。
+        expect(codec).toMatch(/^avc1\.[0-9a-f]{6}$/);
+      } finally {
+        await session.liveView.close();
+        await session.close();
+      }
+    }, 30_000);
+
+    it('端末の実寸が読める（人が触った座標を戻すのに要る）', async () => {
+      const session = await createAndroidAdapter({ build }).connect();
+      try {
+        const size = await session.screenSize?.();
+
+        expect(size?.width).toBeGreaterThan(0);
+        expect(size?.height).toBeGreaterThan(0);
+      } finally {
+        await session.close();
+      }
+    }, 30_000);
+  });
 });

@@ -114,7 +114,14 @@ describe('installDeviceTouch', () => {
     clock = 80;
     release(canvasEl);
 
-    expect(send).toHaveBeenCalledWith({ kind: 'tap', caseNo: 2, x: 540, y: 1110 });
+    // **どの大きさの画面上の座標かを添える。**受け取った側が端末の実寸へ戻す。
+    expect(send).toHaveBeenCalledWith({
+      kind: 'tap',
+      caseNo: 2,
+      x: 540,
+      y: 1110,
+      screen: { x: 1080, y: 2220 },
+    });
   });
 
   it('離れた所で離したら、なぞった操作として送る（フリック）', () => {

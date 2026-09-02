@@ -166,3 +166,16 @@ export function screenText(xml: string): string {
   }
   return found.join('\n');
 }
+
+/**
+ * `wm size` の出力から実寸を読む。
+ *
+ * `Physical size: 1080x2220`（`Override size:` があればそちらが実際に使われる）。
+ */
+export function parseScreenSize(stdout: string): Point | undefined {
+  const override = /Override size:\s*(\d+)x(\d+)/.exec(stdout);
+  const physical = /Physical size:\s*(\d+)x(\d+)/.exec(stdout);
+  const found = override ?? physical;
+  if (found === null) return undefined;
+  return { x: Number(found[1]), y: Number(found[2]) };
+}
