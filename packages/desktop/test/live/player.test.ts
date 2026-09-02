@@ -4,6 +4,9 @@ import { createLivePlayer } from '../../src/live/player.js';
 import type { DecodedFrame, DecoderHandlers, EncodedUnit } from '../../src/live/player.js';
 
 function nal(type: number, first = true): Uint8Array {
+  // SPS（種別 7）は、codec 文字列の材料（profile / constraint / level）を持つ。
+  // **端末が名乗るまで復号器は作られない**ので、検査でも本物と同じ形にする。
+  if ((type & 0x1f) === 7) return new Uint8Array([0, 0, 1, 0x67, 66, 0xc0, 50, 0x11]);
   return new Uint8Array([0, 0, 1, type & 0x1f, first ? 0x80 : 0x40, 0x11]);
 }
 
@@ -24,8 +27,10 @@ function fakeDecoder(options: { failOn?: number; throwOn?: number } = {}) {
   let closed = false;
   let handlers: DecoderHandlers | undefined;
 
-  const create = (h: DecoderHandlers) => {
+  const codecs: string[] = [];
+  const create = (h: DecoderHandlers, codec: string) => {
     handlers = h;
+    codecs.push(codec);
     return {
       decode(unit: EncodedUnit) {
         submitted.push(unit);
@@ -47,6 +52,7 @@ function fakeDecoder(options: { failOn?: number; throwOn?: number } = {}) {
 
   return {
     create,
+    codecs,
     submitted,
     closedFrames,
     get closed() {
@@ -57,6 +63,31 @@ function fakeDecoder(options: { failOn?: number; throwOn?: number } = {}) {
     },
   };
 }
+
+describe('createLivePlayer — codec は端末が名乗ったものを使う', () => {
+  it('SPS から組み立てた codec で復号器を作る', () => {
+    // **決め打ちにすると、解像度で level が変わったときに 1 枚も復号できない**
+    // （実機で真っ黒になった。端末は Level 5.0、こちらは 3.0 固定だった）。
+    const d = fakeDecoder();
+    const player = createLivePlayer({ createDecoder: d.create, onFrame: () => {} });
+
+    player.push(bytes(nal(7), nal(5)));
+    player.end();
+
+    expect(d.codecs).toEqual(['avc1.42c032']);
+    expect(player.stats.codec).toBe('avc1.42c032');
+  });
+
+  it('名乗りが無ければ既定へ落ちる（途中から繋いだ場合）', () => {
+    const d = fakeDecoder();
+    const player = createLivePlayer({ createDecoder: d.create, onFrame: () => {} });
+
+    player.push(bytes(nal(1)));
+    player.end();
+
+    expect(d.codecs).toEqual(['avc1.42E01E']);
+  });
+});
 
 describe('createLivePlayer', () => {
   it('切り出した枚を、順に復号器へ渡す', () => {
@@ -167,9 +198,79 @@ describe('createLivePlayer', () => {
       createDecoder: () => ({ decode: () => {}, close: () => (closes += 1) }),
       onFrame: () => {},
     });
+    // 復号器は最初の 1 枚が来たときに作られるので、先に流す。
+    player.push(bytes(nal(7), nal(5)));
     player.end();
     player.end();
 
     expect(closes).toBe(1);
+  });
+
+  it('1 枚も来ないまま終わったら、復号器は作らない', () => {
+    let created = 0;
+    const player = createLivePlayer({
+      createDecoder: () => {
+        created += 1;
+        return { decode: () => {}, close: () => {} };
+      },
+      onFrame: () => {},
+    });
+
+    player.end();
+
+    expect(created).toBe(0);
+  });
+});
+
+describe('createLivePlayer — 静止した画面でも最初の 1 枚を出す', () => {
+  /**
+   * **Annex-B は「次の絵が始まった」ことで前の絵の終わりを知る。**
+   * 画面が静止していると次の絵が来ないので、最初の 1 枚を抱えたまま待ち続ける
+   * （実機で真っ黒のままになった。160 KB 受け取って 0 枚だった）。
+   */
+  it('しばらく何も来なければ、抱えている枚を吐く', () => {
+    const d = fakeDecoder();
+    let fire: (() => void) | undefined;
+    const player = createLivePlayer({
+      createDecoder: d.create,
+      onFrame: () => {},
+      idleFlushMs: 80,
+      scheduleIdleFlush: (run) => {
+        fire = run;
+        return () => {
+          fire = undefined;
+        };
+      },
+    });
+
+    player.push(bytes(nal(7), nal(5)));
+    expect(d.submitted).toHaveLength(0);
+
+    fire?.();
+
+    expect(d.submitted).toHaveLength(1);
+    expect(d.submitted[0]?.type).toBe('key');
+  });
+
+  it('吐いた後にまた来ても、同じ枚を二度渡さない', () => {
+    const d = fakeDecoder();
+    let fire: (() => void) | undefined;
+    const player = createLivePlayer({
+      createDecoder: d.create,
+      onFrame: () => {},
+      scheduleIdleFlush: (run) => {
+        fire = run;
+        return () => {
+          fire = undefined;
+        };
+      },
+    });
+
+    player.push(bytes(nal(7), nal(5)));
+    fire?.();
+    player.push(bytes(nal(1)));
+    fire?.();
+
+    expect(d.submitted).toHaveLength(2);
   });
 });

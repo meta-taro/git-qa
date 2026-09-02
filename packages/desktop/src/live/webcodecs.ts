@@ -39,8 +39,12 @@ declare class VideoDecoder {
 }
 
 /**
- * Baseline profile / Level 3.0。**`description` を渡さないと Annex-B として扱われる**ので、
- * 端末が吐いたストリームをそのまま食える（ADR 0002）。
+ * 支えられるかを調べるときの見本。**実際に使う値は端末の SPS から組み立てる**
+ * （`codecFromAnnexB`）。固定にすると、端末の解像度で level が変わったときに
+ * 1 枚も復号できない（実機で真っ黒になった。端末は Level 5.0 だった）。
+ *
+ * **`description` を渡さないと Annex-B として扱われる**ので、端末が吐いた
+ * ストリームをそのまま食える（ADR 0002）。
  */
 export const CODEC = 'avc1.42E01E';
 
@@ -51,13 +55,16 @@ export async function isLiveViewSupported(): Promise<boolean> {
   return support.supported === true;
 }
 
-export function createWebCodecsDecoder(handlers: DecoderHandlers): DecoderLike {
+export function createWebCodecsDecoder(
+  handlers: DecoderHandlers,
+  codec: string = CODEC,
+): DecoderLike {
   const decoder = new VideoDecoder({
     output: (frame) => handlers.output(frame),
     error: (error) => handlers.error(new Error(error.message)),
   });
   // 遅延を優先する。溜めて滑らかにされると、人が見て判断する用途では逆効果になる。
-  decoder.configure({ codec: CODEC, optimizeForLatency: true });
+  decoder.configure({ codec, optimizeForLatency: true });
 
   return {
     decode(unit) {

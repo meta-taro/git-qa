@@ -226,8 +226,11 @@ function createSession(deps: SessionDeps): TargetSession {
                 let current: StreamingProcess | undefined;
                 try {
                   while (liveOpen) {
-                    // 前の 1 本を必ず止めてから次を起こす。**止め忘れると端末に溜まる**
-                    // （実機で 5 本残っていた）。
+                    // **端末では screenrecord が同時に 1 本しか成立しない。**
+                    // 2 本目は何も返さずに終わり、画面は真っ黒になる（実機で起きた）。
+                    // いま動いている 1 本を必ず止めてから起こす。読み手が入れ替わったとき
+                    // （画面の読み込み直し）は、古い読み手のほうが切れる。
+                    await liveStream?.stop();
                     await current?.stop();
                     current = startScreenrecord();
                     liveStream = current;

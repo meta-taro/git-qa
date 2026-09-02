@@ -1,5 +1,6 @@
 import type { HumanInput, SessionState } from '@git-qa/core/session';
 
+import { attachConsoleToLog } from './console-log.js';
 import { setLocale, t } from './i18n/current.js';
 import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.js';
 import { defaultStore } from './setting-store.js';
@@ -20,6 +21,10 @@ import { mountLiveView, showLiveViewError } from './live/view.js';
 import { createWebCodecsDecoder, isLiveViewSupported } from './live/webcodecs.js';
 import './styles.css';
 
+// **画面の中で起きたことを、Node 側のログへ流す。**
+// これが無いと、映らない・動かないときに「人に聞く」しか手が無い。
+void attachConsoleToLog();
+
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) {
   // 握り潰さない（product-baseline §8）。index.html と食い違ったら起動時に分かるようにする。
@@ -39,9 +44,17 @@ let latest: SessionState | undefined;
 const diagnostics: {
   decoded: number;
   drawn: number;
+  bytes: number;
   lastError?: string;
+  canDecode?: boolean;
   canvas?: { width: number; height: number };
-} = { decoded: 0, drawn: 0 };
+  decodeError?: string;
+  codec?: string;
+} = { decoded: 0, drawn: 0, bytes: 0 };
+
+/** いま動いている再生。診断で中の様子を読むために持っておく。 */
+let livePlayer:
+  { readonly stats: { error: string | undefined; codec: string | undefined } } | undefined;
 
 /** いま出ている案内の段階。言語が変わったときに描き直すために覚えておく。 */
 let onboarding: ConnectionStatus = 'disconnected';
@@ -102,7 +115,8 @@ async function startLiveView(
   onboarding = 'running';
   renderOnboarding(container, onboarding);
 
-  if (!(await isLiveViewSupported())) {
+  diagnostics.canDecode = await isLiveViewSupported();
+  if (diagnostics.canDecode !== true) {
     // engine ごとに違う（macOS の WebKit で実際に落ちた・ADR 0002）。黙って空の枠にしない。
     throw new Error(t('live.unsupported'));
   }
@@ -120,7 +134,18 @@ async function startLiveView(
     },
   });
 
-  await pumpLiveStream(await openLiveStream(url), player);
+  livePlayer = player;
+
+  // 受け取ったバイト数を数える。**0 なら橋まで届いていない**（画面の問題ではない）。
+  const counted = (await openLiveStream(url)).pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        diagnostics.bytes += chunk.length;
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  await pumpLiveStream(counted, player);
 }
 
 const liveUrl = liveStreamUrlFromLocation(window.location.search);
@@ -171,6 +196,12 @@ if (controlUrl !== undefined) {
     const report: DiagnosticsReport = {
       decoded: diagnostics.decoded,
       drawn: diagnostics.drawn,
+      bytes: diagnostics.bytes,
+      href: window.location.href,
+      ...(diagnostics.canDecode === undefined ? {} : { canDecode: diagnostics.canDecode }),
+      // **復号器が落ちた理由を外へ出す。**握り潰すと、真っ黒の原因が分からない。
+      ...(livePlayer?.stats.error === undefined ? {} : { decodeError: livePlayer.stats.error }),
+      ...(livePlayer?.stats.codec === undefined ? {} : { codec: livePlayer.stats.codec }),
       ...(diagnostics.canvas === undefined ? {} : { canvas: diagnostics.canvas }),
       ...(diagnostics.lastError === undefined ? {} : { lastError: diagnostics.lastError }),
     };

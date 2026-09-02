@@ -5,3 +5,4 @@
 // 映像の切り出しはどちらの実行環境でも要るので、ここから出す。
 export { createAnnexBSplitter } from './annexb.js';
 export type { AccessUnit, AnnexBSplitter } from './annexb.js';
+export { codecFromAnnexB } from './codec.js';

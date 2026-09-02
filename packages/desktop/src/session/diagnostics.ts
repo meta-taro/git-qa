@@ -15,6 +15,16 @@ export interface DiagnosticsReport {
   readonly canvas?: { readonly width: number; readonly height: number };
   /** 最後に起きた失敗。**握り潰さずここへ出す。** */
   readonly lastError?: string;
+  /** 画面がどの URL を開いているか。**`?live=` が渡っているかを外から確かめられる。** */
+  readonly href?: string;
+  /** この webview が H.264 を復号できるか。 */
+  readonly canDecode?: boolean;
+  /** 映像の口から受け取ったバイト数。**0 なら橋まで届いていない。** */
+  readonly bytes?: number;
+  /** 復号器が落ちた理由。**bytes は増えているのに decoded が 0 なら、ここを見る。** */
+  readonly decodeError?: string;
+  /** 実際に使った codec。端末の SPS から組み立てたもの。 */
+  readonly codec?: string;
 }
 
 /**
