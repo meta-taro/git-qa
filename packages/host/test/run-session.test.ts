@@ -237,3 +237,40 @@ describe('人が端末を触る', () => {
     await session.close();
   });
 });
+
+describe('人がなぞる（スワイプ / フリック）', () => {
+  it('なぞった始点・終点・時間が、そのまま端末へ届く', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({});
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-210000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({
+      kind: 'swipe',
+      caseNo: 1,
+      from: { x: 540, y: 2000 },
+      to: { x: 540, y: 400 },
+      durationMs: 120,
+    });
+    await waitFor(() => adapter.actions.some((a) => a.kind === 'swipe'), '端末への swipe');
+
+    expect(adapter.actions.at(-1)).toEqual({
+      kind: 'swipe',
+      from: { at: 'point', x: 540, y: 2000 },
+      to: { at: 'point', x: 540, y: 400 },
+      durationMs: 120,
+    });
+
+    session.abort('検査の後始末');
+    await session.done;
+    await session.close();
+  });
+});

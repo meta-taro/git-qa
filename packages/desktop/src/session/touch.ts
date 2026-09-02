@@ -48,27 +48,83 @@ export interface InstallDeviceTouchOptions {
   /** いまの実行状態。**人の番かどうかはここで見る。** */
   readonly state: () => SessionState | undefined;
   readonly send: (input: HumanInput) => void;
+  /** 時刻の出どころ。**なぞった速さがそのまま端末へ伝わる**ので、検査では固定する。 */
+  readonly now?: () => number;
 }
 
+/** これ以下しか動いていなければタップ扱い（端末の画素）。手が少し震えても拾わない。 */
+const TAP_SLOP = 16;
+
+/** `input swipe` に渡す時間の幅。速すぎても遅すぎても端末が受け取らない。 */
+const MIN_DURATION_MS = 20;
+const MAX_DURATION_MS = 5_000;
+
+const clamp = (value: number, low: number, high: number): number =>
+  Math.min(high, Math.max(low, value));
+
+/**
+ * ライブビューの上での操作を、端末へ送る。
+ *
+ * **押して離すまでを見る。**同じ所なら tap、離れていれば swipe（フリック）。
+ * タップだけでは Android を操作できない — ホームへ戻る・一覧をたどる基本の動きが
+ * なぞる操作で、無いと人は画面の外へ出られない。
+ */
 export function installDeviceTouch(options: InstallDeviceTouchOptions): () => void {
-  const onClick = (event: MouseEvent): void => {
+  const now = options.now ?? ((): number => performance.now());
+  let start: { x: number; y: number; at: number; caseNo: number } | undefined;
+
+  const pointFrom = (event: MouseEvent): { x: number; y: number } | undefined =>
+    devicePoint({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      rect: options.canvas.getBoundingClientRect(),
+      canvas: { width: options.canvas.width, height: options.canvas.height },
+    });
+
+  const onDown = (event: MouseEvent): void => {
+    start = undefined;
     const state = options.state();
     const caseNo = state?.awaiting;
     // **人の番のときだけ送る。**AI が操作している最中に割り込むと、
     // どちらが触ったのか証跡から読めなくなる。
     if (state === undefined || state.phase !== 'waiting' || caseNo === undefined) return;
 
-    const point = devicePoint({
-      clientX: event.clientX,
-      clientY: event.clientY,
-      rect: options.canvas.getBoundingClientRect(),
-      canvas: { width: options.canvas.width, height: options.canvas.height },
-    });
+    const point = pointFrom(event);
+    // 余白（黒い所）から始まった操作は、端末のどこでもない。
     if (point === undefined) return;
-
-    options.send({ kind: 'tap', caseNo, x: point.x, y: point.y });
+    start = { ...point, at: now(), caseNo };
   };
 
-  options.canvas.addEventListener('click', onClick);
-  return () => options.canvas.removeEventListener('click', onClick);
+  const onUp = (event: MouseEvent): void => {
+    const from = start;
+    start = undefined;
+    // 押していないのに離した（枠の外で押し始めた等）。
+    if (from === undefined) return;
+
+    const to = pointFrom(event);
+    if (to === undefined) return;
+
+    const moved = Math.hypot(to.x - from.x, to.y - from.y);
+    if (moved <= TAP_SLOP) {
+      // 長く押していても、動いていなければタップ。**長押しはまだ無い**ので、
+      // 「押しっぱなし」を勝手に別の操作へ化けさせない。
+      options.send({ kind: 'tap', caseNo: from.caseNo, x: to.x, y: to.y });
+      return;
+    }
+
+    options.send({
+      kind: 'swipe',
+      caseNo: from.caseNo,
+      from: { x: from.x, y: from.y },
+      to,
+      durationMs: Math.round(clamp(now() - from.at, MIN_DURATION_MS, MAX_DURATION_MS)),
+    });
+  };
+
+  options.canvas.addEventListener('mousedown', onDown);
+  options.canvas.addEventListener('mouseup', onUp);
+  return () => {
+    options.canvas.removeEventListener('mousedown', onDown);
+    options.canvas.removeEventListener('mouseup', onUp);
+  };
 }

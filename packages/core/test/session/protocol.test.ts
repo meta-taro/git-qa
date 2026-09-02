@@ -125,3 +125,26 @@ describe('parseSessionState — 検証シートの場所', () => {
     expect(parseSessionState(base)).toMatchObject({ runId: 'r' });
   });
 });
+
+describe('parseHumanInput — 人がなぞる（スワイプ / フリック）', () => {
+  const swipe = {
+    kind: 'swipe',
+    caseNo: 1,
+    from: { x: 540, y: 2000 },
+    to: { x: 540, y: 400 },
+    durationMs: 120,
+  };
+
+  it('なぞった始点・終点・かかった時間を受け取る', () => {
+    expect(parseHumanInput(swipe)).toEqual(swipe);
+  });
+
+  it('座標が欠けていたら受け取らない', () => {
+    expect(parseHumanInput({ ...swipe, to: { x: 540 } })).toBeUndefined();
+  });
+
+  it('時間が 1 ms 未満・長すぎるものは受け取らない', () => {
+    expect(parseHumanInput({ ...swipe, durationMs: 0 })).toBeUndefined();
+    expect(parseHumanInput({ ...swipe, durationMs: 60_000 })).toBeUndefined();
+  });
+});

@@ -86,32 +86,101 @@ describe('installDeviceTouch', () => {
       toJSON: () => ({}),
     });
     const send = vi.fn();
-    installDeviceTouch({ canvas: canvasEl, state, send });
+    installDeviceTouch({ canvas: canvasEl, state, send, now: () => clock });
     return { canvasEl, send };
   };
 
-  const clickCenter = (canvasEl: HTMLCanvasElement): void => {
-    canvasEl.dispatchEvent(
-      new MouseEvent('click', {
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-        bubbles: true,
-      }),
-    );
+  let clock = 0;
+
+  /** 枠の中央を基準に、px ずらした位置で押す / 離す。 */
+  const at = (dx: number, dy: number) => ({
+    clientX: rect.left + rect.width / 2 + dx,
+    clientY: rect.top + rect.height / 2 + dy,
+    bubbles: true,
+  });
+
+  const press = (canvasEl: HTMLCanvasElement, dx = 0, dy = 0): void => {
+    canvasEl.dispatchEvent(new MouseEvent('mousedown', at(dx, dy)));
+  };
+  const release = (canvasEl: HTMLCanvasElement, dx = 0, dy = 0): void => {
+    canvasEl.dispatchEvent(new MouseEvent('mouseup', at(dx, dy)));
   };
 
-  it('人の番なら、押した所を送る', () => {
+  it('同じ所で押して離したら、タップ', () => {
+    clock = 0;
     const { canvasEl, send } = setup(() => waiting);
 
-    clickCenter(canvasEl);
+    press(canvasEl);
+    clock = 80;
+    release(canvasEl);
 
     expect(send).toHaveBeenCalledWith({ kind: 'tap', caseNo: 2, x: 540, y: 1110 });
   });
 
+  it('離れた所で離したら、なぞった操作として送る（フリック）', () => {
+    // **タップだけでは Android を操作できない。**ホームへ戻る動きがこれ。
+    clock = 0;
+    const { canvasEl, send } = setup(() => waiting);
+
+    press(canvasEl, 0, 100);
+    clock = 150;
+    release(canvasEl, 0, -100);
+
+    const input = send.mock.calls[0]?.[0] as {
+      kind: string;
+      from: { y: number };
+      to: { y: number };
+      durationMs: number;
+    };
+    expect(input.kind).toBe('swipe');
+    // 上へなぞったので、終点のほうが小さい（画面の上ほど y が小さい）。
+    expect(input.to.y).toBeLessThan(input.from.y);
+    expect(input.durationMs).toBe(150);
+  });
+
+  it('押した時間が長くても、動いていなければタップ（長押しはまだ無い）', () => {
+    clock = 0;
+    const { canvasEl, send } = setup(() => waiting);
+
+    press(canvasEl);
+    clock = 900;
+    release(canvasEl);
+
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ kind: 'tap' });
+  });
+
+  it('余白（黒い所）から始めたら送らない', () => {
+    clock = 0;
+    const { canvasEl, send } = setup(() => waiting);
+
+    canvasEl.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: rect.left + 2,
+        clientY: rect.top + 400,
+        bubbles: true,
+      }),
+    );
+    clock = 50;
+    release(canvasEl);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('押さずに離しただけでは送らない', () => {
+    const { canvasEl, send } = setup(() => waiting);
+
+    release(canvasEl);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('AI が操作している最中は送らない（どちらが触ったか分からなくなる）', () => {
+    clock = 0;
     const { canvasEl, send } = setup(() => ({ ...waiting, phase: 'running' }));
 
-    clickCenter(canvasEl);
+    press(canvasEl);
+    clock = 50;
+    release(canvasEl);
 
     expect(send).not.toHaveBeenCalled();
   });
@@ -119,7 +188,8 @@ describe('installDeviceTouch', () => {
   it('実行が終わっていたら送らない', () => {
     const { canvasEl, send } = setup(() => undefined);
 
-    clickCenter(canvasEl);
+    press(canvasEl);
+    release(canvasEl);
 
     expect(send).not.toHaveBeenCalled();
   });

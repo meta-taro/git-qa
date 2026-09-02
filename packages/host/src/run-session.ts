@@ -5,6 +5,7 @@ import {
   toCaseSubjects,
 } from '@git-qa/core';
 import type {
+  Action,
   Actor,
   CaseContext,
   CaseVerdict,
@@ -103,15 +104,22 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     // **遅れて届いた打鍵が、次のケースに付くのが一番まずい。**
     if (!waiting.has(input.caseNo)) return;
 
-    if (input.kind === 'tap') {
+    if (input.kind === 'tap' || input.kind === 'swipe') {
       // **人の番のときだけ端末へ送る**（待っている＝AI の操作は終わっている）。
       // AI の操作中に人の操作が割り込むと、どちらがやったのか証跡から読めなくなる。
-      void live.session
-        .act({ kind: 'tap', target: { at: 'point', x: input.x, y: input.y } })
-        .catch((error: unknown) => {
-          // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
-          console.error('[git-qa] 人の操作を端末へ送れない', error);
-        });
+      const action: Action =
+        input.kind === 'tap'
+          ? { kind: 'tap', target: { at: 'point', x: input.x, y: input.y } }
+          : {
+              kind: 'swipe',
+              from: { at: 'point', x: input.from.x, y: input.from.y },
+              to: { at: 'point', x: input.to.x, y: input.to.y },
+              durationMs: input.durationMs,
+            };
+      void live.session.act(action).catch((error: unknown) => {
+        // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
+        console.error('[git-qa] 人の操作を端末へ送れない', error);
+      });
       return;
     }
 

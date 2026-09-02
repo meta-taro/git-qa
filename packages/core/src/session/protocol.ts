@@ -47,7 +47,27 @@ export type HumanInput =
    * **AI が判断保留にして止まった後、人が自分で触って確かめる**のが中心の動き。
    * 見えるが触れない画面は、判断の材料にならない。
    */
-  | { readonly kind: 'tap'; readonly caseNo: number; readonly x: number; readonly y: number };
+  | { readonly kind: 'tap'; readonly caseNo: number; readonly x: number; readonly y: number }
+  /**
+   * 人がなぞった（スワイプ / フリック）。
+   *
+   * **タップだけでは Android を操作できない。**ホームへ戻る・一覧をたどるといった
+   * 基本の動きがなぞる操作で、これが無いと人は画面の外へ出られない。
+   */
+  | {
+      readonly kind: 'swipe';
+      readonly caseNo: number;
+      readonly from: Point;
+      readonly to: Point;
+      /** なぞるのにかけた時間。**速さがそのまま端末へ伝わる**（フリックか、ゆっくりかの差）。 */
+      readonly durationMs: number;
+    };
+
+/** 画面上の位置。 */
+export interface Point {
+  readonly x: number;
+  readonly y: number;
+}
 // **取り消しはまだ無い。**確定したケースを開け直す仕組みが要る（Issue 004 の既知の穴）。
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -61,6 +81,11 @@ const isCaseNo = (value: unknown): value is number =>
 const isPixel = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
+const parsePoint = (value: unknown): Point | undefined => {
+  if (!isRecord(value) || !isPixel(value['x']) || !isPixel(value['y'])) return undefined;
+  return { x: value['x'], y: value['y'] };
+};
+
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && (values as readonly string[]).includes(value);
 
@@ -71,6 +96,16 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
   const caseNo = raw['caseNo'];
 
   if (raw['kind'] === 'advance') return { kind: 'advance', caseNo };
+
+  if (raw['kind'] === 'swipe') {
+    const from = parsePoint(raw['from']);
+    const to = parsePoint(raw['to']);
+    const durationMs = raw['durationMs'];
+    if (from === undefined || to === undefined) return undefined;
+    // 1 ms 未満は端末が受け取らない。長すぎるものは、押しっぱなしの取りこぼし。
+    if (!isPixel(durationMs) || durationMs < 1 || durationMs > 10_000) return undefined;
+    return { kind: 'swipe', caseNo, from, to, durationMs };
+  }
 
   if (raw['kind'] === 'tap') {
     const { x, y } = raw;
