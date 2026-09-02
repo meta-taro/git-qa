@@ -17,13 +17,22 @@
 | TSV → 実行 → 人が `VERIFIED` → `run.json` の一本道 | ❌ **未着手**（Issue 004 の本体） |
 | 主指標（手作業との所要時間比較・C7） | ❌ **1 度も測っていない** |
 
-**人にしかできない工程が 4 つ止まっている**（§29）。
+**人にしかできない工程のうち 2 つが動いた（2026-09-02 11:40）。残りは 2 つ**（§29）。
 
 1. **画面のロック解除** — これが最大の詰まり。`pnpm live` の確認・Issue 010 の残り・
-   Docker Desktop の起動が、すべてこれ待ち
-2. **`gh auth login`** — GitHub Issue とコメントを**このセッションで 1 件も見ていない**
-3. **push** — 12 本溜まっている（**CI が 1 度も走っていない**）
-4. **`DESIGN.md`** — 全項目空。埋まるまで骨格に色は入れない（§11）
+   Docker Desktop の起動が、すべてこれ待ち。**未解除**
+2. **`DESIGN.md`** — 全項目空。埋まるまで骨格に色は入れない（§11）。**未着手**
+
+**動いた 2 つ**
+
+- **`gh auth login`** — 完了（`dokokade`・scope `repo` / `workflow` / `read:org` / `gist`）
+- **push** — 完了。13 commit が `3b0060d..2db47f4` として `origin/develop` に載り、
+  **CI が 5 日ぶりに走って 2 本とも success**（`verify` 57s / `oss-privacy-check` 8s・run 33584050094）
+
+**ただし GitHub 上に Issue は 1 件も無かった**（open 0 / closed 0 / PR 0・API でも 0 件）。
+Issue 001〜010 は `.claude/issues/` のローカル Markdown にしか存在しない。
+**CLAUDE.md の日課にある `gh issue list` / `gh issue view` は、受け口が無いまま空振りしていた。**
+→ ローカルの Issue を GitHub へ起こすかどうかは**人の判断待ち**（public への発信のため独断で出さない）
 
 ## 完了した作業
 
@@ -268,13 +277,14 @@ webview から反応が返らず、**ロック中はアプリが動いていな�
 ## 未完了の作業
 
 - **Issue 006 は close していない。**残り 1 条件は Fake アダプタ上で確認できたが、**実機で 1 回も走らせていない**
-- **Issue 002 は完了条件が揃った。**ただし **close は `gh` が要る**ので保留
-  （ローカルの `.claude/issues/002-*.md` には記録済み）。**当てたのはエミュレータで実機ではない**
+- **Issue 002 は完了条件が揃った。**ただし **GitHub 側に Issue が存在しない**ので
+  `gh issue close` する対象が無い（ローカルの `.claude/issues/002-*.md` には記録済み）。
+  **当てたのはエミュレータで実機ではない**
 - **Issue 010 は途中。**5 つ触ったが 3 つが未検証（ReportPortal は Docker、Maestro Studio と
   Appium Inspector は GUI）。**そのうち ReportPortal と Allure TestOps は「人の判定」を持つ
   可能性が残っている**ので、「作る / 作らない / 既存へ貢献する」の判定を書いていない
 - **Issue 003 も close していない。**骨格は出たが、完了条件のうち 2 つが未確認
-  - `gh run list --limit 3` で CI が success — **`gh` が未ログイン**（認証情報の投入は人・§14）。かつ **push は人間**（§6）なので CI はまだ 1 度も走っていない
+  - ~~`gh run list --limit 3` で CI が success~~ — **満たした**（2026-09-02 11:40・run 33584050094 が success）
   - README の手順どおり**別の PC で起動できる** — **この 1 台でしか確認していない**
 - **Issue 007 も close していない。**既定は決まったが、完了条件 2 つが未達
   - 月額の試算 — **超過単価が一次情報から取れていない**（docs に記載が無く料金計算機へ誘導。
@@ -284,7 +294,8 @@ webview から反応が返らず、**ロック中はアプリが動いていな�
 
 ## 次のタスク
 
-1. **人**: `gh auth login`（このセッションでは 120 秒で切れた。別のターミナルで実行が要る）→ push → CI が success することの確認
+1. ~~**人**: `gh auth login` → push → CI が success することの確認~~ — **完了**（2026-09-02 11:40）。
+   次は**ローカル Issue を GitHub へ起こすかどうかの判断**（人）
 2. **人**: 画面のロックを解いた状態で、空の 3 カラムが出ていることの確認（§29）
 3. **人**: 料金計算機で Git LFS の超過単価を確認（Issue 007 の残り）
 4. **人**: 画面のロックを解いて `pnpm live` を実行し、**枠の中に映像が出るかを見る**。
@@ -355,6 +366,8 @@ uiautomator が返さない要素・USB の切断といった実機固有の癖�
   `/opt/homebrew/share/android-commandlinetools` を入れた。**既存を先に確認すべきだった。**
   使っているのは既存のほう。brew 側は `brew uninstall --cask android-commandlinetools` で消せる
 - **主指標（同じケース群の所要時間・C7）をまだ 1 度も測っていない。**測る対象の選定は Issue 009（owner-task）
-- **`gh` が未ログイン。**GitHub Issue とそのコメントを 1 件も確認できていない（close 済 Issue への後追い指示も未確認）。**人が `gh auth login` を実行する必要がある**（§14）
+- **GitHub 上に Issue が 1 件も無い。**`gh` にログインして確認した結果、open 0 / closed 0 / PR 0
+  （API でも 0 件）。**Issue はローカルの `.claude/issues/` にしか無く、外から指示・訂正を入れる
+  経路が無い。**日課の `gh issue list` / `gh issue view` は空振りする
 - **`DESIGN.md` が全項目空。**骨格は OS の既定の配色で出ている。**AI は埋めない**（§11）
 - **Linux（WebKitGTK）で WebCodecs の H.264 復号を未測定**（ADR 0002 の「覆すべき条件」の 1 つ）。**macOS は 2026-09-02 に実測済で、成立しない**ことが分かった

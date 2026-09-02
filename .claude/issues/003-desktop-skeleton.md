@@ -99,10 +99,25 @@ CI に `verify`（format / lint / typecheck / test）を足した（`.github/wor
 
 **まだ満たしていない完了条件**
 
-- `gh run list --limit 3` で CI が success — **未確認。**`gh` は入れたが**未ログイン**（認証情報の投入は人の作業・§14）。かつ **push は人間**（§6）なので、CI はまだ 1 度も走っていない
 - README の手順どおりに**別の PC で起動できる** — **この 1 台でしか確認していない**
 - 空の 3 カラムが実際に出ているかの**画面の確認は人が行う**（§29）
 
+### 2026-09-02 11:40 — CI の完了条件が埋まった
+
+人が `gh auth login` と `git push origin develop` を実行し、溜まっていた 13 commit
+（`3b0060d..2db47f4`）が `origin/develop` に載った。**5 日ぶりに CI が走り、2 本とも success。**
+
+```
+gh run list --limit 2
+completed  success  verify             develop  push  33584050094  57s
+completed  success  oss-privacy-check  develop  push  33584050088   8s
+```
+
+push 前の手元のゲートも緑だった（`pnpm verify` exit 0 / 268 passed・6 skipped /
+`oss-privacy-check.sh` OK / 未 push 13 件の author はすべて noreply・§25）。
+
+**→ 完了条件「`gh run list --limit 3` で CI が success」は満たした。**残りは 2 つ。
+
 ## 結果
 
-（完了時に追記。**現時点では未完了** — 完了条件 4 つのうち満たしたのは ADR とテストの 2 つ。CI の success と別 PC での起動が未確認）
+（完了時に追記。**現時点では未完了** — 完了条件 4 つのうち満たしたのは ADR・テスト・**CI の success** の 3 つ。**別 PC での起動が未確認**、および画面の確認が人待ち）
