@@ -1,10 +1,12 @@
 import type { HumanInput, SessionState } from '@git-qa/core/session';
 
-import { resolveLocale } from './i18n/index.js';
 import { setLocale, t } from './i18n/current.js';
+import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.js';
+import { defaultStore } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
-import { renderColumns } from './render.js';
+import type { ConnectionStatus } from './onboarding/index.js';
+import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { commandForKey } from './session/keys.js';
@@ -23,15 +25,13 @@ if (!root) {
 }
 
 // 描く前に言語を決める。決める前に描くと、一瞬だけ別の言語が出る。
-setLocale(
-  resolveLocale(
-    [...navigator.languages],
-    new URLSearchParams(window.location.search).get('lang') ?? undefined,
-  ),
-);
+setLocale(effectiveLocale(loadLocaleChoice(defaultStore()), navigator.languages));
 
 /** 実行の状態。**打鍵と、人が端末を触る操作の両方がここを見る。** */
 let latest: SessionState | undefined;
+
+/** いま出ている案内の段階。言語が変わったときに描き直すために覚えておく。 */
+let onboarding: ConnectionStatus = 'disconnected';
 
 renderColumns(root);
 // 区切りは、カラムを描いた後に差し込む（描き直すと消えるため）。
@@ -39,6 +39,30 @@ installColumnResizers(root);
 // 外観の切り替えはメニューから（`src-tauri/src/menu.rs`）。**画面には部品を置かない。**
 void startAppearanceSync().catch((error: unknown) => {
   console.error('[appearance] メニューと繋がらない', error);
+});
+
+/**
+ * 言語が変わったときに、いま出ているものを書き直す。
+ *
+ * **カラムは作り直さない。**作り直すと、見ている映像（canvas）が消える。
+ */
+const redrawTexts = (): void => {
+  updateColumnTexts(root);
+  if (latest !== undefined) {
+    renderSession(root, latest);
+    return;
+  }
+  renderOnboarding(root, onboarding);
+};
+
+// 言語の切り替えもメニューから。**OS に従うだけだと、使う人が選べない。**
+void startLocaleSync({
+  onChange: (locale) => {
+    setLocale(locale);
+    redrawTexts();
+  },
+}).catch((error: unknown) => {
+  console.error('[i18n] メニューと繋がらない', error);
 });
 
 /**
@@ -52,7 +76,8 @@ async function startLiveView(
   onCanvas: (canvas: HTMLCanvasElement) => void,
 ): Promise<void> {
   // 映像を出す前に案内を片付ける。**残すと映像の上に説明が重なる。**
-  renderOnboarding(container, 'running');
+  onboarding = 'running';
+  renderOnboarding(container, onboarding);
 
   if (!(await isLiveViewSupported())) {
     // engine ごとに違う（macOS の WebKit で実際に落ちた・ADR 0002）。黙って空の枠にしない。
@@ -74,13 +99,11 @@ const liveUrl = liveStreamUrlFromLocation(window.location.search);
 const controlUrl = controlUrlFromLocation(window.location.search);
 
 // 繋がっていないときは、**次にやること**を中央に出す（Issue 011）。
-renderOnboarding(
-  root,
-  connectionStatus({
-    ...(liveUrl === undefined ? {} : { liveUrl }),
-    ...(controlUrl === undefined ? {} : { controlUrl }),
-  }),
-);
+onboarding = connectionStatus({
+  ...(liveUrl === undefined ? {} : { liveUrl }),
+  ...(controlUrl === undefined ? {} : { controlUrl }),
+});
+renderOnboarding(root, onboarding);
 
 if (liveUrl !== undefined) {
   startLiveView(root, liveUrl, (canvas) => {

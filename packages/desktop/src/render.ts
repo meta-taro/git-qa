@@ -29,3 +29,22 @@ export function renderColumns(root: HTMLElement, columns: readonly Column[] = CO
     root.append(section);
   }
 }
+
+/**
+ * 言語が変わったときに、**文言だけ**差し替える。
+ *
+ * **描き直さない。**`renderColumns` は中身を作り直すので、
+ * 言語を切り替えた拍子に、見ている映像（canvas）が消えてしまう。
+ */
+export function updateColumnTexts(root: HTMLElement, columns: readonly Column[] = COLUMNS): void {
+  for (const column of columns) {
+    const section = root.querySelector<HTMLElement>(`[data-column-id="${column.id}"]`);
+    if (section === null) continue;
+
+    const heading = section.querySelector('.column-heading');
+    if (heading !== null) heading.textContent = t(column.headingKey);
+
+    const placeholder = section.querySelector('.column-placeholder');
+    if (placeholder !== null) placeholder.textContent = t(column.placeholderKey);
+  }
+}

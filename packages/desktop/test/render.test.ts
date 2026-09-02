@@ -2,8 +2,8 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { COLUMNS } from '../src/columns.js';
-import { t } from '../src/i18n/current.js';
-import { renderColumns } from '../src/render.js';
+import { setLocale, t } from '../src/i18n/current.js';
+import { renderColumns, updateColumnTexts } from '../src/render.js';
 
 function columnsIn(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>('.column')];
@@ -79,5 +79,40 @@ describe('renderColumns', () => {
     expect(columnsIn(root)).toHaveLength(1);
     expect(only?.dataset['columnId']).toBe('live');
     expect(only?.style.getPropertyValue('--column-flex')).toBe('2');
+  });
+});
+
+describe('updateColumnTexts — 言語を切り替えたときに文言だけ差し替える', () => {
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    root = document.createElement('div');
+    document.body.append(root);
+  });
+
+  it('見出しと説明を、いまの言語で書き直す', () => {
+    renderColumns(root);
+    setLocale('en');
+    try {
+      updateColumnTexts(root);
+
+      expect(root.querySelector('.column-heading')?.textContent).toBe(t('column.cases.heading'));
+    } finally {
+      setLocale('ja');
+    }
+  });
+
+  it('カラムの中身は作り直さない（映像の canvas を消さない）', () => {
+    renderColumns(root);
+    const live = root.querySelector<HTMLElement>('[data-column-id="live"]')!;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'live-canvas';
+    live.append(canvas);
+
+    updateColumnTexts(root);
+
+    // **描き直すと映像が消える。**言語の切り替えで、見ている映像を落とさない。
+    expect(live.querySelector('.live-canvas')).toBe(canvas);
   });
 });

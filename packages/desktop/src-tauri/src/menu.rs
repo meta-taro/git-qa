@@ -15,8 +15,16 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 /// 2 つの語彙を持つと、片方だけ増やしたときに静かに食い違う。
 pub const APPEARANCES: [&str; 3] = ["system", "light", "dark"];
 
-fn menu_id(value: &str) -> String {
+/// 言語の選択肢。**`system` は「OS に従う」**で、実際に出す言語は画面側が決める
+/// （`navigator.languages` のほうが、環境変数より確かなため）。
+pub const LOCALES: [&str; 3] = ["system", "ja", "en"];
+
+fn appearance_id(value: &str) -> String {
   format!("appearance:{value}")
+}
+
+fn locale_id(value: &str) -> String {
+  format!("locale:{value}")
 }
 
 pub struct MenuText {
@@ -37,6 +45,10 @@ pub struct MenuText {
     pub appearance_system: &'static str,
     pub appearance_light: &'static str,
     pub appearance_dark: &'static str,
+    pub language: &'static str,
+    pub language_system: &'static str,
+    pub language_ja: &'static str,
+    pub language_en: &'static str,
 }
 
 const JA: MenuText = MenuText {
@@ -57,6 +69,10 @@ const JA: MenuText = MenuText {
     appearance_system: "システムに従う",
     appearance_light: "ライト",
     appearance_dark: "ダーク",
+    language: "言語",
+    language_system: "システムに従う",
+    language_ja: "日本語",
+    language_en: "English",
 };
 
 const EN: MenuText = MenuText {
@@ -77,31 +93,49 @@ const EN: MenuText = MenuText {
     appearance_system: "Follow the system",
     appearance_light: "Light",
     appearance_dark: "Dark",
+    language: "Language",
+    language_system: "Follow the system",
+    language_ja: "日本語",
+    language_en: "English",
 };
 
 /// どの言語で出すか。**既定は日本語**（webview 側と同じ判断・`src/i18n/locale.ts`）。
 ///
 /// `GIT_QA_LANG` が最優先。次に OS の `LC_ALL` / `LANG`。
 /// **読めない値のときは日本語へ落とす。**黙って英語にすると、日本語の利用者が英語を見る。
-fn text() -> &'static MenuText {
+fn text(effective: &str) -> &'static MenuText {
+    match effective {
+        "en" => &EN,
+        _ => &JA,
+    }
+}
+
+/// 起動時の言語。**画面がまだ何も言ってこない間**に使う見当。
+///
+/// `GIT_QA_LANG` が最優先。次に OS の `LC_ALL` / `LANG`。
+/// **読めない値のときは日本語へ落とす。**黙って英語にすると、日本語の利用者が英語を見る。
+pub fn locale_from_env() -> String {
     for key in ["GIT_QA_LANG", "LC_ALL", "LANG"] {
         let Ok(value) = std::env::var(key) else {
             continue;
         };
         let code = value.split(['-', '_', '.']).next().unwrap_or("").to_lowercase();
-        match code.as_str() {
-            "ja" => return &JA,
-            "en" => return &EN,
-            _ => continue,
+        if code == "ja" || code == "en" {
+            return code;
         }
     }
-    &JA
+    "ja".to_string()
 }
 
 /// アプリのメニューを組む。**最低限だけ置く。**
 /// 既定のメニューには使っていない項目（File / Help）が並んでいて、押しても何も起きない。
-pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let t = text();
+pub fn build<R: Runtime>(
+    app: &AppHandle<R>,
+    effective_locale: &str,
+    locale_choice: &str,
+    appearance: &str,
+) -> tauri::Result<Menu<R>> {
+    let t = text(effective_locale);
 
     // **版が分かる所を作る。**どれを触っているのか分からないまま報告を受けると、
     // 直っているはずのものが直っていない、という話が噛み合わない。
@@ -148,32 +182,65 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &CheckMenuItem::with_id(
                 app,
-                menu_id("system"),
+                appearance_id("system"),
                 t.appearance_system,
                 true,
-                true,
+                appearance == "system",
                 None::<&str>,
             )?,
             &CheckMenuItem::with_id(
                 app,
-                menu_id("light"),
+                appearance_id("light"),
                 t.appearance_light,
                 true,
-                false,
+                appearance == "light",
                 None::<&str>,
             )?,
             &CheckMenuItem::with_id(
                 app,
-                menu_id("dark"),
+                appearance_id("dark"),
                 t.appearance_dark,
                 true,
-                false,
+                appearance == "dark",
                 None::<&str>,
             )?,
         ],
     )?;
 
-    let view_menu = Submenu::with_items(app, t.view, true, &[&appearance_menu])?;
+    // **言語もここから選べる。**OS に従うだけだと、選ぶ手段が無い。
+    let language_menu = Submenu::with_items(
+        app,
+        t.language,
+        true,
+        &[
+            &CheckMenuItem::with_id(
+                app,
+                locale_id("system"),
+                t.language_system,
+                true,
+                locale_choice == "system",
+                None::<&str>,
+            )?,
+            &CheckMenuItem::with_id(
+                app,
+                locale_id("ja"),
+                t.language_ja,
+                true,
+                locale_choice == "ja",
+                None::<&str>,
+            )?,
+            &CheckMenuItem::with_id(
+                app,
+                locale_id("en"),
+                t.language_en,
+                true,
+                locale_choice == "en",
+                None::<&str>,
+            )?,
+        ],
+    )?;
+
+    let view_menu = Submenu::with_items(app, t.view, true, &[&appearance_menu, &language_menu])?;
 
     let window_menu = Submenu::with_items(
         app,
@@ -195,7 +262,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 /// 1. ウィンドウの外観（枠は OS が描くので、CSS では変えられない）
 /// 2. メニューのチェック
 /// 3. 画面（ページの中の `color-scheme` は webview 側が持っている）
-pub fn apply<R: Runtime>(app: &AppHandle<R>, value: &str) -> tauri::Result<()> {
+pub fn apply_appearance<R: Runtime>(app: &AppHandle<R>, value: &str) -> tauri::Result<()> {
   let theme = match value {
     "light" => Some(tauri::Theme::Light),
     "dark" => Some(tauri::Theme::Dark),
@@ -208,13 +275,19 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, value: &str) -> tauri::Result<()> {
     _ => "system",
   };
 
+  {
+    let state = app.state::<crate::state::SettingsState>();
+    let mut settings = state.0.lock().unwrap();
+    settings.appearance = normalized.to_string();
+  }
+
   for window in app.webview_windows().values() {
     window.set_theme(theme)?;
   }
 
   if let Some(menu) = app.menu() {
     for candidate in APPEARANCES {
-      if let Some(item) = menu.get(&menu_id(candidate)) {
+      if let Some(item) = menu.get(&appearance_id(candidate)) {
         if let Some(check) = item.as_check_menuitem() {
           check.set_checked(candidate == normalized)?;
         }
@@ -224,5 +297,33 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, value: &str) -> tauri::Result<()> {
 
   // 画面へ知らせる。**覚えるのは画面側**（次に開いたときに効かせるため）。
   app.emit("appearance", normalized)?;
+  Ok(())
+}
+
+/// 言語を切り替える。**メニューの文言そのものが変わるので、組み直す。**
+///
+/// `choice` は人が選んだもの（`system` を含む）、`effective` は実際に出す言語。
+/// `system` のときの判定は画面側が持っている（`navigator.languages` のほうが確か）。
+pub fn apply_locale<R: Runtime>(
+  app: &AppHandle<R>,
+  choice: &str,
+  effective: &str,
+) -> tauri::Result<()> {
+  let choice = if LOCALES.contains(&choice) { choice } else { "system" };
+  let effective = if effective == "en" { "en" } else { "ja" };
+
+  let appearance = {
+    let state = app.state::<crate::state::SettingsState>();
+    let mut settings = state.0.lock().unwrap();
+    settings.locale_choice = choice.to_string();
+    settings.locale_effective = effective.to_string();
+    settings.appearance.clone()
+  };
+
+  // 組み直すとチェックは作り直しになるので、外観の選択もそのまま渡す。
+  let menu = build(app, effective, choice, &appearance)?;
+  app.set_menu(menu)?;
+
+  app.emit("locale", choice)?;
   Ok(())
 }
