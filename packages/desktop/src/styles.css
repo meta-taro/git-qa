@@ -327,3 +327,80 @@ body {
   /* 押す前に気づく必要があるので、注記より強く出す。 */
   font-weight: 600;
 }
+
+/*
+ * 端末と検証シートを選ぶ画面（Issue 011 段階 3）。
+ * **色は決めない**（DESIGN.md が空・§11）。枠と強弱は currentColor から作る。
+ */
+
+.setup {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.setup-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.setup-heading {
+  margin: 0.75rem 0 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.setup-device-list,
+.setup-sheet-list {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.setup-device,
+.setup-sheet {
+  padding: 0.5rem 0.625rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+  /* 長いパスで横に伸びない。 */
+  overflow-wrap: anywhere;
+}
+
+.setup-device[aria-pressed='true'],
+.setup-sheet[aria-pressed='true'] {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  border-color: color-mix(in srgb, currentColor 50%, transparent);
+  font-weight: 600;
+}
+
+.setup-start {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.setup-start:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.setup-empty,
+.setup-error {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.setup-error {
+  font-weight: 600;
+}

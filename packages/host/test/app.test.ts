@@ -124,3 +124,16 @@ describe('runWithLiveView', () => {
     expect(launch).not.toHaveBeenCalled();
   });
 });
+
+describe('tauriDevArgs — アプリを入口にする（Issue 011 段階 3）', () => {
+  const config = (args: string[]): { build: { devUrl: string } } =>
+    JSON.parse(args[args.indexOf('--config') + 1] ?? '') as { build: { devUrl: string } };
+
+  it('端末に繋ぐ前でも画面を出せる（映像の URL がまだ無い）', () => {
+    const args = tauriDevArgs(undefined, { setupUrl: 'http://127.0.0.1:7/setup/abc' });
+    const url = new URL(config(args).build.devUrl);
+
+    expect(url.searchParams.get('setup')).toBe('http://127.0.0.1:7/setup/abc');
+    expect(url.searchParams.has('live')).toBe(false);
+  });
+});

@@ -16,6 +16,7 @@ import type {
   TargetSession,
 } from '@git-qa/core';
 
+import type { AdbDevice } from './adb.js';
 import {
   findElementCenter,
   inputCommands,
@@ -429,4 +430,28 @@ export async function readAndroidScreenText(session: TargetSession): Promise<str
     throw new Error('画面の生データが uiautomator の XML ではない');
   }
   return screenText(observation.raw);
+}
+
+export interface ListAndroidDevicesOptions {
+  readonly runner?: CommandRunner;
+  readonly adb?: string;
+}
+
+/**
+ * 繋がっている端末を並べる。
+ *
+ * **アプリを入口にするために要る**（Issue 011 段階 3）。いまはターミナルで `adb devices` を
+ * 打つしかなく、人が端末を選べない。
+ *
+ * **1 台も見えなくても落とさない。**選ぶ前の画面で落とすと、人は次に何をすればよいか
+ * 分からなくなる（「繋いでください」と出すのは画面側の仕事）。
+ */
+export async function listAndroidDevices(
+  options: ListAndroidDevicesOptions = {},
+): Promise<AdbDevice[]> {
+  const runner = options.runner ?? createNodeCommandRunner();
+  const adb = options.adb ?? 'adb';
+  // `-l` は付けない。要るのは serial と状態だけで、増やすと読む所も増える。
+  const result = await runner.run(adb, ['devices']);
+  return parseDeviceList(new TextDecoder().decode(result.stdout));
 }

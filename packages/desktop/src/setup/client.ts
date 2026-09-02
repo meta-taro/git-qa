@@ -1,0 +1,99 @@
+import { localHttpUrlFromLocation } from '../local-url.js';
+
+/**
+ * 入口サーバ（`@git-qa/host`）との線。
+ *
+ * **状態は取りに行く（polling）。**選ぶ画面は遅れに厳しくないので、
+ * 仕掛けを増やすより取りに行くほうが部品が少なくて済む。
+ */
+
+export interface SetupDevice {
+  readonly serial: string;
+  readonly state: string;
+}
+
+export type SetupPhase = 'idle' | 'starting' | 'running' | 'failed';
+
+export interface SetupState {
+  readonly phase: SetupPhase;
+  readonly devices: readonly SetupDevice[];
+  readonly sheets: readonly string[];
+  readonly liveUrl?: string;
+  readonly controlUrl?: string;
+  readonly error?: string;
+}
+
+const PHASES: readonly SetupPhase[] = ['idle', 'starting', 'running', 'failed'];
+
+/** `?setup=<url>` から読む。規則は映像・制御と同じ。 */
+export function setupUrlFromLocation(search: string): string | undefined {
+  return localHttpUrlFromLocation(search, 'setup');
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const asStrings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+function parseSetupState(raw: unknown): SetupState | undefined {
+  if (!isRecord(raw)) return undefined;
+  const phase = raw['phase'];
+  if (typeof phase !== 'string' || !(PHASES as readonly string[]).includes(phase)) return undefined;
+
+  const devices = Array.isArray(raw['devices'])
+    ? raw['devices'].filter(
+        (item): item is SetupDevice =>
+          isRecord(item) && typeof item['serial'] === 'string' && typeof item['state'] === 'string',
+      )
+    : [];
+
+  const text = (key: string): string | undefined =>
+    typeof raw[key] === 'string' ? raw[key] : undefined;
+
+  return {
+    phase: phase as SetupPhase,
+    devices,
+    sheets: asStrings(raw['sheets']),
+    ...(text('liveUrl') === undefined ? {} : { liveUrl: text('liveUrl') as string }),
+    ...(text('controlUrl') === undefined ? {} : { controlUrl: text('controlUrl') as string }),
+    ...(text('error') === undefined ? {} : { error: text('error') as string }),
+  };
+}
+
+/**
+ * いまの状態を読む。**読めなければ `undefined`。**
+ * 落とさないのは、入口サーバが立ち上がる前でも画面を出したいため。
+ */
+export async function fetchSetupState(
+  url: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SetupState | undefined> {
+  try {
+    const res = await fetchImpl(`${url}/state`);
+    if (!res.ok) return undefined;
+    return parseSetupState(await res.json());
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 選んだ端末とシートで始めてもらう。
+ *
+ * **断られたら落とす。**押したのに始まっていない状態で黙ると、人は待ち続ける。
+ */
+export async function requestStart(
+  url: string,
+  params: { serial: string; sheetPath: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetchImpl(`${url}/start`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (res.status !== 202) {
+    throw new Error(`実行を始められなかった: ${String(res.status)}`);
+  }
+}

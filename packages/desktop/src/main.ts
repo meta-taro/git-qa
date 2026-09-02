@@ -6,6 +6,8 @@ import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.
 import { defaultStore } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
+import { fetchSetupState, requestStart, setupUrlFromLocation } from './setup/client.js';
+import { renderSetup } from './setup/view.js';
 import type { ConnectionStatus } from './onboarding/index.js';
 import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
@@ -22,6 +24,11 @@ import { mountLiveView, showLiveViewError } from './live/view.js';
 import { createWebCodecsDecoder, isLiveViewSupported } from './live/webcodecs.js';
 import './styles.css';
 
+// 【一時】どこまで動いたかを外から見るための印。原因が分かったら消す。
+void fetch(
+  `${new URLSearchParams(window.location.search).get('setup') ?? ''}/state?probe=top`,
+).catch(() => undefined);
+
 // **画面の中で起きたことを、Node 側のログへ流す。**
 // これが無いと、映らない・動かないときに「人に聞く」しか手が無い。
 void attachConsoleToLog();
@@ -31,6 +38,9 @@ if (!root) {
   // 握り潰さない（product-baseline §8）。index.html と食い違ったら起動時に分かるようにする。
   throw new Error('#app が index.html に無い');
 }
+
+/** 絞り込み済みの参照。**巻き上げられる関数の中からも使える**ようにするため。 */
+const app: HTMLElement = root;
 
 // 描く前に言語を決める。決める前に描くと、一瞬だけ別の言語が出る。
 setLocale(effectiveLocale(loadLocaleChoice(defaultStore()), navigator.languages));
@@ -159,23 +169,26 @@ async function startLiveView(
 
 const liveUrl = liveStreamUrlFromLocation(window.location.search);
 const controlUrl = controlUrlFromLocation(window.location.search);
+const setupUrl = setupUrlFromLocation(window.location.search);
 
-// 繋がっていないときは、**次にやること**を中央に出す（Issue 011）。
-onboarding = connectionStatus({
-  ...(liveUrl === undefined ? {} : { liveUrl }),
-  ...(controlUrl === undefined ? {} : { controlUrl }),
-});
-renderOnboarding(root, onboarding);
+/**
+ * 端末に繋がったら、映像と実行状態を出す。
+ *
+ * **入口が 2 つある。**起動時に URL で渡される場合（`pnpm run:sheet`）と、
+ * 画面で選んで始めた場合（`pnpm app`・Issue 011 段階 3）。**どちらも同じ道を通す。**
+ */
+const startSession = (live: string, control: string | undefined): void => {
+  onboarding = 'running';
+  renderOnboarding(root, onboarding);
 
-if (liveUrl !== undefined) {
-  startLiveView(root, liveUrl, (canvas) => {
+  startLiveView(root, live, (canvas) => {
     // **人が端末を触れるようにする**（Issue 013）。実行に繋がっているときだけ。
-    if (controlUrl === undefined) return;
+    if (control === undefined) return;
     installDeviceTouch({
       canvas,
       state: () => latest,
       send: (input) => {
-        sendHumanInput(controlUrl, input).catch((error: unknown) => {
+        sendHumanInput(control, input).catch((error: unknown) => {
           showSessionError(root, error instanceof Error ? error.message : String(error));
         });
       },
@@ -189,18 +202,75 @@ if (liveUrl !== undefined) {
       t('live.error', { message: error instanceof Error ? error.message : String(error) }),
     );
   });
+
+  if (control === undefined) return;
+  startControl(control);
+};
+
+// 繋がっていないときは、**次にやること**を中央に出す（Issue 011）。
+onboarding = connectionStatus({
+  ...(liveUrl === undefined ? {} : { liveUrl }),
+  ...(controlUrl === undefined ? {} : { controlUrl }),
+});
+if (setupUrl === undefined) renderOnboarding(root, onboarding);
+
+if (liveUrl !== undefined) {
+  startSession(liveUrl, controlUrl);
+} else if (setupUrl !== undefined) {
+  /**
+   * 端末とシートを選んで始める（Issue 011 段階 3）。
+   *
+   * **状態は取りに行く。**選ぶ画面は遅れに厳しくないので、仕掛けを増やさない。
+   */
+  const url = setupUrl;
+
+  const tick = async (): Promise<void> => {
+    const state = await fetchSetupState(url);
+    if (state === undefined) return;
+
+    if (state.phase === 'running' && state.liveUrl !== undefined) {
+      window.clearInterval(poll);
+      renderSetup(app, state, { onStart: () => undefined });
+      startSession(state.liveUrl, state.controlUrl);
+      return;
+    }
+
+    renderSetup(app, state, {
+      onStart: (params) => {
+        requestStart(url, params).catch((error: unknown) => {
+          showSessionError(app, error instanceof Error ? error.message : String(error));
+        });
+      },
+    });
+  };
+
+  /**
+   * **ウィンドウが完全に隠れると、macOS が画面の時計を止める。**
+   * 止まっている間に実行が始まっていても気づけないので、**戻ってきたら取り直す。**
+   */
+  const resync = (): void => {
+    if (document.visibilityState === 'visible') void tick();
+  };
+  document.addEventListener('visibilitychange', resync);
+  window.addEventListener('focus', resync);
+
+  const poll = window.setInterval(() => {
+    void tick();
+  }, 1000);
+
+  // 最初の 1 回は待たずに出す。**開いた直後に空の画面を見せない。**
+  void tick();
 }
 
 /**
- * 実行器（Node）と繋いでいるときだけ、左右のカラムを実行の状態にする。
+ * 実行器（Node）と繋ぐ。左右のカラムが実行の状態になる。
  *
  * **ここは配線なので検査していない。**判断のある所（キーの割り当て・状態の描き方・
  * 届いたものの検証）は `session/` にあり、そちらは検査してある。
  */
-if (controlUrl !== undefined) {
+function startControl(controlUrl: string): void {
   // 画面の中の様子を置き続ける。**繋がっていない / 復号で落ちている / 描いているが見えない**
   // のどれなのかを、人に聞かずに切り分けられるようにする。
-  const url = controlUrl;
   setInterval(() => {
     const report: DiagnosticsReport = {
       decoded: diagnostics.decoded,
@@ -215,8 +285,11 @@ if (controlUrl !== undefined) {
       ...(diagnostics.canvas === undefined ? {} : { canvas: diagnostics.canvas }),
       ...(diagnostics.lastError === undefined ? {} : { lastError: diagnostics.lastError }),
     };
-    void reportDiagnostics(url, report);
+    void reportDiagnostics(controlUrl, report);
   }, 2000);
+
+  /** 前に見ていた打鍵待ちのケース。カーソルを追従させるかの判断に使う。 */
+  let previousAwaiting: number | undefined;
 
   connectControl({
     url: controlUrl,
@@ -225,12 +298,9 @@ if (controlUrl !== undefined) {
       // 打鍵待ちが進んだら、見ている所も追いかける（戻って見ている最中は動かさない）。
       if (cursor === undefined || cursor === previousAwaiting) cursor = state.awaiting;
       previousAwaiting = state.awaiting;
-      renderSession(root, state, { ...(cursor === undefined ? {} : { cursor }) });
+      renderSession(app, state, { ...(cursor === undefined ? {} : { cursor }) });
     },
   });
-
-  /** 前に見ていた打鍵待ちのケース。カーソルを追従させるかの判断に使う。 */
-  let previousAwaiting: number | undefined;
 
   /** 走り終わったケースだけを行き来する。**まだ走っていないケースには行けない。** */
   const move = (step: -1 | 1): void => {
@@ -243,7 +313,7 @@ if (controlUrl !== undefined) {
     const next = visitable[Math.min(Math.max(at + step, 0), visitable.length - 1)];
     if (next === undefined) return;
     cursor = next;
-    renderSession(root, state, { cursor });
+    renderSession(app, state, { cursor });
   };
 
   /** 打鍵とクリックで、まったく同じ道を通す。 */
@@ -263,7 +333,7 @@ if (controlUrl !== undefined) {
         : { kind: 'verdict', caseNo, humanResult: command.humanResult };
 
     sendHumanInput(controlUrl, input).catch((error: unknown) => {
-      showSessionError(root, error instanceof Error ? error.message : String(error));
+      showSessionError(app, error instanceof Error ? error.message : String(error));
     });
   };
 
@@ -275,7 +345,7 @@ if (controlUrl !== undefined) {
   });
 
   // **打鍵だけにしない。**初めて触る人は、どのキーが何をするか知らない。
-  installVerdictButtons(root, (key) => {
+  installVerdictButtons(app, (key) => {
     const command = commandForKey({ key });
     if (command !== undefined) place(command);
   });

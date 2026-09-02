@@ -37,6 +37,8 @@ export interface TauriDevArgsOptions {
   readonly devUrl?: string;
   /** 打鍵を返す口。**実行を伴わない `pnpm live` では渡さない。** */
   readonly controlUrl?: string;
+  /** 端末とシートを選ぶ口。**アプリを入口にするときに渡す**（Issue 011 段階 3）。 */
+  readonly setupUrl?: string;
 }
 
 /**
@@ -45,11 +47,16 @@ export interface TauriDevArgsOptions {
  * **Tauri は devUrl を開く。**起動時の値を webview へ渡す口はここしか無いので、
  * 映像と制御の URL をクエリに載せる。生で埋めるとクエリが壊れるので `URL` に組ませる。
  */
-export function tauriDevArgs(liveUrl: string, options: TauriDevArgsOptions = {}): string[] {
+export function tauriDevArgs(
+  liveUrl: string | undefined,
+  options: TauriDevArgsOptions = {},
+): string[] {
   const target = new URL(options.devUrl ?? DEFAULT_DEV_URL);
-  target.searchParams.set('live', liveUrl);
+  // 端末に繋ぐ前に画面を出す場合は、まだ映像の URL が無い。
+  if (liveUrl !== undefined) target.searchParams.set('live', liveUrl);
   // 繋いでいないのに口があるように見せない。画面側は `?control=` の有無で振る舞いを変える。
   if (options.controlUrl !== undefined) target.searchParams.set('control', options.controlUrl);
+  if (options.setupUrl !== undefined) target.searchParams.set('setup', options.setupUrl);
 
   return ['dev', '--config', JSON.stringify({ build: { devUrl: target.toString() } })];
 }

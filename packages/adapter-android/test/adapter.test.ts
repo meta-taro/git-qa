@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { describeAdapterContract } from '@git-qa/core/testing';
 import type { TargetAdapter } from '@git-qa/core';
 
-import { createAndroidAdapter, readAndroidScreenText } from '../src/index.js';
+import { createAndroidAdapter, listAndroidDevices, readAndroidScreenText } from '../src/index.js';
 import type {
   CommandResult,
   CommandRunner,
@@ -516,5 +516,32 @@ describe('映像の読み手が入れ替わったとき', () => {
 
     // 止めないと、screenrecord が端末に残り続ける。
     expect(runner.processes.some((p) => !p.isRunning)).toBe(true);
+  });
+});
+
+describe('listAndroidDevices — 繋がっている端末を並べる', () => {
+  /**
+   * **アプリを入口にするために要る**（Issue 011 段階 3）。
+   * いまはターミナルで `adb devices` を打つしかなく、人が端末を選べない。
+   */
+  it('見えている端末を返す', async () => {
+    const runner = fakeRunner();
+
+    const devices = await listAndroidDevices({ runner });
+
+    expect(devices).toEqual([{ serial: 'emulator-5554', state: 'device' }]);
+  });
+
+  it('1 台も見えていなければ空（落とさない）', async () => {
+    // **選ぶ前の画面で落とすと、人は次に何をすればよいか分からない。**
+    const runner = fakeRunner({
+      devices: {
+        code: 0,
+        stdout: new TextEncoder().encode('List of devices attached\n'),
+        stderr: '',
+      },
+    });
+
+    await expect(listAndroidDevices({ runner })).resolves.toEqual([]);
   });
 });

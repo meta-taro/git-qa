@@ -65,8 +65,12 @@ const ALLOWED_ORIGINS: readonly string[] = [
   'https://tauri.localhost',
 ];
 
-/** 名乗ってきたオリジンが許せるものなら、そのまま返す。**`*` は返さない。** */
-function corsHeaders(origin: string | undefined): Record<string, string> {
+/**
+ * 名乗ってきたオリジンが許せるものなら、そのまま返す。**`*` は返さない。**
+ *
+ * **輸出しているのは、同じ規則を 2 箇所に書かないため。**片方だけ緩めると気づけない。
+ */
+export function corsHeaders(origin: string | undefined): Record<string, string> {
   if (origin === undefined || !ALLOWED_ORIGINS.includes(origin)) return {};
   return { 'access-control-allow-origin': origin, vary: 'origin' };
 }

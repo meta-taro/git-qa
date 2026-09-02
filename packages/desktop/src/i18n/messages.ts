@@ -40,6 +40,15 @@ const ja = {
   'live.unsupported': 'この webview は H.264 の復号に対応していない',
   'live.error': 'ライブ映像を出せない: {message}',
 
+  'setup.title': '始める',
+  'setup.device': '1. 端末を選ぶ',
+  'setup.device.none': '端末が見えていない。USB で繋ぐか、エミュレータを起動する',
+  'setup.sheet': '2. 検証シートを選ぶ',
+  'setup.sheet.none': '検証シート（TSV）が見つからない',
+  'setup.start': '実行を始める',
+  'setup.starting': '始めている…',
+  'setup.failed': '始められなかった: {message}',
+
   'onboarding.title': 'はじめかた',
   'onboarding.lead': 'この 3 つが済むと、検証中の端末の画面がここに出る',
   'onboarding.current': 'いまここ',
@@ -99,6 +108,15 @@ const en: Record<keyof typeof ja, string> = {
 
   'live.unsupported': 'This webview cannot decode H.264',
   'live.error': 'Cannot show the live view: {message}',
+
+  'setup.title': 'Start a run',
+  'setup.device': '1. Pick a device',
+  'setup.device.none': 'No device is visible. Plug one in over USB, or start an emulator',
+  'setup.sheet': '2. Pick a test sheet',
+  'setup.sheet.none': 'No test sheet (TSV) was found',
+  'setup.start': 'Start the run',
+  'setup.starting': 'Starting…',
+  'setup.failed': 'Could not start: {message}',
 
   'onboarding.title': 'Getting started',
   'onboarding.lead': 'Once these three are done, the device screen appears here',
