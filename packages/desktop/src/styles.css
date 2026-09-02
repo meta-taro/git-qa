@@ -56,13 +56,37 @@ body {
 
 /*
  * 外観の切り替え。**色は指定しない**（DESIGN.md が空・§11）。
- * 切り替えるのは color-scheme だけで、実際の色は OS が持っているものを使う。
+ * 切り替えるのは color-scheme とウィンドウの外観だけで、実際の色は OS のものを使う。
  */
-.appearance-select {
+.appearance {
+  display: inline-flex;
+  /* 枠を共有して 1 つの部品に見せる。 */
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.appearance-option {
+  appearance: none;
+  margin: 0;
+  padding: 0.125rem 0.5rem;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 400;
-  max-width: 9rem;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  cursor: pointer;
+}
+
+.appearance-option:first-child {
+  border-left: 0;
+}
+
+.appearance-option[aria-pressed='true'] {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  font-weight: 600;
 }
 
 .column-placeholder {
@@ -157,10 +181,18 @@ body {
 }
 
 .key-binding {
+  /* **1 文字のキーは正方形。**実物のキーに見えるほうが、押すものだと分かる。 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
   padding: 0 0.375rem;
   font-family: ui-monospace, monospace;
   border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  border-radius: 3px;
+  /* 下辺を厚くして、キートップの厚みに見せる。 */
+  border-bottom-width: 2px;
+  border-radius: 4px;
 }
 
 .key-label {

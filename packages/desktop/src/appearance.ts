@@ -5,7 +5,8 @@ import type { MessageKey } from './i18n/index.js';
  * ライト / ダークの切り替え。
  *
  * **色は決めない**（`DESIGN.md` が空・product-baseline §11）。
- * ここで切り替えるのは `color-scheme` だけで、実際の色は OS が持っているものを使う。
+ * ここで切り替えるのは `color-scheme` と**ウィンドウの外観**だけで、
+ * 実際の色は OS が持っているものを使う。
  * **独自の配色をここで置くと、それがそのまま既成事実になる。**
  * `DESIGN.md` が埋まったら、そのときに配色を入れる。
  */
@@ -66,8 +67,23 @@ const LABELS: Readonly<Record<Appearance, MessageKey>> = {
   dark: 'appearance.dark',
 };
 
+/**
+ * ウィンドウ（タイトルバー）の外観を切り替える。
+ *
+ * **CSS はページの中しか変えない。**枠は OS が描くので、Tauri 側へ伝える必要がある。
+ * ブラウザで開いているとき（`pnpm --filter @git-qa/desktop dev`）は Tauri がいないので、
+ * **黙って何もしない。**ここで落とすと、ブラウザでは画面が出なくなる。
+ */
+async function setNativeThemeViaTauri(value: Appearance): Promise<void> {
+  if (!('__TAURI_INTERNALS__' in window)) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('set_appearance', { appearance: value });
+}
+
 export interface InstallAppearanceControlOptions {
   readonly store?: AppearanceStore;
+  /** 差し替え口。既定は Tauri へ伝える。 */
+  readonly setNativeTheme?: (value: Appearance) => void | Promise<void>;
 }
 
 /**
@@ -81,34 +97,49 @@ export function installAppearanceControl(
   options: InstallAppearanceControlOptions = {},
 ): void {
   const store = options.store ?? defaultStore();
+  const setNativeTheme = options.setNativeTheme ?? setNativeThemeViaTauri;
+  const doc = root.ownerDocument;
+
   const heading = root.querySelector<HTMLElement>('[data-column-id="verdict"] .column-heading');
   if (heading === null) {
     // 握り潰さない。カラムの構成を変えたときに、静かに消えるのを防ぐ。
     throw new Error('判定カラムの見出しが画面に無い');
   }
-  heading.querySelector('.appearance-select')?.remove();
+  heading.querySelector('.appearance')?.remove();
 
-  const select = root.ownerDocument.createElement('select');
-  select.className = 'appearance-select';
-  select.title = t('appearance.label');
-  select.setAttribute('aria-label', t('appearance.label'));
+  const group = doc.createElement('div');
+  group.className = 'appearance';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', t('appearance.label'));
+
+  const buttons = new Map<Appearance, HTMLButtonElement>();
+
+  const select = (value: Appearance, remember: boolean): void => {
+    applyAppearance(doc, value);
+    for (const [key, button] of buttons) {
+      button.setAttribute('aria-pressed', String(key === value));
+    }
+    if (remember) saveAppearance(value, store);
+    // 枠は OS が描く。伝えられなくても、ページの中の切り替えは効いている。
+    void Promise.resolve(setNativeTheme(value)).catch((error: unknown) => {
+      console.error('[appearance] ウィンドウの外観を切り替えられない', error);
+    });
+  };
 
   for (const value of APPEARANCES) {
-    const option = root.ownerDocument.createElement('option');
-    option.value = value;
-    option.textContent = t(LABELS[value]);
-    select.append(option);
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = 'appearance-option';
+    button.dataset['appearance'] = value;
+    button.textContent = t(LABELS[value]);
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', () => {
+      select(value, true);
+    });
+    buttons.set(value, button);
+    group.append(button);
   }
 
-  const current = loadAppearance(store);
-  select.value = current;
-  applyAppearance(root.ownerDocument, current);
-
-  select.addEventListener('change', () => {
-    const value = isAppearance(select.value) ? select.value : 'system';
-    applyAppearance(root.ownerDocument, value);
-    saveAppearance(value, store);
-  });
-
-  heading.append(select);
+  heading.append(group);
+  select(loadAppearance(store), false);
 }

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionState } from '@git-qa/core/session';
 
 import {
@@ -16,8 +16,8 @@ import { renderSession } from '../src/session/view.js';
  * ライト / ダークの切り替え。
  *
  * **色は決めない**（`DESIGN.md` が空・product-baseline §11）。
- * ここで切り替えるのは `color-scheme` だけで、実際の色は OS が持っているものを使う。
- * 独自の配色を置くと、それがそのまま既成事実になる。
+ * ここで切り替えるのは `color-scheme` と**ウィンドウの外観**だけで、
+ * 実際の色は OS が持っているものを使う。独自の配色を置くと、それが既成事実になる。
  */
 
 const memoryStore = (initial?: string): AppearanceStore & { value: string | undefined } => {
@@ -85,32 +85,62 @@ describe('loadAppearance', () => {
 });
 
 describe('installAppearanceControl', () => {
-  const control = (): HTMLSelectElement =>
-    root.querySelector<HTMLSelectElement>('.appearance-select')!;
+  const buttons = (): HTMLButtonElement[] => [
+    ...root.querySelectorAll<HTMLButtonElement>('.appearance-option'),
+  ];
+  const button = (value: string): HTMLButtonElement =>
+    buttons().find((b) => b.dataset['appearance'] === value)!;
 
   it('判定カラムの見出しに置く（3 カラムの中身を奪わない）', () => {
     installAppearanceControl(root, { store: memoryStore() });
 
     const heading = root.querySelector('[data-column-id="verdict"] .column-heading');
-    expect(heading?.querySelector('.appearance-select')).not.toBeNull();
+    expect(heading?.querySelector('.appearance')).not.toBeNull();
   });
 
-  it('選ぶと、その場で切り替わって保存される', () => {
+  it('プルダウンではなく、押せる 3 つの選択肢として出す', () => {
+    installAppearanceControl(root, { store: memoryStore() });
+
+    expect(root.querySelector('select')).toBeNull();
+    expect(buttons()).toHaveLength(3);
+    expect(root.querySelector('.appearance')?.getAttribute('role')).toBe('group');
+  });
+
+  it('いま選ばれているものが、押した状態として分かる', () => {
+    installAppearanceControl(root, { store: memoryStore('light') });
+
+    expect(button('light').getAttribute('aria-pressed')).toBe('true');
+    expect(button('dark').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('押すと、その場で切り替わって保存される', () => {
     const store = memoryStore();
     installAppearanceControl(root, { store });
 
-    control().value = 'dark';
-    control().dispatchEvent(new Event('change'));
+    button('dark').click();
 
     expect(document.documentElement.style.colorScheme).toBe('dark');
     expect(store.value).toBe('dark');
+    expect(button('dark').getAttribute('aria-pressed')).toBe('true');
+    expect(button('system').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('ウィンドウの外観（タイトルバー）も切り替える', () => {
+    // **CSS はページの中しか変えない。**枠は OS が描くので、そちらへも伝える。
+    const setNativeTheme = vi.fn();
+    installAppearanceControl(root, { store: memoryStore(), setNativeTheme });
+
+    button('light').click();
+
+    expect(setNativeTheme).toHaveBeenLastCalledWith('light');
   });
 
   it('前に選んだものが、起動時に効いている', () => {
-    installAppearanceControl(root, { store: memoryStore('light') });
+    const setNativeTheme = vi.fn();
+    installAppearanceControl(root, { store: memoryStore('light'), setNativeTheme });
 
     expect(document.documentElement.style.colorScheme).toBe('light');
-    expect(control().value).toBe('light');
+    expect(setNativeTheme).toHaveBeenCalledWith('light');
   });
 
   it('実行の状態を描き直しても消えない', () => {
@@ -125,6 +155,6 @@ describe('installAppearanceControl', () => {
     renderSession(root, state);
     renderSession(root, state);
 
-    expect(root.querySelectorAll('.appearance-select')).toHaveLength(1);
+    expect(root.querySelectorAll('.appearance')).toHaveLength(1);
   });
 });
