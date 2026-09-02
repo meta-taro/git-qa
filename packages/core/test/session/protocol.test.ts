@@ -83,3 +83,27 @@ describe('parseSessionState — Node から届いた実行状態', () => {
     ).toBeUndefined();
   });
 });
+
+describe('parseHumanInput — 人が端末を触る', () => {
+  it('画面の中の tap を受け取る', () => {
+    expect(parseHumanInput({ kind: 'tap', caseNo: 2, x: 540, y: 1200 })).toEqual({
+      kind: 'tap',
+      caseNo: 2,
+      x: 540,
+      y: 1200,
+    });
+  });
+
+  it('座標が無い・数でないものは受け取らない', () => {
+    expect(parseHumanInput({ kind: 'tap', caseNo: 2, x: 540 })).toBeUndefined();
+    expect(parseHumanInput({ kind: 'tap', caseNo: 2, x: '540', y: 1200 })).toBeUndefined();
+  });
+
+  it('負の座標は受け取らない（枠の外を押している）', () => {
+    expect(parseHumanInput({ kind: 'tap', caseNo: 2, x: -1, y: 10 })).toBeUndefined();
+  });
+
+  it('整数でない座標は丸めずに捨てる（端末は画素の位置しか受け取らない）', () => {
+    expect(parseHumanInput({ kind: 'tap', caseNo: 2, x: 10.5, y: 10 })).toBeUndefined();
+  });
+});

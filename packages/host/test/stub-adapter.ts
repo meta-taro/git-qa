@@ -15,6 +15,8 @@ export function nal(type: number, first = true): Uint8Array {
 export interface StubTrace {
   readonly opened: string[];
   readonly closed: string[];
+  /** 受けた操作。順番のまま。 */
+  readonly actions: Action[];
 }
 
 /**
@@ -29,6 +31,7 @@ export function stubAdapter(options: {
 }): TargetAdapter & StubTrace {
   const opened: string[] = [];
   const closed: string[] = [];
+  const actions: Action[] = [];
   const mode = options.mode ?? 'h264-stream';
   const chunks = options.chunks ?? [nal(7), nal(8), nal(5), nal(1)];
 
@@ -77,7 +80,10 @@ export function stubAdapter(options: {
       stop: () => Promise.resolve({ state: 'not_requested' as const }),
     },
     isClosed: false,
-    act: (_action: Action) => Promise.resolve(),
+    act: (action: Action) => {
+      actions.push(action);
+      return Promise.resolve();
+    },
     observe: (): Promise<Observation> =>
       Promise.resolve({ kind: 'android', capturedAt: '2026-09-02T00:00:00.000Z', raw: '' }),
     screenshot: (): Promise<Screenshot> =>
@@ -101,5 +107,6 @@ export function stubAdapter(options: {
     },
     opened,
     closed,
+    actions,
   };
 }

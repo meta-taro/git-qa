@@ -8,6 +8,7 @@ import { renderColumns } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { commandForKey } from './session/keys.js';
+import { installDeviceTouch } from './session/touch.js';
 import { renderSession, showSessionError } from './session/view.js';
 import { createLivePlayer } from './live/player.js';
 import { liveStreamUrlFromLocation, openLiveStream, pumpLiveStream } from './live/stream.js';
@@ -29,6 +30,9 @@ setLocale(
   ),
 );
 
+/** 実行の状態。**打鍵と、人が端末を触る操作の両方がここを見る。** */
+let latest: SessionState | undefined;
+
 renderColumns(root);
 // 区切りは、カラムを描いた後に差し込む（描き直すと消えるため）。
 installColumnResizers(root);
@@ -42,7 +46,11 @@ void startAppearanceSync().catch((error: unknown) => {
  *
  * **繋いでいないのに空の枠を出さない。**映らないのか繋いでいないのかが人に分からなくなる。
  */
-async function startLiveView(container: HTMLElement, url: string): Promise<void> {
+async function startLiveView(
+  container: HTMLElement,
+  url: string,
+  onCanvas: (canvas: HTMLCanvasElement) => void,
+): Promise<void> {
   // 映像を出す前に案内を片付ける。**残すと映像の上に説明が重なる。**
   renderOnboarding(container, 'running');
 
@@ -53,6 +61,7 @@ async function startLiveView(container: HTMLElement, url: string): Promise<void>
 
   // 実寸は最初の絵が来た時点で合わせ直す（view.ts）。ここは仮の大きさ。
   const surface = mountLiveView(container, { width: 1080, height: 2220 });
+  onCanvas(surface.canvas);
   const player = createLivePlayer({
     createDecoder: createWebCodecsDecoder,
     onFrame: (frame) => surface.draw(frame),
@@ -74,7 +83,19 @@ renderOnboarding(
 );
 
 if (liveUrl !== undefined) {
-  startLiveView(root, liveUrl).catch((error: unknown) => {
+  startLiveView(root, liveUrl, (canvas) => {
+    // **人が端末を触れるようにする**（Issue 013）。実行に繋がっているときだけ。
+    if (controlUrl === undefined) return;
+    installDeviceTouch({
+      canvas,
+      state: () => latest,
+      send: (input) => {
+        sendHumanInput(controlUrl, input).catch((error: unknown) => {
+          showSessionError(root, error instanceof Error ? error.message : String(error));
+        });
+      },
+    });
+  }).catch((error: unknown) => {
     // **映らない理由を画面に出す。**console だけだと人には見えず、待ち続けることになる。
     console.error('[live-view]', error);
     showLiveViewError(
@@ -91,8 +112,6 @@ if (liveUrl !== undefined) {
  * 届いたものの検証）は `session/` にあり、そちらは検査してある。
  */
 if (controlUrl !== undefined) {
-  let latest: SessionState | undefined;
-
   connectControl({
     url: controlUrl,
     onState: (state) => {

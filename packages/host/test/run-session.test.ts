@@ -176,3 +176,64 @@ describe('startRunSession', () => {
     await session.close();
   });
 });
+
+describe('人が端末を触る', () => {
+  /**
+   * **AI が判断保留にして止まった後、人が自分で触って確かめる**のが中心の動き。
+   * 見えるが触れない画面は、判断の材料にならない（Issue 013）。
+   */
+  it('人の番のときは、押した所が端末へ届く', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({});
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-200000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'tap', caseNo: 1, x: 540, y: 1200 });
+    await waitFor(
+      () => adapter.actions.some((a) => a.kind === 'tap' && a.target.at === 'point'),
+      '端末への tap',
+    );
+
+    expect(adapter.actions.at(-1)).toEqual({
+      kind: 'tap',
+      target: { at: 'point', x: 540, y: 1200 },
+    });
+
+    session.abort('検査の後始末');
+    await session.done;
+    await session.close();
+  });
+
+  it('待っているケース以外宛の操作は捨てる', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({});
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-200100',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    const before = adapter.actions.length;
+    bridge.send({ kind: 'tap', caseNo: 3, x: 10, y: 10 });
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(adapter.actions).toHaveLength(before);
+
+    session.abort('検査の後始末');
+    await session.done;
+    await session.close();
+  });
+});

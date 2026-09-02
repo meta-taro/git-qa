@@ -92,8 +92,24 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   live.bridge.onInput((raw) => {
     const input = parseHumanInput(raw);
     if (input === undefined) return;
+
+    // 待っているケース宛でなければ捨てる。
+    // **遅れて届いた打鍵が、次のケースに付くのが一番まずい。**
+    if (!waiting.has(input.caseNo)) return;
+
+    if (input.kind === 'tap') {
+      // **人の番のときだけ端末へ送る**（待っている＝AI の操作は終わっている）。
+      // AI の操作中に人の操作が割り込むと、どちらがやったのか証跡から読めなくなる。
+      void live.session
+        .act({ kind: 'tap', target: { at: 'point', x: input.x, y: input.y } })
+        .catch((error: unknown) => {
+          // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
+          console.error('[git-qa] 人の操作を端末へ送れない', error);
+        });
+      return;
+    }
+
     const resolve = waiting.get(input.caseNo);
-    // 遅れて届いた打鍵が、次のケースに付くのが一番まずい。
     if (resolve === undefined) return;
     waiting.delete(input.caseNo);
     resolve(input);
@@ -133,7 +149,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     });
 
     awaiting = undefined;
-    if (input === undefined || input.kind === 'advance') {
+    // tap はここへ来ない（`onInput` で処理して待ち続ける）。**型の上でも判定だけに絞る。**
+    if (input === undefined || input.kind !== 'verdict') {
       // 置かずに送られた。**繰り上げない**ので `AUTO_PASS` になる（C1）。
       patch(ctx.subject.no, {
         result: verdict.aiResult === 'PASS' ? 'AUTO_PASS' : verdict.aiResult,

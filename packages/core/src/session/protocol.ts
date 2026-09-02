@@ -35,7 +35,14 @@ export interface SessionState {
 export type HumanInput =
   | { readonly kind: 'verdict'; readonly caseNo: number; readonly humanResult: HumanResult }
   /** 人が判定を置かずに次へ送った。**繰り上げない**ので、結果は `AUTO_PASS` になる。 */
-  | { readonly kind: 'advance'; readonly caseNo: number };
+  | { readonly kind: 'advance'; readonly caseNo: number }
+  /**
+   * 人がライブビューの中を触った。座標は**端末の画素**（画面の表示寸法ではない）。
+   *
+   * **AI が判断保留にして止まった後、人が自分で触って確かめる**のが中心の動き。
+   * 見えるが触れない画面は、判断の材料にならない。
+   */
+  | { readonly kind: 'tap'; readonly caseNo: number; readonly x: number; readonly y: number };
 // **取り消しはまだ無い。**確定したケースを開け直す仕組みが要る（Issue 004 の既知の穴）。
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -44,6 +51,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 /** ケース番号は置き場所（`case-001`）になるので、1 以上の整数だけを通す。 */
 const isCaseNo = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1;
+
+/** 画面上の位置。0 以上の整数だけを通す。 */
+const isPixel = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && (values as readonly string[]).includes(value);
@@ -55,6 +66,14 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
   const caseNo = raw['caseNo'];
 
   if (raw['kind'] === 'advance') return { kind: 'advance', caseNo };
+
+  if (raw['kind'] === 'tap') {
+    const { x, y } = raw;
+    // 端末は画素の位置しか受け取らない。**丸めずに捨てる**（どこを押したのかが曖昧なまま
+    // 端末を触ると、証跡と実際がずれる）。
+    if (!isPixel(x) || !isPixel(y)) return undefined;
+    return { kind: 'tap', caseNo, x, y };
+  }
 
   if (raw['kind'] === 'verdict' && isOneOf(HUMAN_RESULTS, raw['humanResult'])) {
     // `AUTO_PASS` はここを通らない。**人が置ける値ではない**（C17）。
