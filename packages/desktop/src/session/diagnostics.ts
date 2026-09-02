@@ -1,0 +1,37 @@
+/**
+ * 画面の中の様子を、外から読めるようにする。
+ *
+ * **「映っていますか」と人に聞かないと分からない状態を減らす**のが目的。
+ * 復号した枚数・描いた枚数・最後の失敗を置いておけば、
+ * 「繋がっていない」のか「復号で落ちている」のか「描いているが見えない」のかを切り分けられる。
+ */
+
+export interface DiagnosticsReport {
+  /** 復号できた枚数。 */
+  readonly decoded: number;
+  /** canvas へ描いた枚数。 */
+  readonly drawn: number;
+  /** いまの canvas の大きさ（端末の実寸に合わせて変わる）。 */
+  readonly canvas?: { readonly width: number; readonly height: number };
+  /** 最後に起きた失敗。**握り潰さずここへ出す。** */
+  readonly lastError?: string;
+}
+
+/**
+ * 診断の口へ送る。**送れなくても落とさない**（診断のために本筋を止めない）。
+ */
+export async function reportDiagnostics(
+  controlUrl: string,
+  report: DiagnosticsReport,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  try {
+    await fetchImpl(`${controlUrl}/diag`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(report),
+    });
+  } catch {
+    // 診断が送れないこと自体は、人がやろうとしていることを妨げない。
+  }
+}

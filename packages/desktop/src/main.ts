@@ -10,6 +10,7 @@ import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { commandForKey } from './session/keys.js';
+import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics.js';
 import { startMenuActions } from './session/menu-actions.js';
 import { installDeviceTouch } from './session/touch.js';
 import { renderSession, showSessionError } from './session/view.js';
@@ -30,6 +31,17 @@ setLocale(effectiveLocale(loadLocaleChoice(defaultStore()), navigator.languages)
 
 /** 実行の状態。**打鍵と、人が端末を触る操作の両方がここを見る。** */
 let latest: SessionState | undefined;
+
+/**
+ * 画面の中の様子。**「映っていますか」と人に聞かないと分からない状態を減らす。**
+ * 診断の口（`<controlUrl>/diag`）へ定期的に置く。
+ */
+const diagnostics: {
+  decoded: number;
+  drawn: number;
+  lastError?: string;
+  canvas?: { width: number; height: number };
+} = { decoded: 0, drawn: 0 };
 
 /** いま出ている案内の段階。言語が変わったときに描き直すために覚えておく。 */
 let onboarding: ConnectionStatus = 'disconnected';
@@ -100,7 +112,12 @@ async function startLiveView(
   onCanvas(surface.canvas);
   const player = createLivePlayer({
     createDecoder: createWebCodecsDecoder,
-    onFrame: (frame) => surface.draw(frame),
+    onFrame: (frame) => {
+      diagnostics.decoded += 1;
+      surface.draw(frame);
+      diagnostics.drawn += 1;
+      diagnostics.canvas = { width: surface.canvas.width, height: surface.canvas.height };
+    },
   });
 
   await pumpLiveStream(await openLiveStream(url), player);
@@ -132,6 +149,7 @@ if (liveUrl !== undefined) {
   }).catch((error: unknown) => {
     // **映らない理由を画面に出す。**console だけだと人には見えず、待ち続けることになる。
     console.error('[live-view]', error);
+    diagnostics.lastError = error instanceof Error ? error.message : String(error);
     showLiveViewError(
       root,
       t('live.error', { message: error instanceof Error ? error.message : String(error) }),
@@ -146,6 +164,19 @@ if (liveUrl !== undefined) {
  * 届いたものの検証）は `session/` にあり、そちらは検査してある。
  */
 if (controlUrl !== undefined) {
+  // 画面の中の様子を置き続ける。**繋がっていない / 復号で落ちている / 描いているが見えない**
+  // のどれなのかを、人に聞かずに切り分けられるようにする。
+  const url = controlUrl;
+  setInterval(() => {
+    const report: DiagnosticsReport = {
+      decoded: diagnostics.decoded,
+      drawn: diagnostics.drawn,
+      ...(diagnostics.canvas === undefined ? {} : { canvas: diagnostics.canvas }),
+      ...(diagnostics.lastError === undefined ? {} : { lastError: diagnostics.lastError }),
+    };
+    void reportDiagnostics(url, report);
+  }, 2000);
+
   connectControl({
     url: controlUrl,
     onState: (state) => {

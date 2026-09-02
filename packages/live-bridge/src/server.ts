@@ -141,6 +141,8 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
   const controlPath = `/live/${token}/control`;
 
   const viewers = new Set<ServerResponse>();
+  /** 画面が置いた様子（診断）。**人に聞かないと分からない状態を減らすため。** */
+  let diagnostics: string | undefined;
   const handlers = new Set<(input: unknown) => void>();
   let latest: string | undefined;
 
@@ -170,6 +172,22 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
     }
     if (req.url === `${controlPath}/events`) {
       openEvents(res, cors);
+      return;
+    }
+    if (req.url === `${controlPath}/diag`) {
+      if (req.method === 'POST') {
+        readInput(req, res, cors, (value) => {
+          diagnostics = JSON.stringify(value);
+        });
+        return;
+      }
+      res
+        .writeHead(200, {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+          ...cors,
+        })
+        .end(diagnostics ?? JSON.stringify({ reported: false }));
       return;
     }
     if (req.url === `${controlPath}/input`) {

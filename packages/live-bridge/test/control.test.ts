@@ -208,3 +208,38 @@ describe('画面から読めること（CORS）', () => {
     await res.body?.cancel();
   });
 });
+
+/**
+ * 画面の中の様子を、外から見られるようにする（診断）。
+ *
+ * **人に「映っていますか」と聞かないと分からない状態を減らす。**
+ * 画面側は復号した枚数・描いた枚数・最後の失敗を置き、Node 側と AI はそれを読む。
+ */
+describe('診断', () => {
+  it('画面が置いた様子を、そのまま読める', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const posted = await post(
+      `${bridge.controlUrl}/diag`,
+      JSON.stringify({ decoded: 12, drawn: 12 }),
+    );
+    expect(posted.status).toBe(202);
+
+    const res = await fetch(`${bridge.controlUrl}/diag`);
+    expect(await res.json()).toMatchObject({ decoded: 12, drawn: 12 });
+  });
+
+  it('まだ何も置かれていなければ、そう分かる', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(`${bridge.controlUrl}/diag`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reported: false });
+  });
+
+  it('壊れた内容は受け取らない', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    expect((await post(`${bridge.controlUrl}/diag`, '{ こわれている')).status).toBe(400);
+  });
+});
