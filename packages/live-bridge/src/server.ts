@@ -175,6 +175,19 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
       return;
     }
     if (req.url === `${controlPath}/diag`) {
+      if (req.method === 'OPTIONS') {
+        // 診断も content-type を付けて送るので、ブラウザが先に許しを聞きに来る。
+        // **ここに応えないと、画面からの POST がまるごと弾かれる**（実際に届かなかった）。
+        res
+          .writeHead(204, {
+            ...cors,
+            'access-control-allow-methods': 'POST, GET, OPTIONS',
+            'access-control-allow-headers': 'content-type',
+            'access-control-max-age': '600',
+          })
+          .end();
+        return;
+      }
       if (req.method === 'POST') {
         readInput(req, res, cors, (value) => {
           diagnostics = JSON.stringify(value);

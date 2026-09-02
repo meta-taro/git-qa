@@ -243,3 +243,21 @@ describe('診断', () => {
     expect((await post(`${bridge.controlUrl}/diag`, '{ こわれている')).status).toBe(400);
   });
 });
+
+describe('診断の前問い合わせ', () => {
+  it('preflight に応える（応えないと画面からの POST が丸ごと弾かれる）', async () => {
+    bridge = await startLiveBridge({ source: source() });
+
+    const res = await fetch(`${bridge.controlUrl}/diag`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://localhost:1420',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-headers')).toContain('content-type');
+  });
+});

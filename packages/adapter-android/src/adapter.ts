@@ -226,6 +226,9 @@ function createSession(deps: SessionDeps): TargetSession {
                 let current: StreamingProcess | undefined;
                 try {
                   while (liveOpen) {
+                    // 前の 1 本を必ず止めてから次を起こす。**止め忘れると端末に溜まる**
+                    // （実機で 5 本残っていた）。
+                    await current?.stop();
                     current = startScreenrecord();
                     liveStream = current;
 
