@@ -1,5 +1,6 @@
 import type { Column } from './columns.js';
 import { COLUMNS } from './columns.js';
+import { t } from './i18n/current.js';
 
 /**
  * カラムの枠を DOM へ描く。
@@ -18,11 +19,11 @@ export function renderColumns(root: HTMLElement, columns: readonly Column[] = CO
 
     const heading = root.ownerDocument.createElement('h2');
     heading.className = 'column-heading';
-    heading.textContent = column.heading;
+    heading.textContent = t(column.headingKey);
 
     const placeholder = root.ownerDocument.createElement('p');
     placeholder.className = 'column-placeholder';
-    placeholder.textContent = column.placeholder;
+    placeholder.textContent = t(column.placeholderKey);
 
     section.append(heading, placeholder);
     root.append(section);

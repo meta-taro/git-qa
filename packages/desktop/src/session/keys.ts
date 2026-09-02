@@ -1,5 +1,7 @@
 import type { HumanResult } from '@git-qa/core/session';
 
+import type { MessageKey } from '../i18n/index.js';
+
 /**
  * 人が押すキー。**1 打鍵で置いて、次へ進む**（C6）。
  *
@@ -22,12 +24,12 @@ export type KeyCommand =
   | { readonly kind: 'advance' };
 
 /** 割り当ての正本。**画面へ出す説明もここから作る**ので、説明と実装がずれない。 */
-export const KEY_BINDINGS: readonly { readonly key: string; readonly label: string }[] = [
-  { key: 'v', label: 'VERIFIED（見た。合格）' },
-  { key: 'f', label: 'FAIL（見た。不合格）' },
-  { key: 'b', label: 'BLOCKED（人にも判断できない）' },
-  { key: 's', label: 'SKIP（今回は見ない）' },
-  { key: ' ', label: '置かずに次へ（AUTO_PASS のまま）' },
+export const KEY_BINDINGS: readonly { readonly key: string; readonly labelKey: MessageKey }[] = [
+  { key: 'v', labelKey: 'key.verified' },
+  { key: 'f', labelKey: 'key.fail' },
+  { key: 'b', labelKey: 'key.blocked' },
+  { key: 's', labelKey: 'key.skip' },
+  { key: ' ', labelKey: 'key.advance' },
 ];
 
 const VERDICTS: Readonly<Record<string, HumanResult>> = {

@@ -1,5 +1,6 @@
 import type { SessionCase, SessionState } from '@git-qa/core/session';
 
+import { t } from '../i18n/current.js';
 import { KEY_BINDINGS } from './keys.js';
 
 /**
@@ -74,7 +75,7 @@ function renderKeyHelp(doc: Document): HTMLElement {
     key.textContent = binding.key === ' ' ? 'Space' : binding.key;
     const label = doc.createElement('dd');
     label.className = 'key-label';
-    label.textContent = binding.label;
+    label.textContent = t(binding.labelKey);
     list.append(key, label);
   }
   return list;
@@ -90,8 +91,7 @@ function renderVerdict(root: HTMLElement, state: SessionState): void {
   headline.className = 'verdict-headline';
 
   if (awaiting === undefined) {
-    headline.textContent =
-      state.phase === 'finished' ? 'この実行は終わった' : 'AI が操作している。判定はまだ置けない';
+    headline.textContent = t(state.phase === 'finished' ? 'verdict.finished' : 'verdict.running');
     target.append(headline);
     if (state.phase !== 'finished') target.append(renderKeyHelp(doc));
     return;

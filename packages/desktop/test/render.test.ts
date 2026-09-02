@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { COLUMNS } from '../src/columns.js';
+import { t } from '../src/i18n/current.js';
 import { renderColumns } from '../src/render.js';
 
 function columnsIn(root: HTMLElement): HTMLElement[] {
@@ -40,9 +41,10 @@ describe('renderColumns', () => {
     renderColumns(root);
 
     for (const [index, section] of columnsIn(root).entries()) {
-      expect(section.querySelector('.column-heading')?.textContent).toBe(COLUMNS[index]?.heading);
+      const column = COLUMNS[index];
+      expect(section.querySelector('.column-heading')?.textContent).toBe(t(column!.headingKey));
       expect(section.querySelector('.column-placeholder')?.textContent).toBe(
-        COLUMNS[index]?.placeholder,
+        t(column!.placeholderKey),
       );
     }
   });
@@ -64,7 +66,14 @@ describe('renderColumns', () => {
   });
 
   it('渡した構成のとおりに描く', () => {
-    renderColumns(root, [{ id: 'live', heading: '見出し', placeholder: '説明', flex: 2 }]);
+    renderColumns(root, [
+      {
+        id: 'live',
+        headingKey: 'column.verdict.heading',
+        placeholderKey: 'column.verdict.placeholder',
+        flex: 2,
+      },
+    ]);
 
     const [only] = columnsIn(root);
     expect(columnsIn(root)).toHaveLength(1);

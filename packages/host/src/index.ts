@@ -5,3 +5,4 @@ export type { RunWithLiveViewOptions } from './app.js';
 export { startRunSession } from './run-session.js';
 export type { RunSession, StartRunSessionOptions } from './run-session.js';
 export type { TauriDevArgsOptions } from './app.js';
+export { fromInvocationDir } from './paths.js';

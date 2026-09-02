@@ -151,3 +151,74 @@ body {
   margin: 0;
   opacity: 0.8;
 }
+
+/*
+ * はじめかたの案内（Issue 011）。繋がっていないときだけ中央に出る。
+ * **色は決めていない**（DESIGN.md が空・§11）。強弱は余白と文字色だけで作る。
+ */
+
+.onboarding {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.onboarding-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.onboarding-lead {
+  margin: 0.25rem 0 1rem;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+.onboarding-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-step {
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 4px;
+}
+
+/* いまやること。**1 つだけ強く出す。** */
+.onboarding-step[aria-current='step'] {
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  border-width: 2px;
+}
+
+.onboarding-step-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.onboarding-step-detail {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+.onboarding-command {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  /* 選んでコピーできることが分かる形にする。 */
+  user-select: all;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 3px;
+}
+
+.onboarding-note {
+  margin: 1rem 0 0;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}

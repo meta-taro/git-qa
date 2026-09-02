@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MESSAGES } from '../src/i18n/index.js';
 import { COLUMNS, mainColumn, MAIN_COLUMN_ID, type Column } from '../src/columns.js';
 
 describe('COLUMNS', () => {
@@ -11,9 +12,12 @@ describe('COLUMNS', () => {
   });
 
   it('見出しと空のときの文言が、どのカラムにも入っている', () => {
+    // **鍵がカタログに在ることまで見る。**在ることだけを見ると、訳し漏れを取り逃がす。
     for (const column of COLUMNS) {
-      expect(column.heading).not.toBe('');
-      expect(column.placeholder).not.toBe('');
+      expect(MESSAGES.ja[column.headingKey]).toBeTruthy();
+      expect(MESSAGES.ja[column.placeholderKey]).toBeTruthy();
+      expect(MESSAGES.en[column.headingKey]).toBeTruthy();
+      expect(MESSAGES.en[column.placeholderKey]).toBeTruthy();
     }
   });
 

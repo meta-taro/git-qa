@@ -6,6 +6,7 @@ import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-and
 import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
 
 import { startRunSession } from './run-session.js';
+import { fromInvocationDir } from './paths.js';
 import { tauriDevArgs } from './app.js';
 
 /**
@@ -30,7 +31,17 @@ const runIdFrom = (at: Date): string => {
   return `${date}-${pad(at.getHours())}${pad(at.getMinutes())}${pad(at.getSeconds())}`;
 };
 
-const text = await readFile(sheetPath, 'utf8');
+// 人が打った場所を基準に解決する（pnpm --filter は cwd をパッケージへ移す）。
+const resolvedSheet = fromInvocationDir(sheetPath);
+
+let text: string;
+try {
+  text = await readFile(resolvedSheet, 'utf8');
+} catch {
+  // 積み上がったスタックではなく、人が次に何をすればよいかが分かる形で出す。
+  console.error(`[git-qa] 検証シートを開けない: ${resolvedSheet}`);
+  process.exit(1);
+}
 const sheet = parseTestSpecTsv(text);
 
 const session = await startRunSession({
@@ -80,7 +91,7 @@ const run = await session.done;
 await session.close();
 
 // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
-const path = await writeRunJson('runs', run);
+const path = await writeRunJson(fromInvocationDir('runs'), run);
 console.log(`[git-qa] 証跡: ${path}`);
 
 const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
