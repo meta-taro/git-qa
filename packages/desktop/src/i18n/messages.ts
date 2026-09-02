@@ -25,11 +25,6 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
 
-  'appearance.label': '外観',
-  'appearance.system': 'システムに従う',
-  'appearance.light': 'ライト',
-  'appearance.dark': 'ダーク',
-
   'live.unsupported': 'この webview は H.264 の復号に対応していない',
   'live.error': 'ライブ映像を出せない: {message}',
 
@@ -77,11 +72,6 @@ const en: Record<keyof typeof ja, string> = {
   'verdict.ai': 'AI verdict: {result}',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
-
-  'appearance.label': 'Appearance',
-  'appearance.system': 'Follow the system',
-  'appearance.light': 'Light',
-  'appearance.dark': 'Dark',
 
   'live.unsupported': 'This webview cannot decode H.264',
   'live.error': 'Cannot show the live view: {message}',

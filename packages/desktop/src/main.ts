@@ -2,7 +2,7 @@ import type { HumanInput, SessionState } from '@git-qa/core/session';
 
 import { resolveLocale } from './i18n/index.js';
 import { setLocale, t } from './i18n/current.js';
-import { installAppearanceControl } from './appearance.js';
+import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import { renderColumns } from './render.js';
 import { installColumnResizers } from './resize.js';
@@ -32,8 +32,10 @@ setLocale(
 renderColumns(root);
 // 区切りは、カラムを描いた後に差し込む（描き直すと消えるため）。
 installColumnResizers(root);
-// 外観の切り替えは見出しの中に置く。実行の状態を描き直しても消えない。
-installAppearanceControl(root);
+// 外観の切り替えはメニューから（`src-tauri/src/menu.rs`）。**画面には部品を置かない。**
+void startAppearanceSync().catch((error: unknown) => {
+  console.error('[appearance] メニューと繋がらない', error);
+});
 
 /**
  * 端末に繋いでいるときだけ、中央カラムを映像に差し替える。

@@ -5,14 +5,8 @@ mod menu;
 /// **CSS はページの中しか変えない。**枠は OS が描くので、ここで受けて切り替える。
 /// `system` のときは `None` を渡し、OS の設定に従わせる。
 #[tauri::command]
-fn set_appearance(window: tauri::WebviewWindow, appearance: String) -> Result<(), String> {
-  let theme = match appearance.as_str() {
-    "light" => Some(tauri::Theme::Light),
-    "dark" => Some(tauri::Theme::Dark),
-    // 知らない値は「OS に従う」に落とす。黙って暗くしない。
-    _ => None,
-  };
-  window.set_theme(theme).map_err(|error| error.to_string())
+fn set_appearance(app: tauri::AppHandle, appearance: String) -> Result<(), String> {
+  menu::apply(&app, &appearance).map_err(|error| error.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,6 +23,15 @@ pub fn run() {
         )?;
       }
       Ok(())
+    })
+    .on_menu_event(|app, event| {
+      // 外観のメニューだけを見る。ほかは Tauri の既定の項目なので、ここへは来ない。
+      if let Some(value) = event.id().0.strip_prefix("appearance:") {
+        if let Err(error) = menu::apply(app, value) {
+          // 握り潰さない。切り替わらなかったことが分からないと、人は何度も押す。
+          log::error!("外観を切り替えられない: {error}");
+        }
+      }
     })
     .invoke_handler(tauri::generate_handler![set_appearance])
     .run(tauri::generate_context!())

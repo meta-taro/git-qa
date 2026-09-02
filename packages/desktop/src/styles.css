@@ -47,46 +47,6 @@ body {
   font-size: 0.875rem;
   font-weight: 600;
   border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  /* 見出しの中に設定を置く（描き直しで消えないため）。 */
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-/*
- * 外観の切り替え。**色は指定しない**（DESIGN.md が空・§11）。
- * 切り替えるのは color-scheme とウィンドウの外観だけで、実際の色は OS のものを使う。
- */
-.appearance {
-  display: inline-flex;
-  /* 枠を共有して 1 つの部品に見せる。 */
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.appearance-option {
-  appearance: none;
-  margin: 0;
-  padding: 0.125rem 0.5rem;
-  font: inherit;
-  font-size: 0.6875rem;
-  font-weight: 400;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  border-left: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  cursor: pointer;
-}
-
-.appearance-option:first-child {
-  border-left: 0;
-}
-
-.appearance-option[aria-pressed='true'] {
-  background: color-mix(in srgb, currentColor 18%, transparent);
-  font-weight: 600;
 }
 
 .column-placeholder {

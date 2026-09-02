@@ -1,16 +1,15 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionState } from '@git-qa/core/session';
-
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applyAppearance,
-  installAppearanceControl,
   loadAppearance,
+  startAppearanceSync,
+  type Appearance,
+  type AppearanceBridge,
   type AppearanceStore,
 } from '../src/appearance.js';
 import { renderColumns } from '../src/render.js';
-import { renderSession } from '../src/session/view.js';
 
 /**
  * ライト / ダークの切り替え。
@@ -84,77 +83,61 @@ describe('loadAppearance', () => {
   });
 });
 
-describe('installAppearanceControl', () => {
-  const buttons = (): HTMLButtonElement[] => [
-    ...root.querySelectorAll<HTMLButtonElement>('.appearance-option'),
-  ];
-  const button = (value: string): HTMLButtonElement =>
-    buttons().find((b) => b.dataset['appearance'] === value)!;
+describe('startAppearanceSync — メニューと画面をつなぐ', () => {
+  const fakeBridge = (): AppearanceBridge & {
+    notified: Appearance[];
+    send: (value: Appearance) => void;
+  } => {
+    const notified: Appearance[] = [];
+    let handler: ((value: Appearance) => void) | undefined;
+    return {
+      notified,
+      notify: (value) => {
+        notified.push(value);
+        return Promise.resolve();
+      },
+      subscribe: (h) => {
+        handler = h;
+        return Promise.resolve(() => {
+          handler = undefined;
+        });
+      },
+      send: (value) => handler?.(value),
+    };
+  };
 
-  it('判定カラムの見出しに置く（3 カラムの中身を奪わない）', () => {
-    installAppearanceControl(root, { store: memoryStore() });
+  it('覚えている外観を当て、メニュー側へも知らせる', async () => {
+    // 知らせないと、メニューのチェックと枠が前回の選択とずれる。
+    const bridge = fakeBridge();
 
-    const heading = root.querySelector('[data-column-id="verdict"] .column-heading');
-    expect(heading?.querySelector('.appearance')).not.toBeNull();
-  });
-
-  it('プルダウンではなく、押せる 3 つの選択肢として出す', () => {
-    installAppearanceControl(root, { store: memoryStore() });
-
-    expect(root.querySelector('select')).toBeNull();
-    expect(buttons()).toHaveLength(3);
-    expect(root.querySelector('.appearance')?.getAttribute('role')).toBe('group');
-  });
-
-  it('いま選ばれているものが、押した状態として分かる', () => {
-    installAppearanceControl(root, { store: memoryStore('light') });
-
-    expect(button('light').getAttribute('aria-pressed')).toBe('true');
-    expect(button('dark').getAttribute('aria-pressed')).toBe('false');
-  });
-
-  it('押すと、その場で切り替わって保存される', () => {
-    const store = memoryStore();
-    installAppearanceControl(root, { store });
-
-    button('dark').click();
+    await startAppearanceSync({ store: memoryStore('dark'), bridge });
 
     expect(document.documentElement.style.colorScheme).toBe('dark');
-    expect(store.value).toBe('dark');
-    expect(button('dark').getAttribute('aria-pressed')).toBe('true');
-    expect(button('system').getAttribute('aria-pressed')).toBe('false');
+    expect(bridge.notified).toEqual(['dark']);
   });
 
-  it('ウィンドウの外観（タイトルバー）も切り替える', () => {
-    // **CSS はページの中しか変えない。**枠は OS が描くので、そちらへも伝える。
-    const setNativeTheme = vi.fn();
-    installAppearanceControl(root, { store: memoryStore(), setNativeTheme });
+  it('メニューで選ばれたら、画面へ当てて覚える', async () => {
+    const store = memoryStore();
+    const bridge = fakeBridge();
+    await startAppearanceSync({ store, bridge });
 
-    button('light').click();
-
-    expect(setNativeTheme).toHaveBeenLastCalledWith('light');
-  });
-
-  it('前に選んだものが、起動時に効いている', () => {
-    const setNativeTheme = vi.fn();
-    installAppearanceControl(root, { store: memoryStore('light'), setNativeTheme });
+    bridge.send('light');
 
     expect(document.documentElement.style.colorScheme).toBe('light');
-    expect(setNativeTheme).toHaveBeenCalledWith('light');
+    expect(store.value).toBe('light');
   });
 
-  it('実行の状態を描き直しても消えない', () => {
-    installAppearanceControl(root, { store: memoryStore() });
-    const state: SessionState = {
-      runId: 'r',
-      phase: 'waiting',
-      awaiting: 1,
-      cases: [{ no: 1, title: 'アプリが起動する', aiResult: 'PASS' }],
-    };
+  it('Tauri がいなくても（ブラウザで開いても）落ちない', async () => {
+    await startAppearanceSync({ store: memoryStore('dark'), bridge: undefined });
 
-    renderSession(root, state);
-    renderSession(root, state);
+    // 画面の中は切り替わる。枠は Tauri のものなので、そこだけ変わらない。
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+  });
 
-    expect(root.querySelectorAll('.appearance')).toHaveLength(1);
+  it('画面に設定の部品を置かない（3 カラムは検証のための場所）', async () => {
+    await startAppearanceSync({ store: memoryStore(), bridge: fakeBridge() });
+
+    expect(root.querySelector('select')).toBeNull();
+    expect(root.querySelector('.appearance')).toBeNull();
   });
 });

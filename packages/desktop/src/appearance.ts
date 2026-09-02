@@ -1,6 +1,3 @@
-import { t } from './i18n/current.js';
-import type { MessageKey } from './i18n/index.js';
-
 /**
  * ライト / ダークの切り替え。
  *
@@ -61,85 +58,64 @@ export function saveAppearance(
   }
 }
 
-const LABELS: Readonly<Record<Appearance, MessageKey>> = {
-  system: 'appearance.system',
-  light: 'appearance.light',
-  dark: 'appearance.dark',
-};
-
 /**
- * ウィンドウ（タイトルバー）の外観を切り替える。
+ * メニューと画面をつなぐ口。
  *
- * **CSS はページの中しか変えない。**枠は OS が描くので、Tauri 側へ伝える必要がある。
- * ブラウザで開いているとき（`pnpm --filter @git-qa/desktop dev`）は Tauri がいないので、
- * **黙って何もしない。**ここで落とすと、ブラウザでは画面が出なくなる。
+ * **切り替えの入口はメニュー**（`src-tauri/src/menu.rs`）。設定を 3 カラムの中に置くと、
+ * 検証のための場所が設定で埋まる。**覚えるのは画面側**で、次に開いたときに効かせる。
  */
-async function setNativeThemeViaTauri(value: Appearance): Promise<void> {
-  if (!('__TAURI_INTERNALS__' in window)) return;
-  const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('set_appearance', { appearance: value });
-}
-
-export interface InstallAppearanceControlOptions {
-  readonly store?: AppearanceStore;
-  /** 差し替え口。既定は Tauri へ伝える。 */
-  readonly setNativeTheme?: (value: Appearance) => void | Promise<void>;
+export interface AppearanceBridge {
+  /** いまの選択を Rust へ知らせる（ウィンドウの外観とメニューのチェックを揃える）。 */
+  notify(value: Appearance): Promise<void>;
+  /** メニューで選ばれたことを受け取る。戻り値を呼ぶと解除。 */
+  subscribe(handler: (value: Appearance) => void): Promise<() => void>;
 }
 
 /**
- * 判定カラムの**見出しの中**に置く。
+ * 本物の Tauri へ繋ぐ。
  *
- * 見出しの中なのは、実行の状態を描き直しても消えないため（`renderSession` は見出しを残す）。
- * 3 カラムの中身は検証のためのものなので、設定でそこを埋めない。
+ * **ブラウザで開いているとき**（`pnpm --filter @git-qa/desktop dev`）は Tauri がいないので
+ * `undefined` を返す。ここで落とすと、ブラウザでは画面が出なくなる。
  */
-export function installAppearanceControl(
-  root: HTMLElement,
-  options: InstallAppearanceControlOptions = {},
-): void {
-  const store = options.store ?? defaultStore();
-  const setNativeTheme = options.setNativeTheme ?? setNativeThemeViaTauri;
-  const doc = root.ownerDocument;
-
-  const heading = root.querySelector<HTMLElement>('[data-column-id="verdict"] .column-heading');
-  if (heading === null) {
-    // 握り潰さない。カラムの構成を変えたときに、静かに消えるのを防ぐ。
-    throw new Error('判定カラムの見出しが画面に無い');
-  }
-  heading.querySelector('.appearance')?.remove();
-
-  const group = doc.createElement('div');
-  group.className = 'appearance';
-  group.setAttribute('role', 'group');
-  group.setAttribute('aria-label', t('appearance.label'));
-
-  const buttons = new Map<Appearance, HTMLButtonElement>();
-
-  const select = (value: Appearance, remember: boolean): void => {
-    applyAppearance(doc, value);
-    for (const [key, button] of buttons) {
-      button.setAttribute('aria-pressed', String(key === value));
-    }
-    if (remember) saveAppearance(value, store);
-    // 枠は OS が描く。伝えられなくても、ページの中の切り替えは効いている。
-    void Promise.resolve(setNativeTheme(value)).catch((error: unknown) => {
-      console.error('[appearance] ウィンドウの外観を切り替えられない', error);
-    });
+export function tauriAppearanceBridge(): AppearanceBridge | undefined {
+  if (!('__TAURI_INTERNALS__' in window)) return undefined;
+  return {
+    async notify(value) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('set_appearance', { appearance: value });
+    },
+    async subscribe(handler) {
+      const { listen } = await import('@tauri-apps/api/event');
+      return listen<string>('appearance', (event) => {
+        handler(isAppearance(event.payload) ? event.payload : 'system');
+      });
+    },
   };
+}
 
-  for (const value of APPEARANCES) {
-    const button = doc.createElement('button');
-    button.type = 'button';
-    button.className = 'appearance-option';
-    button.dataset['appearance'] = value;
-    button.textContent = t(LABELS[value]);
-    button.setAttribute('aria-pressed', 'false');
-    button.addEventListener('click', () => {
-      select(value, true);
-    });
-    buttons.set(value, button);
-    group.append(button);
-  }
+export interface AppearanceSyncOptions {
+  readonly doc?: Document;
+  readonly store?: AppearanceStore;
+  /** 差し替え口。既定は Tauri。**Tauri がいなければ画面の中だけ切り替わる。** */
+  readonly bridge?: AppearanceBridge | undefined;
+}
 
-  heading.append(group);
-  select(loadAppearance(store), false);
+/**
+ * 覚えている外観を当て、以後はメニューからの知らせに従う。
+ */
+export async function startAppearanceSync(options: AppearanceSyncOptions = {}): Promise<void> {
+  const doc = options.doc ?? document;
+  const store = options.store ?? defaultStore();
+  const bridge = 'bridge' in options ? options.bridge : tauriAppearanceBridge();
+
+  const current = loadAppearance(store);
+  applyAppearance(doc, current);
+
+  await bridge?.subscribe((value) => {
+    applyAppearance(doc, value);
+    saveAppearance(value, store);
+  });
+
+  // 覚えている値を伝える。**伝えないと、メニューのチェックと枠が前回の選択とずれる。**
+  await bridge?.notify(current);
 }
