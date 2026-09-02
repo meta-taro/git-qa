@@ -5,6 +5,10 @@
     "outDir": "./dist",
     "types": ["node"]
   },
-  "references": [{ "path": "../core" }, { "path": "../live-bridge" }],
+  "references": [
+    { "path": "../core" },
+    { "path": "../adapter-android" },
+    { "path": "../live-bridge" }
+  ],
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

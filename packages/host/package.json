@@ -12,7 +12,11 @@
     "build": "tsc --build"
   },
   "dependencies": {
+    "@git-qa/adapter-android": "workspace:*",
     "@git-qa/core": "workspace:*",
     "@git-qa/live-bridge": "workspace:*"
+  },
+  "devDependencies": {
+    "vite-node": "^3.2.4"
   }
 }

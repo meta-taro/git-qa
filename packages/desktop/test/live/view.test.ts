@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { renderColumns } from '../../src/render.js';
-import { mountLiveView } from '../../src/live/view.js';
+import { mountLiveView, showLiveViewError } from '../../src/live/view.js';
 
 describe('mountLiveView', () => {
   let root: HTMLElement;
@@ -62,6 +62,31 @@ describe('mountLiveView', () => {
 
     expect(surface.canvas.width).toBe(720);
     expect(surface.canvas.height).toBe(1280);
+  });
+
+  it('映らない理由を、中央のカラムに出す', () => {
+    // console だけに出しても人には見えない。**見えないと、人は待ち続ける。**
+    showLiveViewError(root, 'この webview は H.264 の復号に対応していない');
+
+    const live = root.querySelector('[data-column-id="live"]');
+    expect(live?.textContent).toContain('H.264 の復号に対応していない');
+  });
+
+  it('理由を出すときは、映像の枠を外す', () => {
+    // 黒い枠が残ると、映っていないのか真っ黒なのかが分からない。
+    mountLiveView(root, { width: 10, height: 20 });
+    showLiveViewError(root, 'だめ');
+
+    expect(root.querySelector('[data-column-id="live"] canvas')).toBeNull();
+  });
+
+  it('理由を二度出しても、積み重ならない', () => {
+    showLiveViewError(root, '1 回目');
+    showLiveViewError(root, '2 回目');
+
+    const live = root.querySelector('[data-column-id="live"]');
+    expect(live?.textContent).not.toContain('1 回目');
+    expect(live?.textContent).toContain('2 回目');
   });
 
   it('カラムが無い画面へ置こうとしたら、黙って諦めず落ちる', () => {

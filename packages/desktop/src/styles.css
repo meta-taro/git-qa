@@ -69,3 +69,10 @@ body {
   object-fit: contain;
   background: #000;
 }
+
+/* 映らない理由。**目立たせる必要はないが、見えないと困る。** */
+.live-error {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+}

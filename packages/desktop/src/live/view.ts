@@ -20,12 +20,38 @@ export interface MountLiveViewOptions {
   readonly height: number;
 }
 
-export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions): LiveSurface {
+/**
+ * 映らない理由を、中央のカラムに出す。
+ *
+ * **console だけに出しても人には見えない。**見えないと、人は「そのうち出るのだろう」と
+ * 待ち続ける。ライブビューが主媒体（C4）である以上、ここが空のまま黙るのが一番まずい。
+ */
+export function showLiveViewError(root: HTMLElement, message: string): void {
+  const column = liveColumn(root);
+
+  // 映像の枠と、前に出した理由は消す。黒い枠が残ると、
+  // 映っていないのか真っ黒なのかが分からない。
+  column.querySelector('.live-canvas')?.remove();
+  column.querySelector('.live-error')?.remove();
+  column.querySelector('.column-placeholder')?.remove();
+
+  const paragraph = root.ownerDocument.createElement('p');
+  paragraph.className = 'live-error';
+  paragraph.textContent = message;
+  column.append(paragraph);
+}
+
+function liveColumn(root: HTMLElement): HTMLElement {
   const column = root.querySelector<HTMLElement>(`[data-column-id="${MAIN_COLUMN_ID}"]`);
   if (column === null) {
     // 握り潰さない。カラムの構成を変えたときに、静かに映らなくなるのを防ぐ。
     throw new Error(`ライブビューのカラム（${MAIN_COLUMN_ID}）が画面に無い`);
   }
+  return column;
+}
+
+export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions): LiveSurface {
+  const column = liveColumn(root);
 
   const placeholder = column.querySelector('.column-placeholder');
   const canvas = root.ownerDocument.createElement('canvas');

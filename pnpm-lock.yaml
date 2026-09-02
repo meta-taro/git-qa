@@ -69,12 +69,19 @@ importers:
 
   packages/host:
     dependencies:
+      '@git-qa/adapter-android':
+        specifier: workspace:*
+        version: link:../adapter-android
       '@git-qa/core':
         specifier: workspace:*
         version: link:../core
       '@git-qa/live-bridge':
         specifier: workspace:*
         version: link:../live-bridge
+    devDependencies:
+      vite-node:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.20.1)
 
   packages/live-bridge:
     dependencies:
