@@ -38,6 +38,8 @@ export interface StartRunSessionOptions {
   /** 画面から読める文字を取る。対象ごとに違うのでコアは知らない（C8）。 */
   readonly readScreenText: (session: TargetSession) => Promise<string>;
   readonly startBridge?: (options: LiveBridgeOptions) => Promise<LiveBridge>;
+  /** 画面へ渡すシートの場所。**人が開くための道** なので、絶対パスが望ましい。 */
+  readonly sheetPath?: string;
   readonly now?: () => Date;
 }
 
@@ -74,6 +76,10 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       runId: options.runId,
       phase,
       ...(awaiting === undefined ? {} : { awaiting }),
+      // 画面のメニューから開けるように、シートの場所を渡す（画面は Node のファイルを見られない）。
+      ...(options.sheetPath === undefined
+        ? { sheetPath: options.sheetRef.path }
+        : { sheetPath: options.sheetPath }),
       cases: [...cases.values()],
     };
     live.bridge.publish(state);

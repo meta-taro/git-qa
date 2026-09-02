@@ -8,7 +8,7 @@
 //! ただし「どの言語で出すか」の決め方は両側にある（webview は `navigator.languages`、
 //! ここは環境変数）。**判定がずれる可能性が残る**ので、`GIT_QA_LANG` で揃えられるようにした。
 
-use tauri::menu::{AboutMetadataBuilder, CheckMenuItem, Menu, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadataBuilder, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// 外観の選択肢。**メニューの id と、画面側が使う値を同じ文字列にしている。**
@@ -49,6 +49,10 @@ pub struct MenuText {
     pub language_system: &'static str,
     pub language_ja: &'static str,
     pub language_en: &'static str,
+    pub file: &'static str,
+    pub open_with_md_business: &'static str,
+    pub reveal: &'static str,
+    pub open_default: &'static str,
 }
 
 const JA: MenuText = MenuText {
@@ -73,6 +77,10 @@ const JA: MenuText = MenuText {
     language_system: "システムに従う",
     language_ja: "日本語",
     language_en: "English",
+    file: "ファイル",
+    open_with_md_business: "検証シートを md-business で開く",
+    reveal: "検証シートの場所を開く",
+    open_default: "検証シートを既定のアプリで開く",
 };
 
 const EN: MenuText = MenuText {
@@ -97,6 +105,10 @@ const EN: MenuText = MenuText {
     language_system: "Follow the system",
     language_ja: "日本語",
     language_en: "English",
+    file: "File",
+    open_with_md_business: "Open the test sheet in md-business",
+    reveal: "Show the test sheet in the file manager",
+    open_default: "Open the test sheet in the default app",
 };
 
 /// どの言語で出すか。**既定は日本語**（webview 側と同じ判断・`src/i18n/locale.ts`）。
@@ -242,6 +254,25 @@ pub fn build<R: Runtime>(
 
     let view_menu = Submenu::with_items(app, t.view, true, &[&appearance_menu, &language_menu])?;
 
+    // **検証シートをどう開くか。**画面から見えているのは映像だけなので、
+    // 「いま何を走らせているのか」を人が実物で確かめる道が要る（Issue 011）。
+    let file_menu = Submenu::with_items(
+        app,
+        t.file,
+        true,
+        &[
+            &MenuItem::with_id(
+                app,
+                "file:md-business",
+                t.open_with_md_business,
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(app, "file:reveal", t.reveal, true, None::<&str>)?,
+            &MenuItem::with_id(app, "file:open", t.open_default, true, None::<&str>)?,
+        ],
+    )?;
+
     let window_menu = Submenu::with_items(
         app,
         t.window,
@@ -252,7 +283,10 @@ pub fn build<R: Runtime>(
         ],
     )?;
 
-    Menu::with_items(app, &[&app_menu, &edit_menu, &view_menu, &window_menu])
+    Menu::with_items(
+        app,
+        &[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu],
+    )
 }
 
 /// 外観を切り替える。**メニューから選んだときも、画面から知らせてきたときも、ここを通る。**

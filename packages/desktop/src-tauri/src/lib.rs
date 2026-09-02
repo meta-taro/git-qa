@@ -1,7 +1,8 @@
 mod menu;
+mod open;
 mod state;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// ウィンドウ（タイトルバー）の外観を切り替える。
 ///
@@ -10,6 +11,13 @@ use tauri::Manager;
 #[tauri::command]
 fn set_appearance(app: tauri::AppHandle, appearance: String) -> Result<(), String> {
   menu::apply_appearance(&app, &appearance).map_err(|error| error.to_string())
+}
+
+/// 検証シートを開く。開き方は `md-business` / `reveal` / `default`。
+#[tauri::command]
+fn open_sheet(path: String, mode: String) -> Result<(), String> {
+  let mode = open::OpenMode::parse(&mode).ok_or_else(|| format!("知らない開き方: {mode}"))?;
+  open::open(&path, mode)
 }
 
 /// 画面が選んだ言語を受ける。`choice` は人の選択、`effective` は実際に出す言語。
@@ -44,6 +52,13 @@ pub fn run() {
           log::error!("外観を切り替えられない: {error}");
         }
       }
+      if let Some(action) = event.id().0.strip_prefix("file:") {
+        // **開くファイルは画面が持っている**（走らせているシートの場所）。
+        // ここでは、押されたことだけを伝える。
+        if let Err(error) = app.emit("menu-action", format!("file:{action}")) {
+          log::error!("メニューの操作を画面へ伝えられない: {error}");
+        }
+      }
       if let Some(choice) = event.id().0.strip_prefix("locale:") {
         // `system` のときに実際どちらで出すかは画面が決める。ここでは見当で組み、
         // 画面から `set_locale` が返ってきた時点で正しくなる。
@@ -57,7 +72,7 @@ pub fn run() {
         }
       }
     })
-    .invoke_handler(tauri::generate_handler![set_appearance, set_locale])
+    .invoke_handler(tauri::generate_handler![set_appearance, set_locale, open_sheet])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

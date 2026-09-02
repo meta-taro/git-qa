@@ -107,3 +107,21 @@ describe('parseHumanInput — 人が端末を触る', () => {
     expect(parseHumanInput({ kind: 'tap', caseNo: 2, x: 10.5, y: 10 })).toBeUndefined();
   });
 });
+
+describe('parseSessionState — 検証シートの場所', () => {
+  const base = { runId: 'r', phase: 'running', cases: [] };
+
+  it('シートの場所を持てる（メニューから開くために要る）', () => {
+    expect(parseSessionState({ ...base, sheetPath: '/repo/docs/a.tsv' })).toMatchObject({
+      sheetPath: '/repo/docs/a.tsv',
+    });
+  });
+
+  it('文字列でなければ受け取らない', () => {
+    expect(parseSessionState({ ...base, sheetPath: 12 })).toBeUndefined();
+  });
+
+  it('無くてもよい', () => {
+    expect(parseSessionState(base)).toMatchObject({ runId: 'r' });
+  });
+});

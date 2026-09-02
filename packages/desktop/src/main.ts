@@ -10,6 +10,7 @@ import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { commandForKey } from './session/keys.js';
+import { startMenuActions } from './session/menu-actions.js';
 import { installDeviceTouch } from './session/touch.js';
 import { renderSession, showSessionError } from './session/view.js';
 import { createLivePlayer } from './live/player.js';
@@ -54,6 +55,16 @@ const redrawTexts = (): void => {
   }
   renderOnboarding(root, onboarding);
 };
+
+// 検証シートを開く道もメニューから（Issue 011）。**開くファイルの場所は画面が持っている。**
+void startMenuActions({
+  sheetPath: () => latest?.sheetPath,
+  onError: (message) => {
+    showSessionError(root, message);
+  },
+}).catch((error: unknown) => {
+  console.error('[menu] メニューと繋がらない', error);
+});
 
 // 言語の切り替えもメニューから。**OS に従うだけだと、使う人が選べない。**
 void startLocaleSync({

@@ -25,6 +25,9 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
 
+  'sheet.none': '走らせている検証シートがない（実行を始めると開けるようになる）',
+  'sheet.openFailed': '検証シートを開けない: {message}',
+
   'live.unsupported': 'この webview は H.264 の復号に対応していない',
   'live.error': 'ライブ映像を出せない: {message}',
 
@@ -72,6 +75,9 @@ const en: Record<keyof typeof ja, string> = {
   'verdict.ai': 'AI verdict: {result}',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
+
+  'sheet.none': 'No test sheet is running yet (start a run and this opens it)',
+  'sheet.openFailed': 'Cannot open the test sheet: {message}',
 
   'live.unsupported': 'This webview cannot decode H.264',
   'live.error': 'Cannot show the live view: {message}',

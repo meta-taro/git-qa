@@ -26,6 +26,11 @@ export type SessionPhase = 'running' | 'waiting' | 'finished';
 export interface SessionState {
   readonly runId: string;
   readonly phase: SessionPhase;
+  /**
+   * 走らせている検証シートの場所。**画面のメニューから開くために要る**（Issue 011）。
+   * 画面は Node 側のファイルを直接は見られないので、ここで渡す。
+   */
+  readonly sheetPath?: string;
   /** 人の判定を待っているケース番号。待っていなければ持たない。 */
   readonly awaiting?: number;
   readonly cases: readonly SessionCase[];
@@ -126,10 +131,14 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
   const awaiting = raw['awaiting'];
   if (awaiting !== undefined && !isCaseNo(awaiting)) return undefined;
 
+  const sheetPath = raw['sheetPath'];
+  if (sheetPath !== undefined && typeof sheetPath !== 'string') return undefined;
+
   return {
     runId: raw['runId'],
     phase: raw['phase'],
     ...(awaiting === undefined ? {} : { awaiting }),
+    ...(sheetPath === undefined ? {} : { sheetPath }),
     cases,
   };
 }

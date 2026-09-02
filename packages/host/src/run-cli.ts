@@ -65,6 +65,8 @@ const session = await startRunSession({
     ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
   },
   runId: runIdFrom(new Date()),
+  // 画面のメニューから開けるようにする。解決済みの絶対パスを渡す。
+  sheetPath: resolvedSheet,
   operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
   readScreenText: readAndroidScreenText,
 });
