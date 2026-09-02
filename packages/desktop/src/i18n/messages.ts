@@ -27,6 +27,10 @@ const ja = {
   'key.advance.note': 'AI の判定のまま（AUTO_PASS）残る',
 
   'verdict.ai': 'AI の判定: {result}',
+  'verdict.revise': '置き直し（このケースは済んでいる。置いても次へは進まない）',
+  'key.prev': '前のケースを見る',
+  'key.next': '次のケースを見る',
+  'key.move.note': '見るだけ。判定は動かない',
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
 
@@ -83,6 +87,10 @@ const en: Record<keyof typeof ja, string> = {
   'key.advance.note': "Stays as the AI's own result (AUTO_PASS)",
 
   'verdict.ai': 'AI verdict: {result}',
+  'verdict.revise': 'Re-placing a verdict (this case is done; it will not move on)',
+  'key.prev': 'Look at the previous case',
+  'key.next': 'Look at the next case',
+  'key.move.note': 'Only moves what you are looking at',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
 

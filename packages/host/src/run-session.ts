@@ -2,11 +2,13 @@ import {
   assertRunnableSheet,
   createSheetCaseRunner,
   executeRun,
+  resolveCaseResult,
   toCaseSubjects,
 } from '@git-qa/core';
 import type {
   Action,
   Actor,
+  HumanResult,
   CaseContext,
   CaseVerdict,
   HumanVerdict,
@@ -56,6 +58,39 @@ export interface RunSession {
   close(): Promise<void>;
 }
 
+/**
+ * 後から置き直された判定を `run.json` へ反映する。
+ *
+ * **置き直した人と時刻は、最後の 1 回のもの。**途中経過は残さない（残すなら形を別に決める）。
+ */
+function applyRevisions(
+  run: Run,
+  revised: ReadonlyMap<number, HumanResult>,
+  operator: Actor,
+  now: () => Date,
+): Run {
+  if (revised.size === 0) return run;
+  const at = now().toISOString();
+
+  return {
+    ...run,
+    cases: run.cases.map((entry) => {
+      const humanResult = revised.get(entry.no);
+      if (humanResult === undefined) return entry;
+      return {
+        ...entry,
+        humanResult,
+        result: resolveCaseResult({
+          ...(entry.aiResult === undefined ? {} : { aiResult: entry.aiResult }),
+          humanResult,
+        }),
+        verifiedBy: operator.handle,
+        verifiedAt: at,
+      };
+    }),
+  };
+}
+
 export async function startRunSession(options: StartRunSessionOptions): Promise<RunSession> {
   // 繋ぐ前にシートを見る。繋いでから落ちると、対象を触った跡だけが残る。
   assertRunnableSheet(options.sheet);
@@ -92,6 +127,12 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     cases.set(no, { ...before, ...fields });
   };
 
+  /**
+   * 後から置き直された判定。**押し間違いは起きるし、見落としにも後から気づく。**
+   * 実行が終わったときに `run.json` へ反映する。
+   */
+  const revised = new Map<number, HumanResult>();
+
   let aborted: string | undefined;
   /** ケース番号ごとの「打鍵待ち」。**宛先の違う打鍵は捨てる。** */
   const waiting = new Map<number, (input: HumanInput | undefined) => void>();
@@ -100,9 +141,12 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     const input = parseHumanInput(raw);
     if (input === undefined) return;
 
-    // 待っているケース宛でなければ捨てる。
-    // **遅れて届いた打鍵が、次のケースに付くのが一番まずい。**
-    if (!waiting.has(input.caseNo)) return;
+    if (!waiting.has(input.caseNo)) {
+      // 待っているケース宛でないものは、**既に走ったケースへの置き直し**としてだけ受ける。
+      // まだ走っていないケースには置けない（AI が操作していないので、見て判断する材料が無い）。
+      if (input.kind === 'verdict') revise(input.caseNo, input.humanResult);
+      return;
+    }
 
     if (input.kind === 'tap' || input.kind === 'swipe') {
       // **映像は端末より小さく流している。**送られてきた座標を実寸へ戻さないと、
@@ -144,6 +188,20 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     waiting.delete(input.caseNo);
     resolve(input);
   });
+
+  /**
+   * 既に走ったケースの判定を置き直す。**待っているケースは進めない**
+   * （戻って直したことで、勝手に先へ行かれると人が見失う）。
+   */
+  const revise = (caseNo: number, humanResult: HumanResult): void => {
+    const before = cases.get(caseNo);
+    // 走っていなければ置けない。`aiResult` がその印。
+    if (before?.aiResult === undefined) return;
+
+    revised.set(caseNo, humanResult);
+    patch(caseNo, { result: humanResult, verifiedBy: options.operator.handle });
+    publish();
+  };
 
   const runner = createSheetCaseRunner({ readScreenText: options.readScreenText });
 
@@ -208,7 +266,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     phase = 'finished';
     awaiting = undefined;
     publish();
-    return run;
+    // **後から置き直したものを、証跡へ反映する。**置き直せるのに残らないなら意味がない。
+    return applyRevisions(run, revised, options.operator, options.now ?? (() => new Date()));
   });
 
   publish();

@@ -52,3 +52,19 @@ describe('commandForKey', () => {
     }
   });
 });
+
+describe('ケースを前後に動かす（Issue 013）', () => {
+  it('← / → で見ているケースを動かす', () => {
+    expect(commandForKey({ key: 'ArrowLeft' })).toEqual({ kind: 'prev' });
+    expect(commandForKey({ key: 'ArrowRight' })).toEqual({ kind: 'next' });
+  });
+
+  it('↑ / ↓ でも動かせる（一覧は縦に並んでいる）', () => {
+    expect(commandForKey({ key: 'ArrowUp' })).toEqual({ kind: 'prev' });
+    expect(commandForKey({ key: 'ArrowDown' })).toEqual({ kind: 'next' });
+  });
+
+  it('修飾キー付きは受け取らない（OS の操作を奪わない）', () => {
+    expect(commandForKey({ key: 'ArrowLeft', metaKey: true })).toBeUndefined();
+  });
+});

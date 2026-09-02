@@ -311,3 +311,84 @@ describe('小さく流した映像の座標を、端末の実寸へ戻す', () =
     await session.close();
   });
 });
+
+describe('判定の置き直し（Issue 013）', () => {
+  /**
+   * **押し間違いは起きるし、「さっきの見落とした」も起きる。**
+   * 既に走ったケースなら、後から置き直せる。**まだ走っていないケースには置けない**
+   * （AI が操作していないので、人が見て判断する材料が無い）。
+   */
+  const start = (bridge: ReturnType<typeof fakeBridge>) =>
+    startRunSession({
+      adapter: stubAdapter({}),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-230000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+  it('既に置いた判定を、後から置き直せる', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    // 1 件目を置き直す（見落としに気づいた）。
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'FAIL' });
+    await waitFor(() => bridge.states.at(-1)?.cases[0]?.result === 'FAIL', '1 件目の置き直し');
+
+    // 置き直しても、待っているのは 2 件目のまま。**勝手に先へ進まない。**
+    expect(bridge.states.at(-1)?.awaiting).toBe(2);
+
+    bridge.send({ kind: 'advance', caseNo: 2 });
+    await waitFor(awaitingIs(bridge, 3), '3 件目の打鍵待ち');
+    session.abort('検査の後始末');
+
+    const run = await session.done;
+    await session.close();
+
+    // 証跡にも置き直しが載る。
+    expect(run.cases[0]?.result).toBe('FAIL');
+    expect(run.cases[0]?.humanResult).toBe('FAIL');
+    expect(run.cases[0]?.verifiedBy).toBe('octocat');
+  });
+
+  it('まだ走っていないケースには置けない', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 4, humanResult: 'VERIFIED' });
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(bridge.states.at(-1)?.cases[3]?.result).toBeUndefined();
+    expect(bridge.states.at(-1)?.awaiting).toBe(1);
+
+    session.abort('検査の後始末');
+    await session.done;
+    await session.close();
+  });
+
+  it('置かずに送ったケースも、後から置き直せる（AUTO_PASS → VERIFIED）', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'advance', caseNo: 1 });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(() => bridge.states.at(-1)?.cases[0]?.result === 'VERIFIED', '置き直し');
+
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.result).toBe('VERIFIED');
+    expect(run.cases[0]?.verifiedBy).toBe('octocat');
+  });
+});

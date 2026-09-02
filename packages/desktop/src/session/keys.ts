@@ -21,7 +21,10 @@ export interface KeyPress {
 export type KeyCommand =
   | { readonly kind: 'verdict'; readonly humanResult: HumanResult }
   /** 置かずに次へ。**繰り上げない**ので結果は `AUTO_PASS` になる。 */
-  | { readonly kind: 'advance' };
+  | { readonly kind: 'advance' }
+  /** 見ているケースを前後に動かす。**実行の進行とは別のカーソル**（Issue 013）。 */
+  | { readonly kind: 'prev' }
+  | { readonly kind: 'next' };
 
 /** 割り当ての正本。**画面へ出す説明もここから作る**ので、説明と実装がずれない。 */
 export interface KeyBinding {
@@ -37,6 +40,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { key: 'b', labelKey: 'key.blocked', noteKey: 'key.blocked.note' },
   { key: 's', labelKey: 'key.skip', noteKey: 'key.skip.note' },
   { key: ' ', labelKey: 'key.advance', noteKey: 'key.advance.note' },
+  { key: 'ArrowUp', labelKey: 'key.prev', noteKey: 'key.move.note' },
+  { key: 'ArrowDown', labelKey: 'key.next', noteKey: 'key.move.note' },
 ];
 
 const VERDICTS: Readonly<Record<string, HumanResult>> = {
@@ -55,6 +60,9 @@ export function commandForKey(press: KeyPress): KeyCommand | undefined {
   const humanResult = VERDICTS[key];
   if (humanResult !== undefined) return { kind: 'verdict', humanResult };
   if (key === ' ') return { kind: 'advance' };
+  // 一覧は縦に並んでいるので、左右でも上下でも動かせるようにする。
+  if (key === 'ArrowLeft' || key === 'ArrowUp') return { kind: 'prev' };
+  if (key === 'ArrowRight' || key === 'ArrowDown') return { kind: 'next' };
   // **取り消し（u）はまだ無い。**確定したケースをコア側で開け直す仕組みが要る。
   // 割り当てだけ先に作ると、押しても何も起きないキーになる。
   return undefined;

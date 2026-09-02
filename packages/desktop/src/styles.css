@@ -314,3 +314,16 @@ body {
     )
     no-repeat;
 }
+
+/* いま見ているケース。**打鍵待ちの印とは別**（戻って置き直しているとき用・Issue 013）。 */
+.case-item[aria-selected='true'] {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.verdict-revise {
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  /* 押す前に気づく必要があるので、注記より強く出す。 */
+  font-weight: 600;
+}

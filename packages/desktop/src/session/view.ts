@@ -29,12 +29,19 @@ function resetBody(target: HTMLElement): void {
   }
 }
 
-function caseItem(doc: Document, subject: SessionCase, awaiting: number | undefined): HTMLElement {
+function caseItem(
+  doc: Document,
+  subject: SessionCase,
+  awaiting: number | undefined,
+  cursor: number | undefined,
+): HTMLElement {
   const item = doc.createElement('li');
   item.className = 'case-item';
   item.dataset['caseNo'] = String(subject.no);
   if (subject.result !== undefined) item.dataset['result'] = subject.result;
   if (awaiting === subject.no) item.setAttribute('aria-current', 'true');
+  // **見ている所と、打鍵待ちの所は別**（Issue 013）。戻って直しているときに混ざらないように。
+  if (cursor === subject.no) item.setAttribute('aria-selected', 'true');
 
   const label = doc.createElement('span');
   label.className = 'case-title';
@@ -54,14 +61,14 @@ function caseItem(doc: Document, subject: SessionCase, awaiting: number | undefi
   return item;
 }
 
-function renderCases(root: HTMLElement, state: SessionState): void {
+function renderCases(root: HTMLElement, state: SessionState, cursor: number | undefined): void {
   const target = column(root, CASES_COLUMN);
   resetBody(target);
 
   const list = root.ownerDocument.createElement('ol');
   list.className = 'case-list';
   for (const subject of state.cases) {
-    list.append(caseItem(root.ownerDocument, subject, state.awaiting));
+    list.append(caseItem(root.ownerDocument, subject, state.awaiting, cursor));
   }
   target.append(list);
 }
@@ -125,12 +132,15 @@ export function installVerdictButtons(root: HTMLElement, onKey: (key: string) =>
   return () => root.removeEventListener('click', onClick);
 }
 
-function renderVerdict(root: HTMLElement, state: SessionState): void {
+function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | undefined): void {
   const doc = root.ownerDocument;
   const target = column(root, VERDICT_COLUMN);
   resetBody(target);
 
-  const awaiting = state.cases.find((c) => c.no === state.awaiting);
+  // 見ているケース。指していなければ、打鍵待ちのケースを見ている。
+  const looking = cursor ?? state.awaiting;
+  const awaiting = state.cases.find((c) => c.no === looking);
+  const revising = looking !== state.awaiting;
   const headline = doc.createElement('p');
   headline.className = 'verdict-headline';
 
@@ -152,7 +162,17 @@ function renderVerdict(root: HTMLElement, state: SessionState): void {
   note.className = 'verdict-note';
   note.textContent = awaiting.note ?? '';
 
-  target.append(headline, ai, note, renderKeyHelp(doc, true));
+  target.append(headline, ai, note);
+
+  if (revising) {
+    // **置いても次へ進まない**ことを、押す前に言う。
+    const hint = doc.createElement('p');
+    hint.className = 'verdict-revise';
+    hint.textContent = t('verdict.revise');
+    target.append(hint);
+  }
+
+  target.append(renderKeyHelp(doc, true));
 }
 
 /**
@@ -170,7 +190,16 @@ export function showSessionError(root: HTMLElement, message: string): void {
   target.append(paragraph);
 }
 
-export function renderSession(root: HTMLElement, state: SessionState): void {
-  renderCases(root, state);
-  renderVerdict(root, state);
+export interface RenderSessionOptions {
+  /** いま見ているケース。**実行の進行とは別**（戻って置き直すため・Issue 013）。 */
+  readonly cursor?: number;
+}
+
+export function renderSession(
+  root: HTMLElement,
+  state: SessionState,
+  options: RenderSessionOptions = {},
+): void {
+  renderCases(root, state, options.cursor);
+  renderVerdict(root, state, options.cursor);
 }

@@ -58,6 +58,12 @@ const diagnostics: {
 let livePlayer:
   { readonly stats: { error: string | undefined; codec: string | undefined } } | undefined;
 
+/**
+ * いま見ているケース。**実行の進行とは別のカーソル**（Issue 013）。
+ * 戻って置き直せるようにするために持つ。
+ */
+let cursor: number | undefined;
+
 /** いま出ている案内の段階。言語が変わったときに描き直すために覚えておく。 */
 let onboarding: ConnectionStatus = 'disconnected';
 
@@ -216,14 +222,39 @@ if (controlUrl !== undefined) {
     url: controlUrl,
     onState: (state) => {
       latest = state;
-      renderSession(root, state);
+      // 打鍵待ちが進んだら、見ている所も追いかける（戻って見ている最中は動かさない）。
+      if (cursor === undefined || cursor === previousAwaiting) cursor = state.awaiting;
+      previousAwaiting = state.awaiting;
+      renderSession(root, state, { ...(cursor === undefined ? {} : { cursor }) });
     },
   });
 
+  /** 前に見ていた打鍵待ちのケース。カーソルを追従させるかの判断に使う。 */
+  let previousAwaiting: number | undefined;
+
+  /** 走り終わったケースだけを行き来する。**まだ走っていないケースには行けない。** */
+  const move = (step: -1 | 1): void => {
+    const state = latest;
+    if (state === undefined) return;
+    const visitable = state.cases.filter((c) => c.aiResult !== undefined).map((c) => c.no);
+    if (visitable.length === 0) return;
+
+    const at = visitable.indexOf(cursor ?? state.awaiting ?? visitable[0]!);
+    const next = visitable[Math.min(Math.max(at + step, 0), visitable.length - 1)];
+    if (next === undefined) return;
+    cursor = next;
+    renderSession(root, state, { cursor });
+  };
+
   /** 打鍵とクリックで、まったく同じ道を通す。 */
   const place = (command: KeyCommand): void => {
-    const caseNo = latest?.awaiting;
-    // 待っていないときは何も送らない。**押した判定が別のケースへ付くのが一番まずい。**
+    if (command.kind === 'prev' || command.kind === 'next') {
+      move(command.kind === 'prev' ? -1 : 1);
+      return;
+    }
+
+    // **見ているケースへ置く。**戻って直しているなら、そのケースが相手になる。
+    const caseNo = cursor ?? latest?.awaiting;
     if (caseNo === undefined) return;
 
     const input: HumanInput =

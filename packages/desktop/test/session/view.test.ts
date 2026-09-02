@@ -168,3 +168,55 @@ describe('判定はクリックでも置ける', () => {
     expect(pressed).toEqual(['f']);
   });
 });
+
+describe('見ているケース（カーソル）を出す（Issue 013）', () => {
+  const ran: SessionState = {
+    runId: 'r',
+    phase: 'waiting',
+    awaiting: 3,
+    cases: [
+      { no: 1, title: 'アプリが起動する', aiResult: 'PASS', result: 'AUTO_PASS' },
+      {
+        no: 2,
+        title: 'メモを保存できる',
+        aiResult: 'BLOCKED',
+        result: 'VERIFIED',
+        verifiedBy: 'octocat',
+      },
+      { no: 3, title: '空のメモは保存できない', aiResult: 'PASS', note: '画面の文字を見た' },
+      { no: 4, title: '日本語で検索できる' },
+    ],
+  };
+
+  it('カーソルが指すケースが分かる（打鍵待ちとは別の印）', () => {
+    renderSession(root, ran, { cursor: 1 });
+
+    const selected = column('cases').querySelectorAll('.case-item[aria-selected="true"]');
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.textContent).toContain('アプリが起動する');
+    // 打鍵待ちの印は 3 件目のまま。
+    expect(column('cases').querySelector('.case-item[aria-current="true"]')?.textContent).toContain(
+      '空のメモ',
+    );
+  });
+
+  it('過去のケースを見ているときは、右に「置き直し」と出る', () => {
+    renderSession(root, ran, { cursor: 1 });
+
+    const text = column('verdict').textContent ?? '';
+    expect(text).toContain('アプリが起動する');
+    expect(text).toContain('置き直');
+  });
+
+  it('打鍵待ちのケースを見ているときは、置き直しとは言わない', () => {
+    renderSession(root, ran, { cursor: 3 });
+
+    expect(column('verdict').textContent).not.toContain('置き直');
+  });
+
+  it('カーソルを渡さなければ、打鍵待ちのケースを見ている', () => {
+    renderSession(root, ran);
+
+    expect(column('verdict').textContent).toContain('空のメモは保存できない');
+  });
+});
