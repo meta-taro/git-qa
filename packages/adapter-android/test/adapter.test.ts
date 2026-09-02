@@ -287,8 +287,11 @@ describe('ライブビュー（生 H.264 を流す方式）', () => {
 
   it('端末に何も送り込まず、screenrecord の生 H.264 を流す', async () => {
     const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([1])];
     const session = await streaming(runner).connect();
     await session.liveView.open();
+    // **読み手が繋いだ時点で起こす。**開いただけでは端末を触らない。
+    for await (const _chunk of session.liveView.frames!()) break;
 
     expect(runner.streamed.at(-1)).toEqual([
       '-s',
@@ -312,6 +315,8 @@ describe('ライブビュー（生 H.264 を流す方式）', () => {
       liveView: { mode: 'h264-stream', timeLimitSec: 600 },
     }).connect();
     await session.liveView.open();
+    runner.chunks = [new Uint8Array([1])];
+    for await (const _chunk of session.liveView.frames!()) break;
 
     expect(runner.streamed.at(-1)).toContain('--time-limit=180');
   });
@@ -348,8 +353,11 @@ describe('ライブビュー（生 H.264 を流す方式）', () => {
 
   it('閉じると screenrecord も止まる', async () => {
     const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([1])];
     const session = await streaming(runner).connect();
     await session.liveView.open();
+    // 読み手がいる状態にしてから閉じる（開いただけでは端末を触らない）。
+    for await (const _chunk of session.liveView.frames!()) break;
     await session.liveView.close();
 
     expect(runner.processes.at(-1)?.isRunning).toBe(false);
@@ -462,5 +470,46 @@ describe('ライブ映像の繋ぎ直し', () => {
     const after = runner.streamed.length;
     // 閉じた後に読み直しても、新しい screenrecord は起きない。
     expect(after).toBe(1);
+  });
+});
+
+describe('映像の読み手が入れ替わったとき', () => {
+  const streamingAdapter = (runner: CommandRunner): TargetAdapter =>
+    createAndroidAdapter({ build, runner, liveView: { mode: 'h264-stream' } });
+
+  /**
+   * **画面を読み込み直すと、橋へ繋ぎ直しに来る**（vite の再読み込み・webview の復帰）。
+   * 端末側の映像を 1 回しか流せない作りだと、2 回目は真っ黒になる（**実機で起きた**）。
+   */
+  const drain = async (frames: AsyncIterable<Uint8Array>, count: number): Promise<number> => {
+    let seen = 0;
+    for await (const _chunk of frames) {
+      seen += 1;
+      if (seen >= count) break;
+    }
+    return seen;
+  };
+
+  it('読み直しても、また映像が来る', async () => {
+    const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([1]), new Uint8Array([2])];
+    const session = await streamingAdapter(runner).connect();
+    await session.liveView.open();
+
+    expect(await drain(session.liveView.frames!(), 2)).toBe(2);
+    // 1 人目が去った後、2 人目が繋いでくる。
+    expect(await drain(session.liveView.frames!(), 2)).toBe(2);
+  });
+
+  it('読み手が去ったら、端末側の取り込みも止める', async () => {
+    const runner = fakeRunner();
+    runner.chunks = [new Uint8Array([1])];
+    const session = await streamingAdapter(runner).connect();
+    await session.liveView.open();
+
+    await drain(session.liveView.frames!(), 1);
+
+    // 止めないと、screenrecord が端末に残り続ける。
+    expect(runner.processes.some((p) => !p.isRunning)).toBe(true);
   });
 });

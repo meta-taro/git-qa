@@ -185,8 +185,9 @@ function createSession(deps: SessionDeps): TargetSession {
 
       liveOpen = true;
       if (mode === 'h264-stream') {
-        liveStream = startScreenrecord();
-        liveProcess = liveStream;
+        // **ここでは端末を触らない。**読み手が繋いだ時点で `frames()` が起こす。
+        // 開いた時点で 1 本起こすと、誰も見ていない間も端末が録り続け、
+        // **読み手が入れ替わったときに 2 人目が受け取れない**（実機で真っ黒になった）。
       } else {
         liveProcess = runner.start(scrcpy, ['-s', serial, '--window-title', `git-qa ${serial}`]);
       }
@@ -195,46 +196,56 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async close() {
       const running = liveProcess;
+      const streaming = liveStream;
       liveOpen = false;
       liveProcess = undefined;
       liveStream = undefined;
+      // 読み手がまだ回している最中でも、端末側は止める。
+      await streaming?.stop();
       await running?.stop();
     },
 
     ...(mode === 'h264-stream'
       ? {
           frames(): AsyncIterable<Uint8Array> {
-            if (liveStream === undefined) {
+            if (!liveOpen) {
               // 開く前に読もうとしている。空を返すと「映像が来ない」に化けるので落とす。
               throw new AdapterError(KIND, 'ライブビューを開く前に映像を読もうとしている');
             }
             return {
               /**
-               * **`screenrecord` には 180 秒の上限がある。**尽きたら繋ぎ直す。
-               * 人は窓を開けっぱなしにするので、切れたまま黙ると画面が固まったように見える
-               * （実機で 3 時間半後に 0 バイトになった）。
+               * **読み手 1 人につき 1 本**の `screenrecord` を持つ。
                *
-               * 繋ぎ直しの前後で数フレーム落ちる。**止まったまま黙るよりはよい。**
+               * 画面を読み込み直すと橋へ繋ぎ直しに来る（vite の再読み込み・webview の復帰）。
+               * 1 本を共有すると、**2 人目が何も受け取れず真っ黒になる**（実機で起きた）。
+               *
+               * `screenrecord` には 180 秒の上限があるので、尽きたら繋ぎ直す。
+               * 人は窓を開けっぱなしにするので、切れたまま黙ると画面が固まったように見える。
                */
               async *[Symbol.asyncIterator]() {
-                while (liveOpen) {
-                  const stream = liveStream ?? startScreenrecord();
-                  liveStream = stream;
-                  liveProcess = stream;
+                let current: StreamingProcess | undefined;
+                try {
+                  while (liveOpen) {
+                    current = startScreenrecord();
+                    liveStream = current;
 
-                  let seen = 0;
-                  for await (const chunk of stream.chunks) {
-                    seen += 1;
-                    yield chunk;
-                  }
+                    let seen = 0;
+                    for await (const chunk of current.chunks) {
+                      seen += 1;
+                      yield chunk;
+                    }
 
-                  // 尽きた。閉じられたのなら起こし直さない（端末を掴んだままにしない）。
-                  if (!liveOpen) return;
-                  if (seen === 0) {
-                    // 1 枚も来ずに終わった。**繋ぎ直しを繰り返すと、黙ったまま回り続ける。**
-                    throw new AdapterError(KIND, 'screenrecord が映像を 1 枚も返さずに終わった');
+                    // 尽きた。閉じられたのなら起こし直さない（端末を掴んだままにしない）。
+                    if (!liveOpen) return;
+                    if (seen === 0) {
+                      // 1 枚も来ずに終わった。**繋ぎ直しを繰り返すと、黙ったまま回り続ける。**
+                      throw new AdapterError(KIND, 'screenrecord が映像を 1 枚も返さずに終わった');
+                    }
                   }
-                  liveStream = undefined;
+                } finally {
+                  // **読み手が去ったら端末側も止める。**残すと screenrecord が溜まる。
+                  await current?.stop();
+                  if (liveStream === current) liveStream = undefined;
                 }
               },
             };
