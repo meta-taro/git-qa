@@ -9,6 +9,12 @@
 #   OSS_ALLOWED_AUTHOR_EMAIL_REGEX  commit author/committer に許可するメールの ERE
 #                                   既定: @users\.noreply\.github\.com$
 #   OSS_ALLOWED_EMAIL_DOMAINS       追加行・commit message で許可するメールドメイン（空白区切り）
+#   OSS_ALLOWED_EMAILS              追加行・commit message で許可する「完全一致の」アドレス
+#                                   （空白区切り）。既定: noreply@anthropic.com
+#                                   §25 が守るのは「個人」であって、bot の受け取らない宛先
+#                                   （users.noreply.github.com と同じ性質）は個人ではない。
+#                                   ドメイン全体を開けると個人アドレスまで通るので、
+#                                   ここは完全一致に限る。
 #   OSS_DENY_WORDS                  禁止語（実名等）を 1 行 1 語。CI では secrets から渡す
 #
 # 設計上の約束:
@@ -19,6 +25,7 @@ set -uo pipefail
 
 ALLOWED_AUTHOR_RE="${OSS_ALLOWED_AUTHOR_EMAIL_REGEX:-@users\.noreply\.github\.com$}"
 ALLOWED_DOMAINS="${OSS_ALLOWED_EMAIL_DOMAINS:-example.com example.org example.net users.noreply.github.com}"
+ALLOWED_EMAILS="${OSS_ALLOWED_EMAILS:-noreply@anthropic.com}"
 DENY_WORDS="${OSS_DENY_WORDS:-}"
 
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
@@ -38,7 +45,12 @@ mask_email() {
 }
 
 allowed_email() {
-  local e="$1" d
+  local e="$1" d lower
+  lower="$(printf '%s' "$e" | tr 'A-Z' 'a-z')"
+  # 完全一致で許可されたアドレス（AI の co-author など。個人ではない）
+  for a in $ALLOWED_EMAILS; do
+    [ "$lower" = "$(printf '%s' "$a" | tr 'A-Z' 'a-z')" ] && return 0
+  done
   d="${e##*@}"
   for a in $ALLOWED_DOMAINS; do
     [ "$(printf '%s' "$d" | tr 'A-Z' 'a-z')" = "$(printf '%s' "$a" | tr 'A-Z' 'a-z')" ] && return 0
