@@ -25,6 +25,13 @@ export interface DiagnosticsReport {
   readonly decodeError?: string;
   /** 実際に使った codec。端末の SPS から組み立てたもの。 */
   readonly codec?: string;
+  /**
+   * 最後に canvas へ描いた時刻（epoch ms）。
+   *
+   * **操作した時刻と引き算すれば、端から端までの遅れが出る**（Issue 005）。
+   * 同じ PC の中なので、時計は揃っている。
+   */
+  readonly lastFrameAt?: number;
 }
 
 /**

@@ -133,7 +133,8 @@ describe('createLivePlayer', () => {
     player.end();
 
     expect(player.stats.received).toBe(3);
-    expect(player.stats.painted).toBe(2);
+    // 2 枚目で落ちる。**落ちた後は key が来るまで捨てる**ので、描けたのは 1 枚。
+    expect(player.stats.painted).toBe(1);
   });
 
   it('最初の絵までの時間を残す', () => {
@@ -272,5 +273,42 @@ describe('createLivePlayer — 静止した画面でも最初の 1 枚を出す'
     fire?.();
 
     expect(d.submitted).toHaveLength(2);
+  });
+});
+
+describe('createLivePlayer — 復号器が落ちても立て直す', () => {
+  /**
+   * **落ちたまま黙ると、画面が止まったように見える**（実機で 4 枚で止まった）。
+   * WebKit は壊れた 1 枚で `Decoder failure` を出して以後を受け付けない。
+   * 次の key が来たら作り直す（delta だけでは絵を組み立てられないので、key を待つ）。
+   */
+  it('落ちた後、次の key で作り直して再生を続ける', () => {
+    const d = fakeDecoder({ failOn: 2 });
+    const player = createLivePlayer({ createDecoder: d.create, onFrame: () => {} });
+
+    player.push(bytes(nal(7), nal(5)));
+    player.push(bytes(nal(1)));
+    // ここで落ちる。delta を渡し続けても直らない。
+    player.push(bytes(nal(1)));
+    expect(d.codecs).toHaveLength(1);
+
+    // 次の key で作り直す。
+    player.push(bytes(nal(5)));
+    player.end();
+
+    expect(d.codecs).toHaveLength(2);
+    expect(d.codecs[1]).toBe('avc1.42c032');
+  });
+
+  it('落ちた理由は最初の 1 件を残す（作り直しで消さない）', () => {
+    const d = fakeDecoder({ failOn: 2 });
+    const player = createLivePlayer({ createDecoder: d.create, onFrame: () => {} });
+
+    player.push(bytes(nal(7), nal(5)));
+    player.push(bytes(nal(1)));
+    player.push(bytes(nal(5)));
+    player.end();
+
+    expect(player.stats.error).toBe('復号器が落ちた');
   });
 });

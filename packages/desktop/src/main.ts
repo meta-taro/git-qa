@@ -50,6 +50,7 @@ const diagnostics: {
   canvas?: { width: number; height: number };
   decodeError?: string;
   codec?: string;
+  lastFrameAt?: number;
 } = { decoded: 0, drawn: 0, bytes: 0 };
 
 /** いま動いている再生。診断で中の様子を読むために持っておく。 */
@@ -130,6 +131,7 @@ async function startLiveView(
       diagnostics.decoded += 1;
       surface.draw(frame);
       diagnostics.drawn += 1;
+      diagnostics.lastFrameAt = Date.now();
       diagnostics.canvas = { width: surface.canvas.width, height: surface.canvas.height };
     },
   });
@@ -202,6 +204,7 @@ if (controlUrl !== undefined) {
       // **復号器が落ちた理由を外へ出す。**握り潰すと、真っ黒の原因が分からない。
       ...(livePlayer?.stats.error === undefined ? {} : { decodeError: livePlayer.stats.error }),
       ...(livePlayer?.stats.codec === undefined ? {} : { codec: livePlayer.stats.codec }),
+      ...(diagnostics.lastFrameAt === undefined ? {} : { lastFrameAt: diagnostics.lastFrameAt }),
       ...(diagnostics.canvas === undefined ? {} : { canvas: diagnostics.canvas }),
       ...(diagnostics.lastError === undefined ? {} : { lastError: diagnostics.lastError }),
     };

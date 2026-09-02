@@ -84,7 +84,13 @@ const DEFAULT_FPS = 60;
 /** SPS が読めないときの逃げ道。Baseline / Level 3.0。 */
 const FALLBACK_CODEC = 'avc1.42E01E';
 
-/** 静止した画面で、最初の 1 枚を出すまでの待ち。 */
+/**
+ * 静止した画面で、抱えている枚を出すまでの待ち。
+ *
+ * **短くしすぎない。**16 ms まで詰めたら、まだ届いている途中の絵を切って渡してしまい、
+ * WebKit が `Decoder failure` を出して以後を受け付けなくなった（実機で 4 枚で止まった）。
+ * ここは「送り手が本当に止まった」と言える長さにする。
+ */
 const DEFAULT_IDLE_FLUSH_MS = 80;
 
 export function createLivePlayer(options: LivePlayerOptions): LivePlayer {
@@ -102,6 +108,9 @@ export function createLivePlayer(options: LivePlayerOptions): LivePlayer {
   let decoder: DecoderLike | undefined;
   let codec: string | undefined;
 
+  /** 落ちた復号器は使い物にならない。**次の key で作り直す。** */
+  let broken = false;
+
   const handlers: DecoderHandlers = {
     output: (frame) => {
       // 描いてから close する。逆にすると、閉じた絵を描くことになる。
@@ -114,17 +123,33 @@ export function createLivePlayer(options: LivePlayerOptions): LivePlayer {
       // 握り潰さない。**最初の 1 件だけ残す** — 後から来る「閉じた復号器へ渡した」で
       // 覆われると、本当の原因が消える（スパイクで踏んだ）。
       failure ??= error.message;
+      // **落ちたまま黙ると、画面が止まったように見える。**次の key で作り直す。
+      broken = true;
     },
   };
 
   const submit = (unit: { bytes: Uint8Array; isKey: boolean }): void => {
     received += 1;
 
+    if (broken) {
+      // delta だけでは絵を組み立てられない。**key が来るまでは捨てる。**
+      if (!unit.isKey) return;
+      try {
+        decoder?.close();
+      } catch {
+        // 既に閉じている。ここで落ちても、作り直しは続ける。
+      }
+      decoder = undefined;
+      broken = false;
+    }
+
     if (decoder === undefined) {
       // **端末が名乗った codec を使う。**決め打ちにすると、解像度で level が変わったときに
       // 1 枚も復号できないまま黙る（実機で真っ黒になった。端末は Level 5.0 だった）。
       // 名乗りが無い流れ（途中から繋いだ等）でだけ、既定へ落ちる。
-      codec = codecFromAnnexB(unit.bytes) ?? options.fallbackCodec ?? FALLBACK_CODEC;
+      // 一度決めたら覚えておく。作り直しのときは key しか手元に無く、
+      // そこから組み立て直すと既定へ落ちてしまう（同じ端末なので値は変わらない）。
+      codec ??= codecFromAnnexB(unit.bytes) ?? options.fallbackCodec ?? FALLBACK_CODEC;
       decoder = options.createDecoder(handlers, codec);
     }
 

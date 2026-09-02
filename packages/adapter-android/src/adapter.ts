@@ -57,6 +57,10 @@ export interface AndroidAdapterOptions {
   /** ライブ映像の出し方。既定は別窓（従来どおり）。 */
   readonly liveView?: {
     readonly mode?: LiveViewMode;
+    /** `h264-stream` のときの大きさ（`720x1480` の形）。**小さいほど遅れが減る。** */
+    readonly size?: string;
+    /** `h264-stream` のときのビットレート（bps）。**落とすほど遅れが減る。** */
+    readonly bitRate?: number;
     /** `h264-stream` のときの 1 回あたりの長さ。上限 180 秒。 */
     readonly timeLimitSec?: number;
   };
@@ -147,6 +151,11 @@ function createSession(deps: SessionDeps): TargetSession {
   };
 
   const mode: LiveViewMode = options.liveView?.mode ?? 'external-window';
+  /** ライブビューの大きさ。端末の実寸ではなく、人が判断できる大きさで足りる。 */
+  const liveSize = options.liveView?.size ?? '720x1480';
+  /** 1 秒あたりの符号化量。落とすほど遅れが減る。 */
+  const liveBitRate = options.liveView?.bitRate ?? 4_000_000;
+
   const timeLimitSec = Math.min(
     options.liveView?.timeLimitSec ?? SCREENRECORD_MAX_SEC,
     SCREENRECORD_MAX_SEC,
@@ -165,6 +174,12 @@ function createSession(deps: SessionDeps): TargetSession {
         'screenrecord',
         '--output-format=h264',
         `--time-limit=${String(timeLimitSec)}`,
+        // **人が見て判断できる大きさで足りる。**大きいほど符号化と転送に時間がかかり、
+        // 操作から画面に出るまでが延びる（Issue 005）。
+        '--size',
+        liveSize,
+        '--bit-rate',
+        String(liveBitRate),
         '-',
       ]),
     ]);
