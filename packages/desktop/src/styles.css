@@ -222,3 +222,33 @@ body {
   font-size: 0.75rem;
   opacity: 0.6;
 }
+
+/*
+ * カラムの区切り（Issue 012）。掴めることが分かる最低限にとどめる。
+ * **太さと色は決めていない**（DESIGN.md が空・§11）。文字色から作る。
+ */
+
+.column-resizer {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  /* 掴む的を確保しつつ、線は細く見せる。 */
+  background: linear-gradient(
+      to right,
+      transparent 2px,
+      color-mix(in srgb, currentColor 25%, transparent) 2px,
+      color-mix(in srgb, currentColor 25%, transparent) 4px,
+      transparent 4px
+    )
+    no-repeat;
+}
+
+.column-resizer:hover {
+  background: linear-gradient(
+      to right,
+      transparent 2px,
+      color-mix(in srgb, currentColor 60%, transparent) 2px,
+      color-mix(in srgb, currentColor 60%, transparent) 4px,
+      transparent 4px
+    )
+    no-repeat;
+}

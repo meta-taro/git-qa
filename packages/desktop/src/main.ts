@@ -4,6 +4,7 @@ import { resolveLocale } from './i18n/index.js';
 import { setLocale, t } from './i18n/current.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import { renderColumns } from './render.js';
+import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { commandForKey } from './session/keys.js';
 import { renderSession, showSessionError } from './session/view.js';
@@ -28,6 +29,8 @@ setLocale(
 );
 
 renderColumns(root);
+// 区切りは、カラムを描いた後に差し込む（描き直すと消えるため）。
+installColumnResizers(root);
 
 /**
  * 端末に繋いでいるときだけ、中央カラムを映像に差し替える。
