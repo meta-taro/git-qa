@@ -167,6 +167,20 @@ pnpm --filter @git-qa/desktop tauri build
 > 画面の色・タイポグラフィは**まだ決めていません**。`DESIGN.md` が空のままなので、骨格は OS の既定の配色で出ます。
 > アイコンも Tauri の既定のままです。
 
+### 配布物（.app / .dmg）を作る
+
+```bash
+pnpm --filter @git-qa/desktop tauri build
+```
+
+`packages/desktop/src-tauri/target/release/bundle/` に `.app` と `.dmg` が出ます。
+
+> **開発中の起動（`pnpm app` / `pnpm live`）ではアイコンが出ません。**Dock のアイコンは
+> `.app` の包みに入っているもので、開発中は実行ファイルを直接動かしているためです。
+>
+> **署名も公証もしていません。**ブラウザで配布物を落とすと Gatekeeper に止められます
+> （鍵の投入は人の作業・§14）。**自動更新もまだ入れていません。**
+
 ### アプリから始める（推奨）
 
 ```bash
