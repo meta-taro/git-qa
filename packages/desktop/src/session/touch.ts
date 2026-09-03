@@ -59,6 +59,9 @@ const TAP_SLOP = 16;
 const MIN_DURATION_MS = 20;
 const MAX_DURATION_MS = 5_000;
 
+/** これ以上押し続けたら長押し。**メニューを出す操作**がこれ。 */
+const LONG_PRESS_MS = 500;
+
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
 
@@ -106,11 +109,23 @@ export function installDeviceTouch(options: InstallDeviceTouchOptions): () => vo
 
     const screen = { x: options.canvas.width, y: options.canvas.height };
     const moved = Math.hypot(to.x - from.x, to.y - from.y);
+    const heldMs = Math.round(clamp(now() - from.at, MIN_DURATION_MS, MAX_DURATION_MS));
+
     if (moved <= TAP_SLOP) {
-      // 長く押していても、動いていなければタップ。**長押しはまだ無い**ので、
-      // 「押しっぱなし」を勝手に別の操作へ化けさせない。
       // **どの大きさの画面上の座標かを添える。**映像は端末より小さく流しているので、
       // 受け取った側で端末の実寸へ戻す必要がある。
+      if (heldMs >= LONG_PRESS_MS) {
+        // 押し続けた。**メニューを出す操作**がこれ。
+        options.send({
+          kind: 'longPress',
+          caseNo: from.caseNo,
+          x: to.x,
+          y: to.y,
+          durationMs: heldMs,
+          screen,
+        });
+        return;
+      }
       options.send({ kind: 'tap', caseNo: from.caseNo, x: to.x, y: to.y, screen });
       return;
     }
@@ -120,7 +135,7 @@ export function installDeviceTouch(options: InstallDeviceTouchOptions): () => vo
       caseNo: from.caseNo,
       from: { x: from.x, y: from.y },
       to,
-      durationMs: Math.round(clamp(now() - from.at, MIN_DURATION_MS, MAX_DURATION_MS)),
+      durationMs: heldMs,
       screen,
     });
   };

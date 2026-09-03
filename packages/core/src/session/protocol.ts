@@ -75,7 +75,26 @@ export type HumanInput =
       readonly durationMs: number;
       /** 座標がどの大きさの画面上のものか。 */
       readonly screen?: Point;
-    };
+    }
+  /**
+   * 押し続けた（長押し）。**メニューを出す操作**がこれ。
+   * タップと区別が付くよう、短すぎるものは受け取らない。
+   */
+  | {
+      readonly kind: 'longPress';
+      readonly caseNo: number;
+      readonly x: number;
+      readonly y: number;
+      readonly durationMs: number;
+      readonly screen?: Point;
+    }
+  /**
+   * 人が端末へ文字を送った。
+   *
+   * **非 ASCII は送れない。**端末の `input text` は IME を通らないので、日本語は打てない
+   * （AI 側と同じ制限・C34）。**黙って化けた文字を送るより、送れないと言うほうがよい。**
+   */
+  | { readonly kind: 'text'; readonly caseNo: number; readonly text: string };
 
 /** 画面上の位置。 */
 export interface Point {
@@ -124,6 +143,30 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
       caseNo,
       from,
       to,
+      durationMs,
+      ...(screen === undefined ? {} : { screen }),
+    };
+  }
+
+  if (raw['kind'] === 'text') {
+    const text = raw['text'];
+    if (typeof text !== 'string' || text === '' || text.length > 1000) return undefined;
+    // 端末の入力は IME を通らない。**送れないものは受け取らない。**
+    if (!/^[\x20-\x7e]+$/.test(text)) return undefined;
+    return { kind: 'text', caseNo, text };
+  }
+
+  if (raw['kind'] === 'longPress') {
+    const { x, y, durationMs } = raw;
+    if (!isPixel(x) || !isPixel(y)) return undefined;
+    // 300 ms 未満はタップと区別が付かない。**曖昧なものを端末へ送らない。**
+    if (!isPixel(durationMs) || durationMs < 300 || durationMs > 10_000) return undefined;
+    const screen = parsePoint(raw['screen']);
+    return {
+      kind: 'longPress',
+      caseNo,
+      x,
+      y,
       durationMs,
       ...(screen === undefined ? {} : { screen }),
     };

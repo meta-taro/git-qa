@@ -13,10 +13,11 @@ import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { humanInputFor, nextCursor } from './session/cursor.js';
-import { commandForKey } from './session/keys.js';
+import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
 import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics.js';
 import { startMenuActions } from './session/menu-actions.js';
+import { installTextSender } from './session/typing.js';
 import { installDeviceTouch } from './session/touch.js';
 import { installVerdictButtons, renderSession, showSessionError } from './session/view.js';
 import { createLivePlayer } from './live/player.js';
@@ -342,10 +343,26 @@ function startControl(controlUrl: string): void {
   };
 
   window.addEventListener('keydown', (event) => {
+    // **文字を打っている最中の `v` を、判定にしない。**
+    if (shouldIgnoreKeyPress(event.target)) return;
     const command = commandForKey(event);
     if (command === undefined) return;
     event.preventDefault();
     place(command);
+  });
+
+  // 端末へ文字を送る欄。**日本語は送れない**ので、そのときは理由を出す。
+  installTextSender(app, {
+    onSend: (text) => {
+      const caseNo = cursor ?? latest?.awaiting;
+      if (caseNo === undefined) return;
+      sendHumanInput(controlUrl, { kind: 'text', caseNo, text }).catch((error: unknown) => {
+        showSessionError(app, error instanceof Error ? error.message : String(error));
+      });
+    },
+    onError: (message) => {
+      showSessionError(app, message);
+    },
   });
 
   // **打鍵だけにしない。**初めて触る人は、どのキーが何をするか知らない。

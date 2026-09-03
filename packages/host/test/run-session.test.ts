@@ -464,3 +464,83 @@ describe('人が触った操作を証跡に残す', () => {
     expect(run.cases[0]?.humanActions).toBeUndefined();
   });
 });
+
+describe('長押し', () => {
+  it('同じ場所への長いなぞりとして端末へ送り、証跡には長押しとして残す', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260903-110000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({
+      kind: 'longPress',
+      caseNo: 1,
+      x: 360,
+      y: 740,
+      durationMs: 800,
+      screen: { x: 720, y: 1480 },
+    });
+    // AI 自身の操作と混ざるので、長押しの実体（なぞり）を待つ。
+    await waitFor(() => adapter.actions.some((a) => a.kind === 'swipe'), '端末への長押し');
+
+    // 端末に「長押し」という命令は無い。同じ場所への長いなぞりになる。
+    expect(adapter.actions.at(-1)).toEqual({
+      kind: 'swipe',
+      from: { at: 'point', x: 540, y: 1110 },
+      to: { at: 'point', x: 540, y: 1110 },
+      durationMs: 800,
+    });
+
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    session.abort('検査の後始末');
+
+    const run = await session.done;
+    await session.close();
+
+    // 証跡には、人が何をしたかで残す。
+    expect(run.cases[0]?.humanActions?.[0]).toMatchObject({ kind: 'longPress' });
+  });
+});
+
+describe('文字を端末へ送る', () => {
+  it('端末へ送り、証跡には中身を残さない', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260903-120000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'text', caseNo: 1, text: 'hello' });
+    await waitFor(() => adapter.actions.some((a) => a.kind === 'type'), '端末への文字');
+
+    expect(adapter.actions.at(-1)).toEqual({ kind: 'type', text: 'hello' });
+
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    session.abort('検査の後始末');
+
+    const run = await session.done;
+    await session.close();
+
+    const action = run.cases[0]?.humanActions?.[0];
+    expect(action).toMatchObject({ kind: 'text' });
+    // **打った文字は証跡に残さない。**画面には顧客名や電話番号が写る（PRD §10）。
+    expect(JSON.stringify(action)).not.toContain('hello');
+  });
+});

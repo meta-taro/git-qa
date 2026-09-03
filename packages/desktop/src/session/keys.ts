@@ -67,3 +67,16 @@ export function commandForKey(press: KeyPress): KeyCommand | undefined {
   // 割り当てだけ先に作ると、押しても何も起きないキーになる。
   return undefined;
 }
+
+/**
+ * その打鍵を、判定として扱わない場所か。
+ *
+ * **端末へ文字を送る欄に打った `v` が、判定になってはいけない。**
+ * ボタンの上での Space も、押下と判定の二重取りになるので外す。
+ */
+export function shouldIgnoreKeyPress(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  const tag = target.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button') return true;
+  return target.getAttribute('contenteditable') === 'true';
+}

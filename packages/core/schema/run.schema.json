@@ -402,7 +402,7 @@
       }
     },
     "humanAction": {
-      "description": "人が自分で端末を触った操作。**AI の足跡（steps）とは別に残す。**\nAI が判断保留にして止まった後、人が触って確かめた過程が読めるようにするため。",
+      "description": "人が自分で端末を触った操作。**AI の足跡（steps）とは別に残す。**\nAI が判断保留にして止まった後、人が触って確かめた過程が読めるようにするため。\n\n**文字入力の中身は残さない。**検証中の画面には顧客名や電話番号が写る（PRD §10）ため、打った文字そのものを証跡へ書かない。「文字を送った」ことと時刻だけを残す。",
       "type": "object",
       "required": ["at", "kind"],
       "additionalProperties": false,
@@ -412,7 +412,7 @@
           "format": "date-time"
         },
         "kind": {
-          "enum": ["tap", "swipe"]
+          "enum": ["tap", "swipe", "longPress", "text"]
         },
         "from": {
           "$ref": "#/$defs/point"

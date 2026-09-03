@@ -81,10 +81,13 @@ export interface Point {
  *
  * AI が判断保留にして止まった後、人が触って確かめた過程が読めるようにするため。
  * **無いことにも意味がある**（触らずに見ただけで判定した）。
+ *
+ * **文字入力の中身は残さない。**検証中の画面には顧客名や電話番号が写る（PRD §10）ので、
+ * 打った文字そのものは書かない。「文字を送った」ことと時刻だけを残す。
  */
 export interface HumanAction {
   at: string;
-  kind: 'tap' | 'swipe';
+  kind: 'tap' | 'swipe' | 'longPress' | 'text';
   from?: Point;
   to?: Point;
 }

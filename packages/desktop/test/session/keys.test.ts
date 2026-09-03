@@ -1,6 +1,8 @@
+// @vitest-environment happy-dom
+
 import { describe, expect, it } from 'vitest';
 
-import { KEY_BINDINGS, commandForKey } from '../../src/session/keys.js';
+import { KEY_BINDINGS, commandForKey, shouldIgnoreKeyPress } from '../../src/session/keys.js';
 
 /**
  * 人が押すキー。**1 打鍵で置いて、次へ進む**（C6）。
@@ -66,5 +68,28 @@ describe('ケースを前後に動かす（Issue 013）', () => {
 
   it('修飾キー付きは受け取らない（OS の操作を奪わない）', () => {
     expect(commandForKey({ key: 'ArrowLeft', metaKey: true })).toBeUndefined();
+  });
+});
+
+describe('shouldIgnoreKeyPress — 文字を打っている最中は判定に取られない', () => {
+  /**
+   * **端末へ文字を送る欄に打った `v` が、判定になってはいけない。**
+   * 入力の中の打鍵は、判定として扱わない。
+   */
+  it('入力欄の中では無視する', () => {
+    const input = document.createElement('input');
+    expect(shouldIgnoreKeyPress(input)).toBe(true);
+
+    const area = document.createElement('textarea');
+    expect(shouldIgnoreKeyPress(area)).toBe(true);
+  });
+
+  it('ボタンの上では無視する（Space で二重に効かないように）', () => {
+    expect(shouldIgnoreKeyPress(document.createElement('button'))).toBe(true);
+  });
+
+  it('画面のどこでもない所は、判定として扱う', () => {
+    expect(shouldIgnoreKeyPress(document.createElement('div'))).toBe(false);
+    expect(shouldIgnoreKeyPress(null)).toBe(false);
   });
 });

@@ -148,3 +148,37 @@ describe('parseHumanInput — 人がなぞる（スワイプ / フリック）',
     expect(parseHumanInput({ ...swipe, durationMs: 60_000 })).toBeUndefined();
   });
 });
+
+describe('parseHumanInput — 長押し', () => {
+  const press = { kind: 'longPress', caseNo: 1, x: 540, y: 1200, durationMs: 700 };
+
+  it('押し続けた時間つきで受け取る', () => {
+    expect(parseHumanInput(press)).toEqual(press);
+  });
+
+  it('短すぎる長押しは受け取らない（タップとの区別が付かない）', () => {
+    expect(parseHumanInput({ ...press, durationMs: 100 })).toBeUndefined();
+  });
+});
+
+describe('parseHumanInput — 文字を送る', () => {
+  it('ASCII の文字列を受け取る', () => {
+    expect(parseHumanInput({ kind: 'text', caseNo: 2, text: 'hello' })).toEqual({
+      kind: 'text',
+      caseNo: 2,
+      text: 'hello',
+    });
+  });
+
+  it('**非 ASCII は受け取らない**（端末の入力は IME を通らない）', () => {
+    expect(parseHumanInput({ kind: 'text', caseNo: 2, text: 'あいうえお' })).toBeUndefined();
+  });
+
+  it('空の文字列は受け取らない', () => {
+    expect(parseHumanInput({ kind: 'text', caseNo: 2, text: '' })).toBeUndefined();
+  });
+
+  it('長すぎる文字列は受け取らない', () => {
+    expect(parseHumanInput({ kind: 'text', caseNo: 2, text: 'a'.repeat(2000) })).toBeUndefined();
+  });
+});

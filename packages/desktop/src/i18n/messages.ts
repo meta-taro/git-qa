@@ -34,6 +34,10 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
 
+  'typing.placeholder': '端末へ送る文字（英数字のみ）',
+  'typing.send': '送る',
+  'typing.notAscii': '端末の入力は IME を通らないので、日本語は送れない（英数字だけ送れる）',
+
   'sheet.none': '走らせている検証シートがない（実行を始めると開けるようになる）',
   'sheet.openFailed': '検証シートを開けない: {message}',
 
@@ -102,6 +106,11 @@ const en: Record<keyof typeof ja, string> = {
   'key.move.note': 'Only moves what you are looking at',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
+
+  'typing.placeholder': 'Text to send to the device (ASCII only)',
+  'typing.send': 'Send',
+  'typing.notAscii':
+    "The device's input does not go through an IME, so Japanese cannot be sent (ASCII only)",
 
   'sheet.none': 'No test sheet is running yet (start a run and this opens it)',
   'sheet.openFailed': 'Cannot open the test sheet: {message}',

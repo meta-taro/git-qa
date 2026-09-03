@@ -162,7 +162,17 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       return;
     }
 
-    if (input.kind === 'tap' || input.kind === 'swipe') {
+    if (input.kind === 'text') {
+      // **中身は証跡へ残さない**（画面には顧客名や電話番号が写る・PRD §10）。
+      const at = (options.now ?? (() => new Date()))().toISOString();
+      touched.set(input.caseNo, [...(touched.get(input.caseNo) ?? []), { at, kind: 'text' }]);
+      void live.session.act({ kind: 'type', text: input.text }).catch((error: unknown) => {
+        console.error('[git-qa] 人の操作を端末へ送れない', error);
+      });
+      return;
+    }
+
+    if (input.kind === 'tap' || input.kind === 'swipe' || input.kind === 'longPress') {
       // **映像は端末より小さく流している。**送られてきた座標を実寸へ戻さないと、
       // 違う所を触る（実機で押しても反応しなかった）。
       const scale = async (x: number, y: number): Promise<{ x: number; y: number }> => {
@@ -188,6 +198,16 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
           const to = await scale(input.x, input.y);
           action = { kind: 'tap', target: { at: 'point', ...to } };
           record = { at, kind: 'tap', to };
+        } else if (input.kind === 'longPress') {
+          // **端末に「長押し」という命令は無い。**同じ場所へ時間をかけてなぞると長押しになる。
+          const to = await scale(input.x, input.y);
+          action = {
+            kind: 'swipe',
+            from: { at: 'point', ...to },
+            to: { at: 'point', ...to },
+            durationMs: input.durationMs,
+          };
+          record = { at, kind: 'longPress', to };
         } else {
           const from = await scale(input.from.x, input.from.y);
           const to = await scale(input.to.x, input.to.y);

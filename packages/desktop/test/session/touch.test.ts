@@ -145,12 +145,23 @@ describe('installDeviceTouch', () => {
     expect(input.durationMs).toBe(150);
   });
 
-  it('押した時間が長くても、動いていなければタップ（長押しはまだ無い）', () => {
+  it('同じ所で長く押したら、長押しとして送る（メニューを出す操作）', () => {
     clock = 0;
     const { canvasEl, send } = setup(() => waiting);
 
     press(canvasEl);
     clock = 900;
+    release(canvasEl);
+
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ kind: 'longPress', durationMs: 900 });
+  });
+
+  it('短く押したらタップ（長押しとの境目）', () => {
+    clock = 0;
+    const { canvasEl, send } = setup(() => waiting);
+
+    press(canvasEl);
+    clock = 200;
     release(canvasEl);
 
     expect(send.mock.calls[0]?.[0]).toMatchObject({ kind: 'tap' });
