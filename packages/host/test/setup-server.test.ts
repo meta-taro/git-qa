@@ -213,3 +213,20 @@ describe('置いた人（ハンドル）', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('シート探しの負荷', () => {
+  /**
+   * **状態は毎秒取りに来る。**そのたびにディスクを掘ると、探す場所が広いときに重い
+   * （配布物では home の下を見る）。
+   */
+  it('毎回は探し直さない', async () => {
+    const findSheets = vi.fn().mockResolvedValue(['/repo/a.tsv']);
+    server = await startSetupServer(options({ findSheets }));
+
+    await json(`${server.url}/state`);
+    await json(`${server.url}/state`);
+    await json(`${server.url}/state`);
+
+    expect(findSheets).toHaveBeenCalledOnce();
+  });
+});

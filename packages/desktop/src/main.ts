@@ -245,6 +245,11 @@ if (liveUrl !== undefined) {
      * （実機で画面が 2 つ縦に並んだ）。
      */
     let started = false;
+    /**
+     * 前に描いた内容。**変わっていないなら描き直さない。**
+     * 毎秒描き直すと、ハンドルを打っている最中に入力が中断される。
+     */
+    let lastDrawn = '';
 
     const tick = async (): Promise<void> => {
       const state = await fetchSetupState(setupUrl);
@@ -258,6 +263,10 @@ if (liveUrl !== undefined) {
         startSession(state.liveUrl, state.controlUrl);
         return;
       }
+
+      const shape = JSON.stringify([state, pickedSheet, operator === '']);
+      if (shape === lastDrawn) return;
+      lastDrawn = shape;
 
       renderSetup(app, state, {
         ...(pickedSheet === undefined ? {} : { pickedSheet }),

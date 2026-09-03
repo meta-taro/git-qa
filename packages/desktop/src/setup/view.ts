@@ -164,7 +164,15 @@ export function renderSetup(
 
   section.append(sheetHeading);
 
-  if (state.sheets.length === 0) {
+  // **自分で選んだものも一覧に出す。**選んだのに画面に出ないと、選べたのか分からない。
+  const sheets = [
+    ...(options.pickedSheet === undefined || state.sheets.includes(options.pickedSheet)
+      ? []
+      : [options.pickedSheet]),
+    ...state.sheets,
+  ];
+
+  if (sheets.length === 0) {
     const empty = doc.createElement('p');
     empty.className = 'setup-empty';
     empty.textContent = t('setup.sheet.none');
@@ -173,7 +181,7 @@ export function renderSetup(
     section.append(
       pickList(
         doc,
-        state.sheets.map((path) => ({ value: path, label: path })),
+        sheets.map((path) => ({ value: path, label: path })),
         'setup-sheet',
         'path',
         defaultSheet,

@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   createAndroidAdapter,
@@ -43,12 +45,30 @@ const runIdFrom = (at: Date): string => {
 };
 
 const workingDir = fromInvocationDir('.');
+
+/**
+ * 検証シートを探す場所。
+ *
+ * **配布物を Finder から起動すると、作業ディレクトリが `/` になる**（実機で
+ * 「検証シートが無い」と出た）。そのときは、よくある置き場所を見る。
+ * どちらにせよ、見つからなければ人が自分で選べる。
+ */
+const sheetRoots =
+  workingDir === '/'
+    ? ['Documents', 'Desktop', 'Downloads'].map((dir) => join(homedir(), dir))
+    : [workingDir];
 let session: RunSession | undefined;
 let finished: Promise<Run> | undefined;
 
 const setup = await startSetupServer({
   listDevices: async () => (await listAndroidDevices()).map((d) => ({ ...d })),
-  findSheets: () => findSheets(workingDir),
+  findSheets: async () =>
+    (
+      await Promise.all(
+        // home の下は 1 段深く見る。**プロジェクトの中の `docs/test-specs/` まで届かせる。**
+        sheetRoots.map((root) => findSheets(root, workingDir === '/' ? { maxDepth: 6 } : {})),
+      )
+    ).flat(),
 
   start: async ({ serial, sheetPath, operator }) => {
     const text = await readFile(sheetPath, 'utf8');

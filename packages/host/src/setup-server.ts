@@ -101,11 +101,17 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
   let started: StartedRun | undefined;
   let failure: string | undefined;
 
+  /**
+   * 見つけたシート。**毎回は探し直さない。**
+   * 状態は毎秒取りに来るので、そのたびにディスクを掘ると重い（配布物では home の下を見る）。
+   */
+  let sheets: readonly string[] | undefined;
+
   const state = async (): Promise<SetupState> => ({
     phase,
     // **選ぶたびに取り直す。**繋ぎ替えた端末が出てこないと、人は待たされ続ける。
     devices: phase === 'idle' ? await options.listDevices() : [],
-    sheets: phase === 'idle' ? await options.findSheets() : [],
+    sheets: phase === 'idle' ? (sheets ??= await options.findSheets()) : [],
     ...(started === undefined ? {} : started),
     ...(failure === undefined ? {} : { error: failure }),
   });
