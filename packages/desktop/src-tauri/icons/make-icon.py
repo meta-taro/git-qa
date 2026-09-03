@@ -2,12 +2,14 @@
 
 角丸の四角（md-business / dbboard と同じ家族の形）に、**端末の枠の中のチェック**。
 この道具の芯は「端末の画面を人が見て保証する」ことなので、枠＝画面を入れる。
-色は #0F768E — 家族の藍（#5B5BD6 / #4F46E5）と Dock で見分けが付くもの。
+色は #34D399（白みがかったエメラルド）。**「見て、大丈夫だった」を表す緑**で、
+家族の藍（md-business #5B5BD6 / dbboard #4F46E5）と Dock で見分けが付く。
+dbboard の DESIGN.md が success に使っている値と同じもの。
 """
 import math, struct, zlib, sys
 
 SIZE = 1024
-BG = (0x0F, 0x76, 0x8E)
+BG = (0x34, 0xD3, 0x99)
 
 def rrect(px, py, x0, y0, x1, y1, r):
     cx = min(max(px, x0 + r), x1 - r); cy = min(max(py, y0 + r), y1 - r)
