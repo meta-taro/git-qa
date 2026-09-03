@@ -6,7 +6,7 @@ import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.
 import { defaultStore } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
-import { fetchSetupState, requestStart, setupUrlFromLocation } from './setup/client.js';
+import { fetchSetupState, requestStart, resolveSetupUrl } from './setup/client.js';
 import { renderSetup } from './setup/view.js';
 import type { ConnectionStatus } from './onboarding/index.js';
 import { renderColumns, updateColumnTexts } from './render.js';
@@ -169,7 +169,6 @@ async function startLiveView(
 
 const liveUrl = liveStreamUrlFromLocation(window.location.search);
 const controlUrl = controlUrlFromLocation(window.location.search);
-const setupUrl = setupUrlFromLocation(window.location.search);
 
 /**
  * 端末に繋がったら、映像と実行状態を出す。
@@ -212,54 +211,67 @@ onboarding = connectionStatus({
   ...(liveUrl === undefined ? {} : { liveUrl }),
   ...(controlUrl === undefined ? {} : { controlUrl }),
 });
-if (setupUrl === undefined) renderOnboarding(root, onboarding);
+renderOnboarding(root, onboarding);
 
 if (liveUrl !== undefined) {
   startSession(liveUrl, controlUrl);
-} else if (setupUrl !== undefined) {
+} else {
   /**
    * 端末とシートを選んで始める（Issue 011 段階 3）。
    *
-   * **状態は取りに行く。**選ぶ画面は遅れに厳しくないので、仕掛けを増やさない。
+   * **入口の URL は 2 通りで来る。**開発中は `?setup=`、配布物ではアプリに聞く
+   * （`.app` を叩いたときはクエリが付かない）。
    */
-  const url = setupUrl;
-
-  const tick = async (): Promise<void> => {
-    const state = await fetchSetupState(url);
-    if (state === undefined) return;
-
-    if (state.phase === 'running' && state.liveUrl !== undefined) {
-      window.clearInterval(poll);
-      renderSetup(app, state, { onStart: () => undefined });
-      startSession(state.liveUrl, state.controlUrl);
+  void (async () => {
+    let url: string | undefined;
+    try {
+      url = await resolveSetupUrl(window.location.search);
+    } catch (error: unknown) {
+      // **起こせなかった理由を画面に出す。**黙って空の画面を出さない。
+      showLiveViewError(app, error instanceof Error ? error.message : String(error));
       return;
     }
+    if (url === undefined) return;
 
-    renderSetup(app, state, {
-      onStart: (params) => {
-        requestStart(url, params).catch((error: unknown) => {
-          showSessionError(app, error instanceof Error ? error.message : String(error));
-        });
-      },
-    });
-  };
+    const setupUrl = url;
 
-  /**
-   * **ウィンドウが完全に隠れると、macOS が画面の時計を止める。**
-   * 止まっている間に実行が始まっていても気づけないので、**戻ってきたら取り直す。**
-   */
-  const resync = (): void => {
-    if (document.visibilityState === 'visible') void tick();
-  };
-  document.addEventListener('visibilitychange', resync);
-  window.addEventListener('focus', resync);
+    const tick = async (): Promise<void> => {
+      const state = await fetchSetupState(setupUrl);
+      if (state === undefined) return;
 
-  const poll = window.setInterval(() => {
-    void tick();
-  }, 1000);
+      if (state.phase === 'running' && state.liveUrl !== undefined) {
+        window.clearInterval(poll);
+        renderSetup(app, state, { onStart: () => undefined });
+        startSession(state.liveUrl, state.controlUrl);
+        return;
+      }
 
-  // 最初の 1 回は待たずに出す。**開いた直後に空の画面を見せない。**
-  void tick();
+      renderSetup(app, state, {
+        onStart: (params) => {
+          requestStart(setupUrl, params).catch((error: unknown) => {
+            showSessionError(app, error instanceof Error ? error.message : String(error));
+          });
+        },
+      });
+    };
+
+    /**
+     * **ウィンドウが完全に隠れると、macOS が画面の時計を止める。**
+     * 止まっている間に実行が始まっていても気づけないので、**戻ってきたら取り直す。**
+     */
+    const resync = (): void => {
+      if (document.visibilityState === 'visible') void tick();
+    };
+    document.addEventListener('visibilitychange', resync);
+    window.addEventListener('focus', resync);
+
+    const poll = window.setInterval(() => {
+      void tick();
+    }, 1000);
+
+    // 最初の 1 回は待たずに出す。**開いた直後に空の画面を見せない。**
+    await tick();
+  })();
 }
 
 /**

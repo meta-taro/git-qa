@@ -97,3 +97,43 @@ export async function requestStart(
     throw new Error(`実行を始められなかった: ${String(res.status)}`);
   }
 }
+
+export interface ResolveSetupUrlOptions {
+  /** アプリ（Rust 側）に聞く口。差し替えられる形にしてある。 */
+  readonly ask?: () => Promise<string | null>;
+  readonly waitMs?: number;
+  readonly tries?: number;
+}
+
+/**
+ * 入口サーバの URL を決める。
+ *
+ * **配布物ではクエリで渡せない。**開発中（`pnpm app`）は `?setup=` が付くが、
+ * `.app` を叩いたときは付かないので、Node 側を起こしたアプリに聞く。
+ * **起こせなかった理由はそのまま投げる**（黙って空の画面を出さない）。
+ */
+export async function resolveSetupUrl(
+  search: string,
+  options: ResolveSetupUrlOptions = {},
+): Promise<string | undefined> {
+  const fromQuery = setupUrlFromLocation(search);
+  if (fromQuery !== undefined) return fromQuery;
+
+  const ask =
+    options.ask ??
+    (async (): Promise<string | null> => {
+      if (!('__TAURI_INTERNALS__' in window)) return null;
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke<string | null>('setup_url');
+    });
+
+  const tries = options.tries ?? 40;
+  const waitMs = options.waitMs ?? 250;
+
+  for (let i = 0; i < tries; i += 1) {
+    const url = await ask();
+    if (url !== null && url !== '') return url;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+  return undefined;
+}

@@ -11,14 +11,16 @@
     "@tauri-apps/plugin-log": "^2.9.1"
   },
   "scripts": {
-    "build": "tsc --build && vite build",
+    "build": "pnpm bundle:host && tsc --build && vite build",
     "dev": "vite",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "bundle:host": "esbuild ../host/src/app-cli.ts --bundle --platform=node --target=node22 --format=esm --outfile=src-tauri/resources/host-bundle.mjs"
   },
   "devDependencies": {
     "@git-qa/live-bridge": "workspace:*",
     "@tauri-apps/cli": "^2.11.4",
     "happy-dom": "^20.12.0",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "esbuild": "^0.28.2"
   }
 }

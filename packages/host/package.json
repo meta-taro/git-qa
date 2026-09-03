@@ -17,6 +17,7 @@
     "@git-qa/live-bridge": "workspace:*"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "vite-node": "^3.2.4"
   }
 }

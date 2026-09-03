@@ -1,18 +1,18 @@
-import { readFileSync } from 'node:fs';
-
 // ajv は CJS で配られている。既定書き出しは Node からだと名前空間として見えるので、
 // 名前付きで取り出す（`new Ajv2020()` が構築できる形になる）。
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import formatsPlugin from 'ajv-formats';
 
+import runSchema from '../../schema/run.schema.json' with { type: 'json' };
+
 /**
  * `run.json` の形の正本は JSON Schema ファイルの側。
  * TypeScript の型はその写しであって、検証はこちらで行う。
  */
-export const RUN_SCHEMA: Record<string, unknown> = JSON.parse(
-  readFileSync(new URL('../../schema/run.schema.json', import.meta.url), 'utf8'),
-) as Record<string, unknown>;
+// **実行時にファイルを読まない。**読むと、1 枚に束ねたときに置き場所が変わって壊れる
+// （配布物の中で `schema/run.schema.json` を探しに行って落ちた）。
+export const RUN_SCHEMA: Record<string, unknown> = runSchema;
 
 const ajv = new Ajv2020({
   allErrors: true,

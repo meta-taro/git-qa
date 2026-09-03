@@ -10,6 +10,8 @@ export default tseslint.config(
       // Rust のビルド成果物と Tauri の生成物。生成された JS が混ざるので検査対象から外す。
       '**/src-tauri/target/**',
       '**/src-tauri/gen/**',
+      // 配布物に入れる Node 側の束ね（生成物）。
+      '**/src-tauri/resources/**',
     ],
   },
   js.configs.recommended,

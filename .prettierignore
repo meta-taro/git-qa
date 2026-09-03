@@ -15,3 +15,6 @@ pnpm-lock.yaml
 # Rust のビルド成果物と、Tauri が生成する権限スキーマ。人が書くものではない。
 packages/*/src-tauri/target/
 packages/*/src-tauri/gen/
+
+# 束ねた配布物。生成物なので整形しない。
+packages/desktop/src-tauri/resources/

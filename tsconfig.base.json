@@ -1,6 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    // JSON をそのまま取り込む。**形の正本は JSON Schema ファイル**（C18）で、
+    // ファイルを実行時に読むと束ねたときに壊れる。
+    "resolveJsonModule": true,
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "NodeNext",

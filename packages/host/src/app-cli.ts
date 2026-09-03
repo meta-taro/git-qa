@@ -25,9 +25,15 @@ import { startSetupServer } from './setup-server.js';
  * **端末に繋ぐ前に画面を出す。**人はアプリの中で端末と検証シートを選んで始められる。
  * ターミナルで打つのは、この 1 行だけ。
  *
+ * **`--serve` を付けると、画面を起こさずサーバだけを立てる。**配布物（.app）の中から
+ * 呼ばれる形で、画面は Tauri 側が既に出している。URL は標準出力の 1 行目に出す。
+ *
  * **ここは配線なので検査していない。**判断のある所（入口サーバ・シート探し・実行）は
  * `setup-server.ts` / `find-sheets.ts` / `run-session.ts` にあり、そちらは検査してある。
  */
+
+/** 画面を起こさない（配布物の中から呼ばれるとき）。 */
+const serveOnly = process.argv.includes('--serve');
 
 /** `20260902-150000`。人が ls で並べ替えられる形にする。 */
 const runIdFrom = (at: Date): string => {
@@ -77,31 +83,43 @@ const setup = await startSetupServer({
 
 console.log(`[git-qa] 画面から始める: ${setup.url}`);
 
-const child = spawn(
-  'pnpm',
-  [
-    '--filter',
-    '@git-qa/desktop',
-    'exec',
-    'tauri',
-    ...tauriDevArgs(undefined, { setupUrl: setup.url }),
-  ],
-  { stdio: 'inherit' },
-);
+if (serveOnly) {
+  // 画面は既に出ている。**ここは待つだけ。**親（アプリ）が終わればここも終わる。
+  const stop = (): void => {
+    void session?.close().finally(() => process.exit(0));
+  };
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
+  // 親が消えたら道連れにする。残ると端末を掴んだままになる。
+  process.stdin.on('close', stop);
+  process.stdin.resume();
+} else {
+  const child = spawn(
+    'pnpm',
+    [
+      '--filter',
+      '@git-qa/desktop',
+      'exec',
+      'tauri',
+      ...tauriDevArgs(undefined, { setupUrl: setup.url }),
+    ],
+    { stdio: 'inherit' },
+  );
 
-// 画面が閉じられたら、残りを「やっていない」ではなく判断保留として残して終える。
-child.on('close', () => session?.abort('画面が閉じられた'));
+  // 画面が閉じられたら、残りを「やっていない」ではなく判断保留として残して終える。
+  child.on('close', () => session?.abort('画面が閉じられた'));
 
-await new Promise<void>((resolve) => child.on('close', () => resolve()));
+  await new Promise<void>((resolve) => child.on('close', () => resolve()));
 
-if (finished !== undefined) {
-  const run = await finished;
-  await session?.close();
-  // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
-  const path = await writeRunJson(fromInvocationDir('runs'), run);
-  console.log(`[git-qa] 証跡: ${path}`);
-  const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
-  console.log(`[git-qa] ${String(run.cases.length)} 件中 ${String(placed)} 件を人が見て置いた`);
+  if (finished !== undefined) {
+    const run = await finished;
+    await session?.close();
+    // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
+    const path = await writeRunJson(fromInvocationDir('runs'), run);
+    console.log(`[git-qa] 証跡: ${path}`);
+    const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
+    console.log(`[git-qa] ${String(run.cases.length)} 件中 ${String(placed)} 件を人が見て置いた`);
+  }
+
+  await setup.close();
 }
-
-await setup.close();

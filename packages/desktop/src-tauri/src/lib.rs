@@ -1,3 +1,4 @@
+mod host;
 mod menu;
 mod open;
 mod state;
@@ -11,6 +12,16 @@ use tauri::{Emitter, Manager};
 #[tauri::command]
 fn set_appearance(app: tauri::AppHandle, appearance: String) -> Result<(), String> {
   menu::apply_appearance(&app, &appearance).map_err(|error| error.to_string())
+}
+
+/// 入口サーバの URL。**画面は起動直後にここへ聞きに来る**（配布物では URL を
+/// クエリで渡せないため）。まだ起きていなければ空を返す。
+#[tauri::command]
+fn setup_url(state: tauri::State<'_, host::HostState>) -> Result<Option<String>, String> {
+  if let Some(error) = state.error.lock().unwrap().clone() {
+    return Err(error);
+  }
+  Ok(state.url.lock().unwrap().clone())
 }
 
 /// 検証シートを開く。開き方は `md-business` / `reveal` / `default`。
@@ -35,6 +46,13 @@ pub fn run() {
       let effective = menu::locale_from_env();
       app.manage(state::SettingsState::new(&effective));
       app.set_menu(menu::build(app.handle(), &effective, "system", "system")?)?;
+
+      // **配布物では Node 側をここで起こす。**開発中（`pnpm app`）は既に起きているので、
+      // その場合は起こさない（二重に立てると端末を掴み合う）。
+      app.manage(host::HostState::default());
+      if std::env::var("GIT_QA_EMBEDDED_HOST").as_deref() != Ok("0") && !cfg!(debug_assertions) {
+        host::spawn(app.handle())?;
+      }
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -72,7 +90,18 @@ pub fn run() {
         }
       }
     })
-    .invoke_handler(tauri::generate_handler![set_appearance, set_locale, open_sheet])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .invoke_handler(tauri::generate_handler![
+      set_appearance,
+      set_locale,
+      open_sheet,
+      setup_url
+    ])
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app, event| {
+      // 閉じるときに Node 側も道連れにする。残ると端末を掴んだままになる。
+      if let tauri::RunEvent::ExitRequested { .. } = event {
+        host::stop(app);
+      }
+    });
 }

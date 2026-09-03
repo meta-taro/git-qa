@@ -18,3 +18,6 @@ SECRETS.local.md
 # Free / Pro の LFS 無料枠 10 GiB は 5 か月で尽きる。帯域はもっと早く、
 # 溜まった履歴を 1 回 clone しただけで月間 10 GiB を超える。
 runs/
+
+# 配布物に入れる Node 側の束ね（ビルドで作る）
+packages/desktop/src-tauri/resources/host-bundle.mjs
