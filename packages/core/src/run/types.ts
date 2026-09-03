@@ -70,6 +70,25 @@ export interface RunStep {
   label?: string;
 }
 
+/** 端末の画面の位置（画素）。 */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * 人が自分で端末を触った操作。**AI の足跡（`steps`）とは別に残す。**
+ *
+ * AI が判断保留にして止まった後、人が触って確かめた過程が読めるようにするため。
+ * **無いことにも意味がある**（触らずに見ただけで判定した）。
+ */
+export interface HumanAction {
+  at: string;
+  kind: 'tap' | 'swipe';
+  from?: Point;
+  to?: Point;
+}
+
 export interface RunCase {
   /** 検証シートの No. 列。行 ID は md-business 側のものなので持たない（C3）。 */
   no: number;
@@ -82,6 +101,8 @@ export interface RunCase {
   verifiedBy?: string;
   verifiedAt?: string;
   steps: RunStep[];
+  /** 人が自分で触った操作。無ければ、人は触っていない。 */
+  humanActions?: HumanAction[];
   recording: CaseRecording;
   note?: string;
 }

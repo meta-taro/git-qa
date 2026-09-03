@@ -170,3 +170,47 @@ describe('TS の語彙と JSON Schema の語彙がずれていない', () => {
     expect(enumOf([...caseSchema, 'humanResult', 'enum'])).toEqual(HUMAN_RESULTS);
   });
 });
+
+describe('人が触った操作（humanActions）', () => {
+  /**
+   * **いまの証跡は AI の足跡しか持っていない。**AI が判断保留にして止まった後、
+   * 人が自分で触って確かめた過程が残らない。**「本当に見たのか」が読めない。**
+   */
+  it('人が触った操作を残せる', () => {
+    const run = validRun();
+    run.cases[0] = {
+      ...run.cases[0]!,
+      humanActions: [
+        { at: '2026-08-17T14:45:40.000Z', kind: 'tap', to: { x: 540, y: 1200 } },
+        {
+          at: '2026-08-17T14:45:42.000Z',
+          kind: 'swipe',
+          from: { x: 540, y: 2000 },
+          to: { x: 540, y: 400 },
+        },
+      ],
+    };
+
+    expect(validateRun(run).valid).toBe(true);
+  });
+
+  it('知らない種類の操作は通さない', () => {
+    const run = validRun();
+    run.cases[0] = {
+      ...run.cases[0]!,
+      humanActions: [{ at: '2026-08-17T14:45:40.000Z', kind: 'ピンチ' } as never],
+    };
+
+    expect(validateRun(run).valid).toBe(false);
+  });
+
+  it('時刻の無い操作は通さない（いつ触ったかが読めないと証跡にならない）', () => {
+    const run = validRun();
+    run.cases[0] = {
+      ...run.cases[0]!,
+      humanActions: [{ kind: 'tap' } as never],
+    };
+
+    expect(validateRun(run).valid).toBe(false);
+  });
+});

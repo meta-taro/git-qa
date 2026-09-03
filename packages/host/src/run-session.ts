@@ -8,6 +8,7 @@ import {
 import type {
   Action,
   Actor,
+  HumanAction,
   HumanResult,
   CaseContext,
   CaseVerdict,
@@ -59,26 +60,33 @@ export interface RunSession {
 }
 
 /**
- * 後から置き直された判定を `run.json` へ反映する。
+ * 後から置き直された判定と、人が触った操作を `run.json` へ反映する。
  *
  * **置き直した人と時刻は、最後の 1 回のもの。**途中経過は残さない（残すなら形を別に決める）。
  */
-function applyRevisions(
+function applyHumanTrace(
   run: Run,
   revised: ReadonlyMap<number, HumanResult>,
+  touched: ReadonlyMap<number, HumanAction[]>,
   operator: Actor,
   now: () => Date,
 ): Run {
-  if (revised.size === 0) return run;
+  if (revised.size === 0 && touched.size === 0) return run;
   const at = now().toISOString();
 
   return {
     ...run,
     cases: run.cases.map((entry) => {
       const humanResult = revised.get(entry.no);
-      if (humanResult === undefined) return entry;
+      const actions = touched.get(entry.no);
+
+      // **触っていないケースには足さない。**「触らずに見た」も記録のうち。
+      const withActions =
+        actions === undefined || actions.length === 0 ? entry : { ...entry, humanActions: actions };
+
+      if (humanResult === undefined) return withActions;
       return {
-        ...entry,
+        ...withActions,
         humanResult,
         result: resolveCaseResult({
           ...(entry.aiResult === undefined ? {} : { aiResult: entry.aiResult }),
@@ -133,6 +141,12 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
    */
   const revised = new Map<number, HumanResult>();
 
+  /**
+   * 人が自分で触った操作。**AI の足跡とは別に残す。**
+   * これが無いと「本当に人が見たのか」が証跡から読めない。
+   */
+  const touched = new Map<number, HumanAction[]>();
+
   let aborted: string | undefined;
   /** ケース番号ごとの「打鍵待ち」。**宛先の違う打鍵は捨てる。** */
   const waiting = new Map<number, (input: HumanInput | undefined) => void>();
@@ -166,15 +180,28 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       // **人の番のときだけ端末へ送る**（待っている＝AI の操作は終わっている）。
       // AI の操作中に人の操作が割り込むと、どちらがやったのか証跡から読めなくなる。
       void (async () => {
-        const action: Action =
-          input.kind === 'tap'
-            ? { kind: 'tap', target: { at: 'point', ...(await scale(input.x, input.y)) } }
-            : {
-                kind: 'swipe',
-                from: { at: 'point', ...(await scale(input.from.x, input.from.y)) },
-                to: { at: 'point', ...(await scale(input.to.x, input.to.y)) },
-                durationMs: input.durationMs,
-              };
+        const at = (options.now ?? (() => new Date()))().toISOString();
+        let action: Action;
+        let record: HumanAction;
+
+        if (input.kind === 'tap') {
+          const to = await scale(input.x, input.y);
+          action = { kind: 'tap', target: { at: 'point', ...to } };
+          record = { at, kind: 'tap', to };
+        } else {
+          const from = await scale(input.from.x, input.from.y);
+          const to = await scale(input.to.x, input.to.y);
+          action = {
+            kind: 'swipe',
+            from: { at: 'point', ...from },
+            to: { at: 'point', ...to },
+            durationMs: input.durationMs,
+          };
+          record = { at, kind: 'swipe', from, to };
+        }
+
+        // **端末の実寸で残す。**画面に映していた大きさではなく、実際に触った位置。
+        touched.set(input.caseNo, [...(touched.get(input.caseNo) ?? []), record]);
         await live.session.act(action);
       })().catch((error: unknown) => {
         // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
@@ -267,7 +294,13 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     awaiting = undefined;
     publish();
     // **後から置き直したものを、証跡へ反映する。**置き直せるのに残らないなら意味がない。
-    return applyRevisions(run, revised, options.operator, options.now ?? (() => new Date()));
+    return applyHumanTrace(
+      run,
+      revised,
+      touched,
+      options.operator,
+      options.now ?? (() => new Date()),
+    );
   });
 
   publish();

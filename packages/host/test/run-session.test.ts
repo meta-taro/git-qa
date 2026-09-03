@@ -392,3 +392,75 @@ describe('判定の置き直し（Issue 013）', () => {
     expect(run.cases[0]?.verifiedBy).toBe('octocat');
   });
 });
+
+describe('人が触った操作を証跡に残す', () => {
+  /**
+   * **AI の足跡しか残らないと、「本当に人が見たのか」が読めない。**
+   * 判断保留のあと人が自分で触って確かめた過程を、証跡に残す。
+   */
+  it('触った操作が、端末の実寸の座標で run.json に残る', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260903-100000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'tap', caseNo: 1, x: 360, y: 740, screen: { x: 720, y: 1480 } });
+    bridge.send({
+      kind: 'swipe',
+      caseNo: 1,
+      from: { x: 360, y: 1400 },
+      to: { x: 360, y: 200 },
+      durationMs: 120,
+      screen: { x: 720, y: 1480 },
+    });
+    await waitFor(() => adapter.actions.length >= 2, '端末への操作');
+
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    session.abort('検査の後始末');
+
+    const run = await session.done;
+    await session.close();
+
+    const actions = run.cases[0]?.humanActions ?? [];
+    expect(actions).toHaveLength(2);
+    expect(actions[0]).toMatchObject({ kind: 'tap', to: { x: 540, y: 1110 } });
+    expect(actions[1]).toMatchObject({
+      kind: 'swipe',
+      from: { x: 540, y: 2100 },
+      to: { x: 540, y: 300 },
+    });
+    expect(typeof actions[0]?.at).toBe('string');
+  });
+
+  it('触っていないケースには残らない（「触らずに見た」も記録のうち）', async () => {
+    const bridge = fakeBridge();
+    const session = await startRunSession({
+      adapter: stubAdapter({ screen: { width: 1080, height: 2220 } }),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260903-100100',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    session.abort('検査の後始末');
+
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.humanActions).toBeUndefined();
+  });
+});
