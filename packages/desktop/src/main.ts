@@ -1,4 +1,4 @@
-import type { HumanInput, SessionState } from '@git-qa/core/session';
+import type { SessionState } from '@git-qa/core/session';
 
 import { attachConsoleToLog } from './console-log.js';
 import { setLocale, t } from './i18n/current.js';
@@ -12,6 +12,7 @@ import type { ConnectionStatus } from './onboarding/index.js';
 import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
+import { humanInputFor, nextCursor } from './session/cursor.js';
 import { commandForKey } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
 import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics.js';
@@ -314,15 +315,11 @@ function startControl(controlUrl: string): void {
     },
   });
 
-  /** 走り終わったケースだけを行き来する。**まだ走っていないケースには行けない。** */
+  /** 走り終わったケースだけを行き来する（動かし方は `session/cursor.ts`）。 */
   const move = (step: -1 | 1): void => {
     const state = latest;
     if (state === undefined) return;
-    const visitable = state.cases.filter((c) => c.aiResult !== undefined).map((c) => c.no);
-    if (visitable.length === 0) return;
-
-    const at = visitable.indexOf(cursor ?? state.awaiting ?? visitable[0]!);
-    const next = visitable[Math.min(Math.max(at + step, 0), visitable.length - 1)];
+    const next = nextCursor(state.cases, cursor, state.awaiting, step);
     if (next === undefined) return;
     cursor = next;
     renderSession(app, state, { cursor });
@@ -336,13 +333,8 @@ function startControl(controlUrl: string): void {
     }
 
     // **見ているケースへ置く。**戻って直しているなら、そのケースが相手になる。
-    const caseNo = cursor ?? latest?.awaiting;
-    if (caseNo === undefined) return;
-
-    const input: HumanInput =
-      command.kind === 'advance'
-        ? { kind: 'advance', caseNo }
-        : { kind: 'verdict', caseNo, humanResult: command.humanResult };
+    const input = humanInputFor(command, cursor ?? latest?.awaiting);
+    if (input === undefined) return;
 
     sendHumanInput(controlUrl, input).catch((error: unknown) => {
       showSessionError(app, error instanceof Error ? error.message : String(error));
