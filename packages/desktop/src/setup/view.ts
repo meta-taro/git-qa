@@ -11,6 +11,15 @@ import type { SetupState } from './client.js';
 
 export interface RenderSetupOptions {
   readonly onStart: (params: { serial: string; sheetPath: string }) => void;
+  /**
+   * 自分で検証シートを選ぶ。
+   *
+   * **配布物では作業ディレクトリが `/` になる**ので、探して並べるだけでは足りない
+   * （実機で「検証シートが無い」と出た）。
+   */
+  readonly onPickSheet?: () => void;
+  /** 人が選んだシート。一覧に無くてもこれで始められる。 */
+  readonly pickedSheet?: string;
 }
 
 function liveColumn(root: HTMLElement): HTMLElement {
@@ -73,8 +82,9 @@ export function renderSetup(
   if (state.phase === 'running') return;
 
   // 既定は 1 つ目。**1 台・1 枚しか無ければ、選ぶ手間を作らない。**
+  // 人が自分で選んだものがあれば、そちらが優先。
   const defaultSerial = state.devices[0]?.serial;
-  const defaultSheet = state.sheets[0];
+  const defaultSheet = options.pickedSheet ?? state.sheets[0];
 
   const section = doc.createElement('div');
   section.className = 'setup';
@@ -100,7 +110,8 @@ export function renderSetup(
     state.phase === 'starting' || defaultSerial === undefined || defaultSheet === undefined;
   start.addEventListener('click', () => {
     const serial = picked(column, 'setup-device', 'serial');
-    const sheetPath = picked(column, 'setup-sheet', 'path');
+    // 一覧から選ばれていなければ、人が自分で選んだものを使う。
+    const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
     if (serial === undefined || sheetPath === undefined) return;
     options.onStart({ serial, sheetPath });
   });
@@ -143,6 +154,15 @@ export function renderSetup(
         () => {},
       ),
     );
+  }
+
+  if (options.onPickSheet !== undefined) {
+    const pick = doc.createElement('button');
+    pick.type = 'button';
+    pick.className = 'setup-pick';
+    pick.textContent = t('setup.pick');
+    pick.addEventListener('click', () => options.onPickSheet?.());
+    section.append(pick);
   }
 
   section.append(start);

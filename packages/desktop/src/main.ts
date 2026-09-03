@@ -6,7 +6,7 @@ import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.
 import { defaultStore } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
-import { fetchSetupState, requestStart, resolveSetupUrl } from './setup/client.js';
+import { fetchSetupState, pickSheet, requestStart, resolveSetupUrl } from './setup/client.js';
 import { renderSetup } from './setup/view.js';
 import type { ConnectionStatus } from './onboarding/index.js';
 import { renderColumns, updateColumnTexts } from './render.js';
@@ -236,6 +236,8 @@ if (liveUrl !== undefined) {
     if (url === undefined) return;
 
     const setupUrl = url;
+    /** 人が自分で選んだ検証シート。一覧に無くてもこれで始められる。 */
+    let pickedSheet: string | undefined;
 
     const tick = async (): Promise<void> => {
       const state = await fetchSetupState(setupUrl);
@@ -249,10 +251,22 @@ if (liveUrl !== undefined) {
       }
 
       renderSetup(app, state, {
+        ...(pickedSheet === undefined ? {} : { pickedSheet }),
         onStart: (params) => {
           requestStart(setupUrl, params).catch((error: unknown) => {
             showSessionError(app, error instanceof Error ? error.message : String(error));
           });
+        },
+        onPickSheet: () => {
+          void pickSheet()
+            .then((chosen) => {
+              if (chosen === undefined) return;
+              pickedSheet = chosen;
+              void tick();
+            })
+            .catch((error: unknown) => {
+              showSessionError(app, error instanceof Error ? error.message : String(error));
+            });
         },
       });
     };

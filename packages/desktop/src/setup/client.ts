@@ -137,3 +137,20 @@ export async function resolveSetupUrl(
   }
   return undefined;
 }
+
+/**
+ * 検証シートを人に選んでもらう。
+ *
+ * **配布物では作業ディレクトリが `/` になる**ので、探して並べるだけでは足りない
+ * （実機で「検証シートが無い」と出た）。ブラウザで開いているときは何もしない。
+ */
+export async function pickSheet(): Promise<string | undefined> {
+  if (!('__TAURI_INTERNALS__' in window)) return undefined;
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const chosen = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: '検証シート', extensions: ['tsv'] }],
+  });
+  return typeof chosen === 'string' ? chosen : undefined;
+}

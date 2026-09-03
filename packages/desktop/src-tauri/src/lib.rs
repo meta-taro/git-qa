@@ -40,6 +40,9 @@ fn set_locale(app: tauri::AppHandle, choice: String, effective: String) -> Resul
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    // 検証シートを人が選べるようにする。**配布物では作業ディレクトリが `/` になる**ので、
+    // 探して並べるだけでは足りない（実機で「検証シートが無い」と出た）。
+    .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       // 自前のメニューを置く。置かないと Tauri の既定（英語）がそのまま出る（Issue 011）。
       // **画面がまだ何も言ってこない間**は、環境変数から見当を付ける。

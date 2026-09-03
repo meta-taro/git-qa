@@ -101,3 +101,42 @@ describe('renderSetup', () => {
     expect(cases.innerHTML).toBe(before);
   });
 });
+
+describe('検証シートを自分で選ぶ（Issue 011 段階 3 の続き）', () => {
+  /**
+   * **配布物では作業ディレクトリが `/` になる**ので、探して並べるだけでは足りない
+   * （実機で「検証シートが無い」と出た）。人が自分で選べる道を用意する。
+   */
+  it('選ぶボタンが出る', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), onPickSheet: vi.fn() });
+
+    expect(live().querySelector('.setup-pick')).not.toBeNull();
+  });
+
+  it('押すと、選ぶ口が呼ばれる', () => {
+    const onPickSheet = vi.fn();
+    renderSetup(root, idle, { onStart: vi.fn(), onPickSheet });
+
+    live().querySelector<HTMLButtonElement>('.setup-pick')?.click();
+
+    expect(onPickSheet).toHaveBeenCalledOnce();
+  });
+
+  it('シートが 1 つも見つからなくても、選ぶボタンは出る', () => {
+    renderSetup(root, { ...idle, sheets: [] }, { onStart: vi.fn(), onPickSheet: vi.fn() });
+
+    expect(live().querySelector('.setup-pick')).not.toBeNull();
+  });
+
+  it('選んだシートが一覧に無くても、それで始められる', () => {
+    const onStart = vi.fn();
+    renderSetup(root, idle, { onStart, onPickSheet: vi.fn(), pickedSheet: '/どこか/別の.tsv' });
+
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart).toHaveBeenCalledWith({
+      serial: 'emulator-5554',
+      sheetPath: '/どこか/別の.tsv',
+    });
+  });
+});
