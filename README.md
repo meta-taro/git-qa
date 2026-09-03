@@ -164,7 +164,9 @@ pnpm --filter @git-qa/desktop dev   # http://localhost:1420
 pnpm --filter @git-qa/desktop tauri build
 ```
 
-> 画面の色・タイポグラフィは**まだ決めていません**。`DESIGN.md` が空のままなので、骨格は OS の既定の配色で出ます。
+> 見た目の方向は `DESIGN.md` にあります。アクセント色は `#0F768E`（青緑）で、
+> **使い所は「いま人がやること」1 つだけ**。それ以外は OS の色を使います。
+> 字面（フォント）はまだ決めていません。
 > アイコンも Tauri の既定のままです。
 
 ### 配布物（.app / .dmg）を作る
