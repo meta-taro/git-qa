@@ -50,7 +50,7 @@ const setup = await startSetupServer({
   listDevices: async () => (await listAndroidDevices()).map((d) => ({ ...d })),
   findSheets: () => findSheets(workingDir),
 
-  start: async ({ serial, sheetPath }) => {
+  start: async ({ serial, sheetPath, operator }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -72,7 +72,9 @@ const setup = await startSetupServer({
       },
       runId: runIdFrom(new Date()),
       sheetPath,
-      operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
+      // **置いた人。**画面から受け取る。無ければ環境変数、それも無ければ unknown
+      // （unknown のまま残ると「誰が保証したか」が読めないので、画面側で入力を促す）。
+      operator: { handle: operator ?? process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
       readScreenText: readAndroidScreenText,
     });
 

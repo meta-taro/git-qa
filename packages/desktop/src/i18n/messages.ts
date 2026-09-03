@@ -34,7 +34,7 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
 
-  'typing.placeholder': '端末へ送る文字（英数字のみ）',
+  'typing.placeholder': '端末に文字を打ち込む（英数字のみ。日本語は送れない）',
   'typing.send': '送る',
   'typing.notAscii': '端末の入力は IME を通らないので、日本語は送れない（英数字だけ送れる）',
 
@@ -45,6 +45,8 @@ const ja = {
   'live.error': 'ライブ映像を出せない: {message}',
 
   'setup.title': '始める',
+  'setup.operator': '0. あなたのハンドル（証跡に「誰が見たか」として残る）',
+  'setup.operator.placeholder': '個人名ではなくハンドル（例: octocat）',
   'setup.device': '1. 端末を選ぶ',
   'setup.device.none': '端末が見えていない。USB で繋ぐか、エミュレータを起動する',
   'setup.sheet': '2. 検証シートを選ぶ',
@@ -108,7 +110,7 @@ const en: Record<keyof typeof ja, string> = {
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
 
-  'typing.placeholder': 'Text to send to the device (ASCII only)',
+  'typing.placeholder': 'Type into the device (ASCII only; Japanese cannot be sent)',
   'typing.send': 'Send',
   'typing.notAscii':
     "The device's input does not go through an IME, so Japanese cannot be sent (ASCII only)",
@@ -120,6 +122,8 @@ const en: Record<keyof typeof ja, string> = {
   'live.error': 'Cannot show the live view: {message}',
 
   'setup.title': 'Start a run',
+  'setup.operator': '0. Your handle (recorded as who verified)',
+  'setup.operator.placeholder': 'A handle, not a personal name (e.g. octocat)',
   'setup.device': '1. Pick a device',
   'setup.device.none': 'No device is visible. Plug one in over USB, or start an emulator',
   'setup.sheet': '2. Pick a test sheet',

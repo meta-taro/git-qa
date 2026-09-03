@@ -144,3 +144,72 @@ describe('startSetupServer', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:1420');
   });
 });
+
+describe('置いた人（ハンドル）', () => {
+  /**
+   * **`unknown` のまま証跡に残ると、「誰が保証したか」が読めない。**
+   * この製品の芯なので、始めるときに受け取る。
+   */
+  it('ハンドルを受け取って実行へ渡す', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serial: 'emulator-5554',
+        sheetPath: '/repo/a.tsv',
+        operator: 'octocat',
+      }),
+    });
+
+    for (let i = 0; i < 50; i += 1) {
+      if (start.mock.calls.length > 0) {
+        expect(start).toHaveBeenCalledWith({
+          serial: 'emulator-5554',
+          sheetPath: '/repo/a.tsv',
+          operator: 'octocat',
+        });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error('start が呼ばれなかった');
+  });
+
+  it('ハンドルが無くても始められる（環境変数で渡す道を残す）', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    const res = await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv' }),
+    });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('個人名を書かせない形にする（長すぎるものは受け取らない）', async () => {
+    server = await startSetupServer(options());
+
+    const res = await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serial: 'emulator-5554',
+        sheetPath: '/repo/a.tsv',
+        operator: 'a'.repeat(100),
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+});

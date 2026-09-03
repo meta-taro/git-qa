@@ -10,7 +10,7 @@ import type { SetupState } from './client.js';
  */
 
 export interface RenderSetupOptions {
-  readonly onStart: (params: { serial: string; sheetPath: string }) => void;
+  readonly onStart: (params: { serial: string; sheetPath: string; operator: string }) => void;
   /**
    * 自分で検証シートを選ぶ。
    *
@@ -20,6 +20,12 @@ export interface RenderSetupOptions {
   readonly onPickSheet?: () => void;
   /** 人が選んだシート。一覧に無くてもこれで始められる。 */
   readonly pickedSheet?: string;
+  /**
+   * 置いた人のハンドル。**`unknown` のまま証跡に残ると「誰が保証したか」が読めない**ので、
+   * 空のままでは始められないようにする。
+   */
+  readonly operator?: string;
+  readonly onOperatorChange?: (handle: string) => void;
 }
 
 function liveColumn(root: HTMLElement): HTMLElement {
@@ -93,6 +99,21 @@ export function renderSetup(
   title.className = 'setup-title';
   title.textContent = t('setup.title');
 
+  const operatorHeading = doc.createElement('p');
+  operatorHeading.className = 'setup-heading';
+  operatorHeading.textContent = t('setup.operator');
+
+  const operator = doc.createElement('input');
+  operator.type = 'text';
+  operator.className = 'setup-operator';
+  operator.placeholder = t('setup.operator.placeholder');
+  operator.value = options.operator ?? '';
+  operator.addEventListener('input', () => {
+    start.disabled =
+      operator.value.trim() === '' || defaultSerial === undefined || defaultSheet === undefined;
+    options.onOperatorChange?.(operator.value.trim());
+  });
+
   const deviceHeading = doc.createElement('p');
   deviceHeading.className = 'setup-heading';
   deviceHeading.textContent = t('setup.device');
@@ -107,16 +128,21 @@ export function renderSetup(
   start.textContent = state.phase === 'starting' ? t('setup.starting') : t('setup.start');
   // **選べていないなら押させない。**押しても始まらないボタンは、壊れて見える。
   start.disabled =
-    state.phase === 'starting' || defaultSerial === undefined || defaultSheet === undefined;
+    state.phase === 'starting' ||
+    defaultSerial === undefined ||
+    defaultSheet === undefined ||
+    // **誰が置いたか分からない証跡を作らない。**
+    (options.operator ?? '').trim() === '';
   start.addEventListener('click', () => {
     const serial = picked(column, 'setup-device', 'serial');
     // 一覧から選ばれていなければ、人が自分で選んだものを使う。
     const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
-    if (serial === undefined || sheetPath === undefined) return;
-    options.onStart({ serial, sheetPath });
+    const handle = operator.value.trim();
+    if (serial === undefined || sheetPath === undefined || handle === '') return;
+    options.onStart({ serial, sheetPath, operator: handle });
   });
 
-  section.append(title, deviceHeading);
+  section.append(title, operatorHeading, operator, deviceHeading);
 
   if (state.devices.length === 0) {
     const empty = doc.createElement('p');

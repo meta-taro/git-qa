@@ -43,7 +43,12 @@ export interface StartedRun {
 export interface StartSetupServerOptions {
   readonly listDevices: () => Promise<readonly SetupDevice[]>;
   readonly findSheets: () => Promise<readonly string[]>;
-  readonly start: (params: { serial: string; sheetPath: string }) => Promise<StartedRun>;
+  readonly start: (params: {
+    serial: string;
+    sheetPath: string;
+    /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */
+    operator?: string;
+  }) => Promise<StartedRun>;
   readonly port?: number;
 }
 
@@ -105,11 +110,11 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     ...(failure === undefined ? {} : { error: failure }),
   });
 
-  const begin = (serial: string, sheetPath: string): void => {
+  const begin = (serial: string, sheetPath: string, operator: string | undefined): void => {
     phase = 'starting';
     failure = undefined;
     void options
-      .start({ serial, sheetPath })
+      .start({ serial, sheetPath, ...(operator === undefined ? {} : { operator }) })
       .then((run) => {
         started = run;
         phase = 'running';
@@ -162,11 +167,17 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
       readJson(req, res, cors, (body) => {
         const serial = (body as { serial?: unknown }).serial;
         const sheetPath = (body as { sheetPath?: unknown }).sheetPath;
+        const operator = (body as { operator?: unknown }).operator;
         if (typeof serial !== 'string' || typeof sheetPath !== 'string') {
           res.writeHead(400, cors).end();
           return;
         }
-        begin(serial, sheetPath);
+        // ハンドルは短い。**個人名やメールを書かせない**（公開リポジトリ・§25）。
+        if (operator !== undefined && (typeof operator !== 'string' || operator.length > 64)) {
+          res.writeHead(400, cors).end();
+          return;
+        }
+        begin(serial, sheetPath, operator);
         res.writeHead(202, cors).end();
       });
       return;

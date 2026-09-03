@@ -3,7 +3,7 @@ import type { SessionState } from '@git-qa/core/session';
 import { attachConsoleToLog } from './console-log.js';
 import { setLocale, t } from './i18n/current.js';
 import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.js';
-import { defaultStore } from './setting-store.js';
+import { defaultStore, readSetting, writeSetting } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import { fetchSetupState, pickSheet, requestStart, resolveSetupUrl } from './setup/client.js';
@@ -238,6 +238,13 @@ if (liveUrl !== undefined) {
     const setupUrl = url;
     /** 人が自分で選んだ検証シート。一覧に無くてもこれで始められる。 */
     let pickedSheet: string | undefined;
+    /** 置いた人のハンドル。**覚えておく**（毎回打たせない）。 */
+    let operator = readSetting('git-qa.operator', defaultStore()) ?? '';
+    /**
+     * 実行へ移ったか。**取りに行く処理が同時に 2 本走ると、映像が二重に立ち上がる**
+     * （実機で画面が 2 つ縦に並んだ）。
+     */
+    let started = false;
 
     const tick = async (): Promise<void> => {
       const state = await fetchSetupState(setupUrl);
@@ -245,6 +252,8 @@ if (liveUrl !== undefined) {
 
       if (state.phase === 'running' && state.liveUrl !== undefined) {
         window.clearInterval(poll);
+        if (started) return;
+        started = true;
         renderSetup(app, state, { onStart: () => undefined });
         startSession(state.liveUrl, state.controlUrl);
         return;
@@ -252,6 +261,11 @@ if (liveUrl !== undefined) {
 
       renderSetup(app, state, {
         ...(pickedSheet === undefined ? {} : { pickedSheet }),
+        operator,
+        onOperatorChange: (handle) => {
+          operator = handle;
+          writeSetting('git-qa.operator', handle, defaultStore());
+        },
         onStart: (params) => {
           requestStart(setupUrl, params).catch((error: unknown) => {
             showSessionError(app, error instanceof Error ? error.message : String(error));

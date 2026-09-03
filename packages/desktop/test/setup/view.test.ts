@@ -47,13 +47,17 @@ describe('renderSetup', () => {
 
   it('選んで押すと、その組で始める', () => {
     const onStart = vi.fn();
-    renderSetup(root, idle, { onStart });
+    renderSetup(root, idle, { onStart, operator: 'octocat' });
 
     live().querySelector<HTMLElement>('.setup-device[data-serial="R5CT1234"]')?.click();
     live().querySelector<HTMLElement>('.setup-sheet[data-path="/repo/docs/b.tsv"]')?.click();
     live().querySelector<HTMLButtonElement>('.setup-start')?.click();
 
-    expect(onStart).toHaveBeenCalledWith({ serial: 'R5CT1234', sheetPath: '/repo/docs/b.tsv' });
+    expect(onStart).toHaveBeenCalledWith({
+      serial: 'R5CT1234',
+      sheetPath: '/repo/docs/b.tsv',
+      operator: 'octocat',
+    });
   });
 
   it('端末が見えていなければ、始められない（繋いでくださいと出す）', () => {
@@ -130,13 +134,56 @@ describe('検証シートを自分で選ぶ（Issue 011 段階 3 の続き）', 
 
   it('選んだシートが一覧に無くても、それで始められる', () => {
     const onStart = vi.fn();
-    renderSetup(root, idle, { onStart, onPickSheet: vi.fn(), pickedSheet: '/どこか/別の.tsv' });
+    renderSetup(root, idle, {
+      onStart,
+      onPickSheet: vi.fn(),
+      pickedSheet: '/どこか/別の.tsv',
+      operator: 'octocat',
+    });
 
     live().querySelector<HTMLButtonElement>('.setup-start')?.click();
 
     expect(onStart).toHaveBeenCalledWith({
       serial: 'emulator-5554',
       sheetPath: '/どこか/別の.tsv',
+      operator: 'octocat',
+    });
+  });
+});
+
+describe('置いた人（ハンドル）を入れる', () => {
+  /**
+   * **`unknown` のまま証跡に残ると、「誰が保証したか」が読めない。**
+   * この製品の芯なので、始める前に受け取る。
+   */
+  it('ハンドルの欄が出る', () => {
+    renderSetup(root, idle, { onStart: vi.fn() });
+
+    expect(live().querySelector('.setup-operator')).not.toBeNull();
+  });
+
+  it('覚えているハンドルが入っている', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
+
+    expect(live().querySelector<HTMLInputElement>('.setup-operator')?.value).toBe('octocat');
+  });
+
+  it('**空のままでは始められない**（誰が置いたか分からない証跡を作らない）', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: '' });
+
+    expect(live().querySelector<HTMLButtonElement>('.setup-start')?.disabled).toBe(true);
+  });
+
+  it('入れて押すと、その名前で始まる', () => {
+    const onStart = vi.fn();
+    renderSetup(root, idle, { onStart, operator: 'octocat' });
+
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart).toHaveBeenCalledWith({
+      serial: 'emulator-5554',
+      sheetPath: '/repo/docs/a.tsv',
+      operator: 'octocat',
     });
   });
 });
