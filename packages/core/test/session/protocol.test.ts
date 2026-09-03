@@ -182,3 +182,17 @@ describe('parseHumanInput — 文字を送る', () => {
     expect(parseHumanInput({ kind: 'text', caseNo: 2, text: 'a'.repeat(2000) })).toBeUndefined();
   });
 });
+
+describe('parseSessionState — 映像が止まった理由', () => {
+  const base = { runId: 'r', phase: 'running', cases: [] };
+
+  it('理由を持てる（黙って真っ黒にしない）', () => {
+    expect(parseSessionState({ ...base, liveError: '端末の画面が消えている' })).toMatchObject({
+      liveError: '端末の画面が消えている',
+    });
+  });
+
+  it('文字列でなければ受け取らない', () => {
+    expect(parseSessionState({ ...base, liveError: 5 })).toBeUndefined();
+  });
+});

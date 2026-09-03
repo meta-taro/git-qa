@@ -304,11 +304,18 @@ function startControl(controlUrl: string): void {
 
   /** 前に見ていた打鍵待ちのケース。カーソルを追従させるかの判断に使う。 */
   let previousAwaiting: number | undefined;
+  /** 出した理由。同じものを何度も出さない。 */
+  let liveErrorShown: string | undefined;
 
   connectControl({
     url: controlUrl,
     onState: (state) => {
       latest = state;
+      // **映像が止まった理由を画面へ出す。**黙って真っ黒にしない（実機で踏んだ）。
+      if (state.liveError !== undefined && state.liveError !== liveErrorShown) {
+        liveErrorShown = state.liveError;
+        showLiveViewError(app, t('live.error', { message: state.liveError }));
+      }
       // 打鍵待ちが進んだら、見ている所も追いかける（戻って見ている最中は動かさない）。
       if (cursor === undefined || cursor === previousAwaiting) cursor = state.awaiting;
       previousAwaiting = state.awaiting;

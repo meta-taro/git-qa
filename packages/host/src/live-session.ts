@@ -23,6 +23,13 @@ export interface StartLiveSessionOptions {
   readonly adapter: TargetAdapter;
   /** 差し替え口。既定は本物の橋。**橋が起きない場合の後始末を検査するために要る。** */
   readonly startBridge?: (options: LiveBridgeOptions) => Promise<LiveBridge>;
+  /**
+   * 映像が止まった理由を受け取る。
+   *
+   * **橋は生のバイト列を流すので、途中で理由を差し込めない。**受け取った側が
+   * 別の道（制御チャネル）で人へ伝えられるように、ここで拾う。
+   */
+  readonly onLiveError?: (message: string) => void;
 }
 
 export async function startLiveSession(options: StartLiveSessionOptions): Promise<LiveSession> {
@@ -44,7 +51,18 @@ export async function startLiveSession(options: StartLiveSessionOptions): Promis
     await liveView.open();
     opened = true;
 
-    const frames = liveView.frames.bind(liveView);
+    const original = liveView.frames.bind(liveView);
+    /** 映像が止まったら、理由を控える。**黙って終わらせない。** */
+    const frames = (): AsyncIterable<Uint8Array> => ({
+      async *[Symbol.asyncIterator]() {
+        try {
+          for await (const chunk of original()) yield chunk;
+        } catch (error: unknown) {
+          options.onLiveError?.(error instanceof Error ? error.message : String(error));
+          throw error;
+        }
+      },
+    });
     const bridge = await (options.startBridge ?? startLiveBridge)({ source: frames });
 
     let closed = false;

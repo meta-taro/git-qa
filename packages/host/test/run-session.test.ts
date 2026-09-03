@@ -30,9 +30,11 @@ function fakeBridge(): {
   start: (options: LiveBridgeOptions) => Promise<LiveBridge>;
   states: SessionState[];
   send: (input: unknown) => void;
+  frames: () => AsyncIterable<Uint8Array>;
 } {
   const states: SessionState[] = [];
   const handlers = new Set<(input: unknown) => void>();
+  let source: (() => AsyncIterable<Uint8Array>) | undefined;
 
   const bridge: LiveBridge = {
     url: 'http://127.0.0.1:65000/live/token.h264',
@@ -47,7 +49,11 @@ function fakeBridge(): {
   };
 
   return {
-    start: () => Promise.resolve(bridge),
+    start: (options) => {
+      source = options.source;
+      return Promise.resolve(bridge);
+    },
+    frames: () => source?.() ?? { async *[Symbol.asyncIterator]() {} },
     states,
     send: (input) => {
       for (const handler of handlers) handler(input);
@@ -542,5 +548,43 @@ describe('文字を端末へ送る', () => {
     expect(action).toMatchObject({ kind: 'text' });
     // **打った文字は証跡に残さない。**画面には顧客名や電話番号が写る（PRD §10）。
     expect(JSON.stringify(action)).not.toContain('hello');
+  });
+});
+
+describe('映像が止まった理由を画面へ伝える', () => {
+  /**
+   * **橋は生のバイト列を流すので、途中で理由を差し込めない。**
+   * 黙って終わると、画面は真っ黒のまま何も言えない（実機で踏んだ）。
+   */
+  it('映像が落ちたら、その理由が実行の状態に載る', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({ failFrames: '端末の画面が消えている' });
+    const session = await startRunSession({
+      adapter,
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260903-130000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    // 橋が映像を読み始めた時点で落ちる。**理由は上へ投げつつ、控えも残す。**
+    await expect(
+      (async () => {
+        for await (const _chunk of bridge.frames()) {
+          // 1 枚も来ない。
+        }
+      })(),
+    ).rejects.toThrow(/画面が消えている/);
+
+    await waitFor(
+      () => bridge.states.at(-1)?.liveError?.includes('画面が消えている') === true,
+      '止まった理由',
+    );
+
+    session.abort('検査の後始末');
+    await session.done;
+    await session.close();
   });
 });

@@ -31,6 +31,11 @@ export interface SessionState {
    * 画面は Node 側のファイルを直接は見られないので、ここで渡す。
    */
   readonly sheetPath?: string;
+  /**
+   * 映像が止まった理由。**黙って真っ黒にしない。**
+   * 端末の画面が消えている、繋ぎ直せない、といったことを人へ伝えるために使う。
+   */
+  readonly liveError?: string;
   /** 人の判定を待っているケース番号。待っていなければ持たない。 */
   readonly awaiting?: number;
   readonly cases: readonly SessionCase[];
@@ -235,11 +240,15 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
   const sheetPath = raw['sheetPath'];
   if (sheetPath !== undefined && typeof sheetPath !== 'string') return undefined;
 
+  const liveError = raw['liveError'];
+  if (liveError !== undefined && typeof liveError !== 'string') return undefined;
+
   return {
     runId: raw['runId'],
     phase: raw['phase'],
     ...(awaiting === undefined ? {} : { awaiting }),
     ...(sheetPath === undefined ? {} : { sheetPath }),
+    ...(liveError === undefined ? {} : { liveError }),
     cases,
   };
 }

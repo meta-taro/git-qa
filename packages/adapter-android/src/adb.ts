@@ -179,3 +179,22 @@ export function parseScreenSize(stdout: string): Point | undefined {
   if (found === null) return undefined;
   return { x: Number(found[1]), y: Number(found[2]) };
 }
+
+/** 端末の画面の状態。**消えていると映像が 1 枚も出ない。** */
+export type Wakefulness = 'awake' | 'asleep' | 'unknown';
+
+/**
+ * `dumpsys power` から画面の状態を読む。
+ *
+ * **画面が消えていると `screenrecord` は 1 枚も返さない**（実機でヘッダの 61 バイトだけ出た）。
+ * 黙って真っ黒になるので、理由を言えるようにする。
+ */
+export function parseWakefulness(stdout: string): Wakefulness {
+  const found = /mWakefulness=(\w+)/.exec(stdout);
+  if (found === null) return 'unknown';
+  const value = (found[1] ?? '').toLowerCase();
+  if (value === 'awake') return 'awake';
+  // Dozing（うとうと）も、映像が出ない側として扱う。
+  if (value === 'asleep' || value === 'dozing' || value === 'dreaming') return 'asleep';
+  return 'unknown';
+}

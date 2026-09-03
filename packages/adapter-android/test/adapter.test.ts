@@ -545,3 +545,53 @@ describe('listAndroidDevices — 繋がっている端末を並べる', () => {
     await expect(listAndroidDevices({ runner })).resolves.toEqual([]);
   });
 });
+
+describe('映像が 1 枚も来なかったとき', () => {
+  /**
+   * **画面が消えていると screenrecord は 1 枚も返さない**（実機で踏んだ）。
+   * 「映像が来ない」ではなく「画面が消えている」と言えるようにする。
+   */
+  const drainAll = async (frames: AsyncIterable<Uint8Array>): Promise<void> => {
+    for await (const _chunk of frames) {
+      // 1 枚も来ない前提。
+    }
+  };
+
+  it('画面が消えていたら、そう言う', async () => {
+    const runner = fakeRunner({
+      'shell dumpsys power': {
+        code: 0,
+        stdout: new TextEncoder().encode('  mWakefulness=Asleep\n'),
+        stderr: '',
+      },
+    });
+    runner.chunks = [];
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      liveView: { mode: 'h264-stream' },
+    }).connect();
+    await session.liveView.open();
+
+    await expect(drainAll(session.liveView.frames!())).rejects.toThrow(/画面が消えている/);
+  });
+
+  it('画面は点いているのに来ないなら、そちらの理由を言う', async () => {
+    const runner = fakeRunner({
+      'shell dumpsys power': {
+        code: 0,
+        stdout: new TextEncoder().encode('  mWakefulness=Awake\n'),
+        stderr: '',
+      },
+    });
+    runner.chunks = [];
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      liveView: { mode: 'h264-stream' },
+    }).connect();
+    await session.liveView.open();
+
+    await expect(drainAll(session.liveView.frames!())).rejects.toThrow(/1 枚も返さずに終わった/);
+  });
+});

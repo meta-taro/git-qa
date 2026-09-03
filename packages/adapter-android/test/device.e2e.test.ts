@@ -17,11 +17,18 @@ import { createAndroidAdapter } from '../src/index.js';
  */
 const enabled = process.env['GIT_QA_ANDROID_E2E'] === '1';
 
+/**
+ * 当てる端末。**複数見えているときは指定が要る**（指定が無ければ選ばずに落ちる・C31）。
+ * 実機とエミュレータを同時に繋いでいる場面は普通にある。
+ */
+const serial = process.env['GIT_QA_ANDROID_SERIAL'];
+const target = serial === undefined ? {} : { serial };
+
 describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
   const build = { source: 'example/sample-notes-app', label: 'e2e' };
 
   it('繋いで、端末の型番と OS の版が取れる', async () => {
-    const session = await createAndroidAdapter({ build }).connect();
+    const session = await createAndroidAdapter({ build, ...target }).connect();
     expect(session.target.kind).toBe('android');
     if (session.target.kind === 'android') {
       expect(session.target.device).not.toBe('');
@@ -31,7 +38,7 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
   });
 
   it('画面の状態が uiautomator の XML として取れる', async () => {
-    const session = await createAndroidAdapter({ build }).connect();
+    const session = await createAndroidAdapter({ build, ...target }).connect();
     const observation = await session.observe();
     expect(typeof observation.raw).toBe('string');
     expect(observation.raw as string).toContain('<hierarchy');
@@ -39,7 +46,7 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
   });
 
   it('スクリーンショットが PNG として取れる', async () => {
-    const session = await createAndroidAdapter({ build }).connect();
+    const session = await createAndroidAdapter({ build, ...target }).connect();
     const shot = await session.screenshot();
     // PNG の署名。中身までは見ないが、空でないことと形は確かめる。
     expect([...shot.bytes.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
@@ -48,7 +55,7 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
   }, 30000);
 
   it('操作すると画面が変わる', async () => {
-    const session = await createAndroidAdapter({ build }).connect();
+    const session = await createAndroidAdapter({ build, ...target }).connect();
     await session.act({ kind: 'key', key: 'home' });
     const before = (await session.observe()).raw as string;
     await session.act({
@@ -66,6 +73,7 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
     // ここが通らなければ、scrcpy のサーバへ繋ぐ側（選択肢 A）へ進む根拠になる。
     const session = await createAndroidAdapter({
       build,
+      ...target,
       liveView: { mode: 'h264-stream', timeLimitSec: 30 },
     }).connect();
     await session.liveView.open();
@@ -132,6 +140,7 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
     it('端末が名乗った codec を、流れてくるものから組み立てられる', async () => {
       const session = await createAndroidAdapter({
         build,
+        ...target,
         liveView: { mode: 'h264-stream' },
       }).connect();
       try {
@@ -156,7 +165,7 @@ describe.skipIf(!enabled)('実機（adb / scrcpy が要る）', () => {
     }, 30_000);
 
     it('端末の実寸が読める（人が触った座標を戻すのに要る）', async () => {
-      const session = await createAndroidAdapter({ build }).connect();
+      const session = await createAndroidAdapter({ build, ...target }).connect();
       try {
         const size = await session.screenSize?.();
 

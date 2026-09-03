@@ -8,6 +8,7 @@ import {
   keycode,
   parseDeviceList,
   parseScreenSize,
+  parseWakefulness,
   screenText,
   withSerial,
 } from '../src/index.js';
@@ -197,5 +198,27 @@ describe('parseScreenSize — 端末の実寸', () => {
 
   it('読めなければ undefined（勝手に決めない）', () => {
     expect(parseScreenSize('なにか')).toBeUndefined();
+  });
+});
+
+describe('parseWakefulness — 端末の画面が点いているか', () => {
+  /**
+   * **画面が消えていると screenrecord は 1 枚も返さない**（実機で 61 バイトだけ出た）。
+   * 黙って真っ黒になるので、理由を言えるようにする。
+   */
+  it('起きている', () => {
+    expect(parseWakefulness('  mWakefulness=Awake\n  mWakefulnessChanging=false')).toBe('awake');
+  });
+
+  it('寝ている', () => {
+    expect(parseWakefulness('  mWakefulness=Asleep')).toBe('asleep');
+  });
+
+  it('うとうとしている（Doze）も、映像は出ない側', () => {
+    expect(parseWakefulness('  mWakefulness=Dozing')).toBe('asleep');
+  });
+
+  it('読めなければ unknown（勝手に決めない）', () => {
+    expect(parseWakefulness('なにか')).toBe('unknown');
   });
 });

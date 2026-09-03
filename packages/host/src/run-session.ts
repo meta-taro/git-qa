@@ -107,6 +107,11 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   const live = await startLiveSession({
     adapter: options.adapter,
     ...(options.startBridge === undefined ? {} : { startBridge: options.startBridge }),
+    onLiveError: (message) => {
+      // 人へ伝える道は制御チャネルしか無い（橋は生のバイト列を流している）。
+      liveError = message;
+      publish();
+    },
   });
 
   const cases = new Map<number, SessionCase>(
@@ -114,6 +119,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   );
   let phase: SessionPhase = 'running';
   let awaiting: number | undefined;
+  /** 映像が止まった理由。**黙って真っ黒にしない。** */
+  let liveError: string | undefined;
 
   const publish = (): void => {
     const state: SessionState = {
@@ -124,6 +131,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       ...(options.sheetPath === undefined
         ? { sheetPath: options.sheetRef.path }
         : { sheetPath: options.sheetPath }),
+      ...(liveError === undefined ? {} : { liveError }),
       cases: [...cases.values()],
     };
     live.bridge.publish(state);

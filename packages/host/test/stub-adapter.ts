@@ -28,6 +28,8 @@ export function stubAdapter(options: {
   mode?: 'h264-stream' | 'external-window';
   chunks?: Uint8Array[];
   failOpen?: boolean;
+  /** 映像を読み始めた時点で落ちる（画面が消えている等）。 */
+  failFrames?: string;
   screen?: { width: number; height: number };
 }): TargetAdapter & StubTrace {
   const opened: string[] = [];
@@ -59,6 +61,7 @@ export function stubAdapter(options: {
             return {
               // eslint-disable-next-line @typescript-eslint/require-await -- 同期の中身を非同期の口へ
               async *[Symbol.asyncIterator]() {
+                if (options.failFrames !== undefined) throw new Error(options.failFrames);
                 for (const c of chunks) yield c;
               },
             };

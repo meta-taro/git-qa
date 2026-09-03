@@ -10,7 +10,8 @@ export {
   keycode,
   parseDeviceList,
   parseScreenSize,
+  parseWakefulness,
   screenText,
   withSerial,
 } from './adb.js';
-export type { AdbDevice, Point, ResolvedAction } from './adb.js';
+export type { AdbDevice, Point, ResolvedAction, Wakefulness } from './adb.js';

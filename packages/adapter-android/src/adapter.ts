@@ -22,6 +22,7 @@ import {
   inputCommands,
   parseDeviceList,
   parseScreenSize,
+  parseWakefulness,
   screenText,
   withSerial,
   type Point,
@@ -262,6 +263,16 @@ function createSession(deps: SessionDeps): TargetSession {
                     if (!liveOpen) return;
                     if (seen === 0) {
                       // 1 枚も来ずに終わった。**繋ぎ直しを繰り返すと、黙ったまま回り続ける。**
+                      // **まず画面の状態を見る。**消えていれば、それが理由（実機で踏んだ）。
+                      const power = await adbRun(['shell', 'dumpsys', 'power'], serial).catch(
+                        () => new Uint8Array(),
+                      );
+                      if (parseWakefulness(new TextDecoder().decode(power)) === 'asleep') {
+                        throw new AdapterError(
+                          KIND,
+                          '端末の画面が消えている。点けてから繋ぎ直すこと',
+                        );
+                      }
                       throw new AdapterError(KIND, 'screenrecord が映像を 1 枚も返さずに終わった');
                     }
                   }
