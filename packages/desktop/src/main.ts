@@ -7,6 +7,7 @@ import { defaultStore, readSetting, writeSetting } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import { fetchSetupState, pickSheet, requestStart, resolveSetupUrl } from './setup/client.js';
+import { isTypingHandle, nextDrawing } from './setup/redraw.js';
 import { renderSetup } from './setup/view.js';
 import type { ConnectionStatus } from './onboarding/index.js';
 import { renderColumns, updateColumnTexts } from './render.js';
@@ -247,7 +248,7 @@ if (liveUrl !== undefined) {
     let started = false;
     /**
      * 前に描いた内容。**変わっていないなら描き直さない。**
-     * 毎秒描き直すと、ハンドルを打っている最中に入力が中断される。
+     * 判断は `setup/redraw.ts` にある（ここは配線なので検査していない）。
      */
     let lastDrawn = '';
 
@@ -264,8 +265,9 @@ if (liveUrl !== undefined) {
         return;
       }
 
-      const shape = JSON.stringify([state, pickedSheet, operator === '']);
-      if (shape === lastDrawn) return;
+      // **ハンドルを打っている最中は描き直さない。**入力欄が作り直されてフォーカスが飛ぶ。
+      const shape = nextDrawing(state, pickedSheet, lastDrawn, isTypingHandle(document));
+      if (shape === undefined) return;
       lastDrawn = shape;
 
       renderSetup(app, state, {
