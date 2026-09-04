@@ -8,6 +8,41 @@
  * 端末の画面を撮る `device_screenshot` とは別物。あちらは検証の対象、こちらは道具自身。
  */
 
+/**
+ * 画面収録の許可があるか、OS へ直接聞く。
+ *
+ * **`screencapture` は許可が無くてもエラーを返さない。**実測（2026-09-04）:
+ * `exit=0`・stderr は空・PNG は 4.3 MB。**窓を全部消した絵**が返る。
+ * 3 回撮って 3 回とも壁紙だけが返り、危うく「窓が出ていない」と報告するところだった。
+ *
+ * **見えない道具より、嘘をつく道具のほうが悪い。**そこで撮る前に聞く。
+ *
+ * 聞いているのは `osascript` 自身の許可だが、TCC は責任を持つプロセス（端末やアプリ）に
+ * ひも付くので、同じ親から起きているこちらの許可と一致する。
+ */
+export function screenCaptureAllowedScript(): string {
+  return (
+    'ObjC.bindFunction("CGPreflightScreenCaptureAccess", ["bool", []]); ' +
+    '$.CGPreflightScreenCaptureAccess()'
+  );
+}
+
+/** 返事を読む。**読めないものは「分からない」**にして、撮ること自体は止めない。 */
+export function parseAllowed(stdout: string): boolean | undefined {
+  const answer = stdout.trim();
+  if (answer === 'true') return true;
+  if (answer === 'false') return false;
+  return undefined;
+}
+
+/** 許可が無いときに出す文。**どこで許可するか、何が要るかまで言う。** */
+const DENIED =
+  '画面収録の許可が無い。このままだと macOS は、エラーを返さずに' +
+  '**窓を全部消した絵**（壁紙だけ）を返す。' +
+  'システム設定 → プライバシーとセキュリティ → 画面収録 で、' +
+  'この道具を動かしているアプリ（ターミナル等）を許可する。' +
+  '**許可したあと、そのアプリを一度終了して開き直すまで効かない。**';
+
 export interface WindowBounds {
   readonly x: number;
   readonly y: number;
@@ -87,6 +122,18 @@ export function createWindowCapture(
   };
 
   return async (app: string, mode: CaptureMode = 'window'): Promise<Screenshot> => {
+    // **撮る前に聞く。**許可が無いと、嘘の絵が黙って返る。
+    let allowed: boolean | undefined;
+    try {
+      allowed = parseAllowed(
+        await options.run('osascript', ['-l', 'JavaScript', '-e', screenCaptureAllowedScript()]),
+      );
+    } catch {
+      // 聞けないだけ。**確かめられないことを理由に手を止めない**（古い macOS・macOS 以外）。
+      allowed = undefined;
+    }
+    if (allowed === false) throw new Error(DENIED);
+
     const path = options.tmpPath();
     // 画面全体は、窓の位置を聞かずに撮れる（アクセシビリティの許可が要らない）。
     if (mode === 'screen') return shoot(['-x', '-o', path]);

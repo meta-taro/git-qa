@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { boundsScript, captureArgs, createWindowCapture, parseBounds } from '../src/screen.js';
+import {
+  boundsScript,
+  captureArgs,
+  createWindowCapture,
+  parseAllowed,
+  parseBounds,
+  screenCaptureAllowedScript,
+} from '../src/screen.js';
 
 /**
  * **画面を自分で見る。**
@@ -57,8 +64,10 @@ describe('createWindowCapture', () => {
 
     expect(shot.mimeType).toBe('image/png');
     expect(shot.base64).toBe(Buffer.from(png).toString('base64'));
+    // 1 本目は画面収録の許可を聞く、2 本目が窓の位置。**撮るのは最後。**
     expect(ran[0]?.[0]).toBe('osascript');
-    expect(ran[1]).toEqual(['screencapture', '-x', '-o', '-R', '12,34,800,600', '/tmp/shot.png']);
+    expect(ran[1]?.[0]).toBe('osascript');
+    expect(ran[2]).toEqual(['screencapture', '-x', '-o', '-R', '12,34,800,600', '/tmp/shot.png']);
   });
 
   it('窓が見つからなければ、理由を出す（黙って空の絵を返さない）', async () => {
@@ -93,7 +102,10 @@ describe('許可が足りないとき', () => {
 
     await capture('git-qa', 'screen');
 
-    expect(ran).toEqual([['screencapture', '-x', '-o', '/tmp/shot.png']]);
+    // **窓の位置は聞かない**（アクセシビリティの許可が要らない）。
+    // 画面収録の許可だけは聞く —— 無いと嘘の絵が返るため。
+    expect(ran.filter((call) => call[0] === 'osascript')).toHaveLength(1);
+    expect(ran.at(-1)).toEqual(['screencapture', '-x', '-o', '/tmp/shot.png']);
   });
 
   it('窓の位置を聞けなかったら、何の許可が要るかを言う', async () => {
@@ -109,5 +121,89 @@ describe('許可が足りないとき', () => {
     });
 
     await expect(capture('git-qa')).rejects.toThrow(/アクセシビリティ/);
+  });
+});
+
+/**
+ * **許可が無いことを、道具が自分で言う。**
+ *
+ * 2026-09-04、`app_screenshot` を 3 回撮り、3 回とも壁紙だけが返った。
+ * 窓が 1 つも写らない —— 人が開いているターミナルの窓すら写らなかった。
+ *
+ * **画面収録の許可が無いとき、macOS の `screencapture` はエラーを返さない。**
+ * 実測: `exit=0`・stderr は空・PNG は 4.3 MB。窓を全部消した絵が返る。
+ * 危うく「窓が出ていない」と報告するところだった。
+ * **見えない道具より、嘘をつく道具のほうが悪い。**
+ */
+describe('画面収録の許可', () => {
+  it('許可の有無を OS へ直接聞く', () => {
+    expect(screenCaptureAllowedScript()).toContain('CGPreflightScreenCaptureAccess');
+  });
+
+  it('返事を読む', () => {
+    expect(parseAllowed('true')).toBe(true);
+    expect(parseAllowed('false')).toBe(false);
+  });
+
+  it('読めない返事は「分からない」（塞がない）', () => {
+    // 古い macOS・macOS 以外。**確かめられないことを理由に、手を止めない。**
+    expect(parseAllowed('')).toBeUndefined();
+    expect(parseAllowed('なんだこれ')).toBeUndefined();
+  });
+
+  it('許可が無いと分かっているときは、撮らずに落ちる', async () => {
+    const calls: string[] = [];
+    const capture = createWindowCapture({
+      run: (command) => {
+        calls.push(command);
+        return Promise.resolve(command === 'osascript' ? 'false' : '');
+      },
+      readFile: () => Promise.resolve(new Uint8Array()),
+      tmpPath: () => '/tmp/a.png',
+    });
+
+    await expect(capture('git-qa', 'screen')).rejects.toThrow(/画面収録/);
+    // **壁紙だけの絵を返さない。**撮ること自体をしない。
+    expect(calls).not.toContain('screencapture');
+  });
+
+  it('落ちるときは、どこで許可するかまで言う', async () => {
+    const capture = createWindowCapture({
+      run: (command) => Promise.resolve(command === 'osascript' ? 'false' : ''),
+      readFile: () => Promise.resolve(new Uint8Array()),
+      tmpPath: () => '/tmp/a.png',
+    });
+
+    await expect(capture('git-qa', 'screen')).rejects.toThrow(
+      /プライバシーとセキュリティ[\s\S]*開き直す/,
+    );
+  });
+
+  it('許可があれば、今までどおり撮る', async () => {
+    const calls: string[] = [];
+    const capture = createWindowCapture({
+      run: (command) => {
+        calls.push(command);
+        return Promise.resolve(command === 'osascript' ? 'true' : '');
+      },
+      readFile: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+      tmpPath: () => '/tmp/a.png',
+    });
+
+    expect((await capture('git-qa', 'screen')).mimeType).toBe('image/png');
+    expect(calls).toContain('screencapture');
+  });
+
+  it('確かめられないときも撮る（分からないことで止めない）', async () => {
+    const capture = createWindowCapture({
+      run: (command) =>
+        command === 'osascript'
+          ? Promise.reject(new Error('osascript が無い'))
+          : Promise.resolve(''),
+      readFile: () => Promise.resolve(new Uint8Array([1])),
+      tmpPath: () => '/tmp/a.png',
+    });
+
+    expect((await capture('git-qa', 'screen')).mimeType).toBe('image/png');
   });
 });
