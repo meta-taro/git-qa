@@ -58,7 +58,7 @@ export type { ValidationResult } from './run/validate.js';
 export { createAnnexBSplitter } from './live/annexb.js';
 export type { AccessUnit, AnnexBSplitter } from './live/annexb.js';
 
-export { AdapterError } from './adapter/errors.js';
+export { AdapterError, humanMessage } from './adapter/errors.js';
 export type {
   Action,
   AdapterCapabilities,

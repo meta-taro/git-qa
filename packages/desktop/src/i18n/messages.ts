@@ -5,6 +5,12 @@
  * 鍵の集合が言語間でずれていないことは、テストで見ている（訳し漏れの検出）。
  *
  * **色や字面は決めない**（`DESIGN.md` が空・product-baseline §11）。ここにあるのは文言だけ。
+ *
+ * **書き方**（C51）:
+ * 1. 何が起きたかを、**人の言葉で先に**書く（道具の内部名を先頭に置かない）
+ * 2. 次に何をすればいいかを書く
+ * 3. 技術的な詳細（コマンド名・stderr・serial）は**括弧で後ろに残す。消さない**
+ * 4. **見出しと重ねない。**欄の中に出る文は、欄の名前を繰り返さない
  */
 
 const ja = {
@@ -52,7 +58,8 @@ const ja = {
   'sheet.openFailed': '検証シートを開けない: {message}',
 
   'live.unsupported': 'この webview は H.264 の復号に対応していない',
-  'live.error': 'ライブ映像を出せない: {message}',
+  // ライブビューの欄の中に出る。**見出しと重ねない。**中身の文が自分で何が起きたかを言う
+  'live.error': '{message}',
 
   'setup.title': '検証の準備',
   'setup.operator': '0. あなたのハンドル（証跡に「誰が見たか」として残る）',
@@ -144,7 +151,7 @@ const en: Record<keyof typeof ja, string> = {
   'sheet.openFailed': 'Cannot open the test sheet: {message}',
 
   'live.unsupported': 'This webview cannot decode H.264',
-  'live.error': 'Cannot show the live view: {message}',
+  'live.error': '{message}',
 
   'setup.title': 'Before you start',
   'setup.operator': '0. Your handle (recorded as who verified)',

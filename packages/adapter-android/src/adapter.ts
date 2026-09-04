@@ -102,7 +102,10 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
   const adbRun = async (args: readonly string[], serial?: string): Promise<Uint8Array> => {
     const result = await runner.run(adb, withSerial(serial, args));
     if (result.code !== 0) {
-      throw new AdapterError(KIND, `adb ${args.join(' ')} が失敗した: ${result.stderr.trim()}`);
+      throw new AdapterError(
+        KIND,
+        `端末とやりとりできなかった: ${result.stderr.trim()}（adb ${args.join(' ')}）`,
+      );
     }
     return result.stdout;
   };
@@ -124,12 +127,15 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
           listed.length === 0
             ? '1 台も見えていない'
             : listed.map((d) => `${d.serial}=${d.state}`).join(', ');
-        throw new AdapterError(KIND, `繋げる端末が無い（${seen}）`);
+        throw new AdapterError(
+          KIND,
+          `繋がっている端末が無い。USB で繋ぐか、エミュレータを起動する（adb には ${seen} と見えている）`,
+        );
       }
       if (options.serial === undefined && usable.length > 1) {
         throw new AdapterError(
           KIND,
-          `端末が ${usable.length} 台見えている。serial で指定すること（${usable.map((d) => d.serial).join(', ')}）`,
+          `端末が ${usable.length} 台見えている。どれを使うかを serial で指定する（${usable.map((d) => d.serial).join(', ')}）`,
         );
       }
 
@@ -168,7 +174,7 @@ function createSession(deps: SessionDeps): TargetSession {
   let closed = false;
 
   const ensureOpen = (): void => {
-    if (closed) throw new AdapterError(KIND, 'セッションは閉じられている');
+    if (closed) throw new AdapterError(KIND, '端末との接続はもう閉じている');
   };
 
   const mode: LiveViewMode = options.liveView?.mode ?? 'external-window';
@@ -246,7 +252,10 @@ function createSession(deps: SessionDeps): TargetSession {
           frames(): AsyncIterable<Uint8Array> {
             if (!liveOpen) {
               // 開く前に読もうとしている。空を返すと「映像が来ない」に化けるので落とす。
-              throw new AdapterError(KIND, 'ライブビューを開く前に映像を読もうとしている');
+              throw new AdapterError(
+                KIND,
+                '映像を出す準備ができていない（ライブビューを開く前に読もうとした）',
+              );
             }
             return {
               /**
@@ -293,8 +302,8 @@ function createSession(deps: SessionDeps): TargetSession {
                       if (!listed.some((d) => d.serial === serial && d.state === 'device')) {
                         throw new AdapterError(
                           KIND,
-                          `端末が見つからない（${serial ?? '不明'}）。` +
-                            'ケーブルが抜けていないかを見て、挿し直すこと',
+                          '端末が見つからない。USB ケーブルが抜けていないかを見て、挿し直す' +
+                            `（serial: ${serial ?? '不明'}）`,
                         );
                       }
 
@@ -305,10 +314,16 @@ function createSession(deps: SessionDeps): TargetSession {
                       if (parseWakefulness(new TextDecoder().decode(power)) === 'asleep') {
                         throw new AdapterError(
                           KIND,
-                          '端末の画面が消えている。点けてから繋ぎ直すこと',
+                          '端末の画面が消えている。画面を点けて、ロックを解除する',
                         );
                       }
-                      throw new AdapterError(KIND, 'screenrecord が映像を 1 枚も返さずに終わった');
+                      // 画面は点いていて端末も居る。**残る原因は、画面を配る口の取り合い。**
+                      // 端末では screenrecord が同時に 1 本しか成立しない（この上の注記）。
+                      throw new AdapterError(
+                        KIND,
+                        '端末の画面を受け取れなかった。ほかに git-qa が動いていたら閉じて、' +
+                          'もう一度始める（端末が画面を配れるのは 1 つの実行だけ）',
+                      );
                     }
                   }
                 } finally {
@@ -453,7 +468,7 @@ function createSession(deps: SessionDeps): TargetSession {
   const assertAwake = async (): Promise<void> => {
     const power = await adbRun(['shell', 'dumpsys', 'power'], serial).catch(() => new Uint8Array());
     if (parseWakefulness(new TextDecoder().decode(power)) === 'asleep') {
-      throw new AdapterError(KIND, '端末の画面が消えている。点けてから実行すること');
+      throw new AdapterError(KIND, '端末の画面が消えている。画面を点けて、ロックを解除する');
     }
   };
 
@@ -525,7 +540,7 @@ function createSession(deps: SessionDeps): TargetSession {
         // 握り潰さない。**勝手な既定を返すと、見当違いの所を触る。**
         throw new AdapterError(
           KIND,
-          `端末の画面の大きさを読めない: ${new TextDecoder().decode(stdout)}`,
+          `端末の画面の大きさを読めない（wm size の返事: ${new TextDecoder().decode(stdout)}）`,
         );
       }
       cachedScreen = { width: size.x, height: size.y };
@@ -544,7 +559,7 @@ function createSession(deps: SessionDeps): TargetSession {
       ensureOpen();
       const bytes = await adbRun(['exec-out', 'screencap', '-p'], serial);
       if (bytes.byteLength === 0) {
-        throw new AdapterError(KIND, 'screencap が空を返した');
+        throw new AdapterError(KIND, '端末の画面を撮れなかった（screencap が空を返した）');
       }
       return { format: 'png', bytes, capturedAt: now().toISOString() };
     },

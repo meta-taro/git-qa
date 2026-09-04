@@ -604,7 +604,14 @@ describe('映像が 1 枚も来なかったとき', () => {
     );
   });
 
-  it('画面は点いているのに来ないなら、そちらの理由を言う', async () => {
+  /**
+   * 端末は居て、画面も点いている。**残る原因は、画面を配る口の取り合い。**
+   * 端末では `screenrecord` が同時に 1 本しか成立しない。
+   *
+   * 以前は `screenrecord が映像を 1 枚も返さずに終わった` としか言えず、
+   * **人は何をすればいいか分からなかった**（実物を使った人が画面で踏んだ・2026-09-04）。
+   */
+  it('端末も画面も生きているなら、ほかの実行を疑うよう言う', async () => {
     const runner = fakeRunner({
       'shell dumpsys power': {
         code: 0,
@@ -620,7 +627,9 @@ describe('映像が 1 枚も来なかったとき', () => {
     }).connect();
     await session.liveView.open();
 
-    await expect(drainAll(session.liveView.frames!())).rejects.toThrow(/1 枚も返さずに終わった/);
+    await expect(drainAll(session.liveView.frames!())).rejects.toThrow(
+      /ほかに git-qa が動いていたら閉じて/,
+    );
   });
 });
 

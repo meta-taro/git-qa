@@ -1,4 +1,4 @@
-import { AdapterError } from '@git-qa/core';
+import { AdapterError, humanMessage } from '@git-qa/core';
 import type { TargetAdapter, TargetSession } from '@git-qa/core';
 import { startLiveBridge } from '@git-qa/live-bridge';
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
@@ -101,7 +101,8 @@ export async function startLiveSession(options: StartLiveSessionOptions): Promis
             // 尽きた。落ちたのではないので繋ぎ直さない（閉じられた・読み手が去った）。
             return;
           } catch (error: unknown) {
-            const reason = error instanceof Error ? error.message : String(error);
+            // **人が読む文にする。**`[android]` のような内部の印は画面では邪魔にしかならない。
+            const reason = humanMessage(error);
             // 閉じたなら繋ぎ直さない。**端末を掴んだままにしない。**
             if (closed) throw error;
             if (waitedMs >= limitMs) {
