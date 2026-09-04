@@ -92,6 +92,22 @@ export interface HumanAction {
   to?: Point;
 }
 
+/**
+ * 人が道具へ打った、判定まわりの入力回数。**手数（Issue 008 の主指標）を数えるために要る。**
+ *
+ * 端末を触った回数は `humanActions` の長さで数えられるが、**判定を置いた打鍵は
+ * どこにも残っていなかった。**所要時間で差が出なかったときに、どこで食っているかを
+ * 切り分ける材料になる。
+ *
+ * `verdict` が 2 以上のケースは**置き直したケース**。多いなら、そこは画面が分かりにくい。
+ */
+export interface HumanInputCounts {
+  /** 判定を置いた回数（置き直しを含む）。 */
+  verdict: number;
+  /** 判定を置かずに次へ送った回数。 */
+  advance: number;
+}
+
 export interface RunCase {
   /** 検証シートの No. 列。行 ID は md-business 側のものなので持たない（C3）。 */
   no: number;
@@ -106,6 +122,8 @@ export interface RunCase {
   steps: RunStep[];
   /** 人が自分で触った操作。無ければ、人は触っていない。 */
   humanActions?: HumanAction[];
+  /** 判定まわりの打鍵回数。無ければ、人はこのケースに何も打っていない。 */
+  humanInputs?: HumanInputCounts;
   recording: CaseRecording;
   note?: string;
 }

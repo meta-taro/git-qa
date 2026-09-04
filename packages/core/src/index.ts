@@ -10,6 +10,7 @@ export type {
   CaseResult,
   Finding,
   HumanAction,
+  HumanInputCounts,
   HumanResult,
   Point,
   Run,

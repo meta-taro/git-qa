@@ -9,6 +9,7 @@ import type {
   Action,
   Actor,
   HumanAction,
+  HumanInputCounts,
   HumanResult,
   CaseContext,
   CaseVerdict,
@@ -73,10 +74,11 @@ function applyHumanTrace(
   run: Run,
   revised: ReadonlyMap<number, HumanResult>,
   touched: ReadonlyMap<number, HumanAction[]>,
+  typed: ReadonlyMap<number, HumanInputCounts>,
   operator: Actor,
   now: () => Date,
 ): Run {
-  if (revised.size === 0 && touched.size === 0) return run;
+  if (revised.size === 0 && touched.size === 0 && typed.size === 0) return run;
   const at = now().toISOString();
 
   return {
@@ -84,14 +86,18 @@ function applyHumanTrace(
     cases: run.cases.map((entry) => {
       const humanResult = revised.get(entry.no);
       const actions = touched.get(entry.no);
+      const counts = typed.get(entry.no);
 
       // **触っていないケースには足さない。**「触らずに見た」も記録のうち。
       const withActions =
         actions === undefined || actions.length === 0 ? entry : { ...entry, humanActions: actions };
+      // **打っていないケースにも足さない。**0 を並べると、打った 0 回と未実施が同じ形になる。
+      const withCounts =
+        counts === undefined ? withActions : { ...withActions, humanInputs: counts };
 
-      if (humanResult === undefined) return withActions;
+      if (humanResult === undefined) return withCounts;
       return {
-        ...withActions,
+        ...withCounts,
         humanResult,
         result: resolveCaseResult({
           ...(entry.aiResult === undefined ? {} : { aiResult: entry.aiResult }),
@@ -165,6 +171,16 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
    */
   const touched = new Map<number, HumanAction[]>();
 
+  /**
+   * 判定まわりの打鍵回数。**手数（Issue 008 の主指標）を数えるために要る。**
+   * 受け取った打鍵だけを数える —— 宛先違いで捨てたものは、人の手数ではない。
+   */
+  const typed = new Map<number, HumanInputCounts>();
+  const countInput = (no: number, kind: 'verdict' | 'advance'): void => {
+    const before = typed.get(no) ?? { verdict: 0, advance: 0 };
+    typed.set(no, { ...before, [kind]: before[kind] + 1 });
+  };
+
   let aborted: string | undefined;
   /** ケース番号ごとの「打鍵待ち」。**宛先の違う打鍵は捨てる。** */
   const waiting = new Map<number, (input: HumanInput | undefined) => void>();
@@ -176,7 +192,9 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     if (!waiting.has(input.caseNo)) {
       // 待っているケース宛でないものは、**既に走ったケースへの置き直し**としてだけ受ける。
       // まだ走っていないケースには置けない（AI が操作していないので、見て判断する材料が無い）。
-      if (input.kind === 'verdict') revise(input.caseNo, input.humanResult);
+      if (input.kind === 'verdict' && revise(input.caseNo, input.humanResult)) {
+        countInput(input.caseNo, 'verdict');
+      }
       return;
     }
 
@@ -251,6 +269,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     const resolve = waiting.get(input.caseNo);
     if (resolve === undefined) return;
     waiting.delete(input.caseNo);
+    countInput(input.caseNo, input.kind);
     resolve(input);
   });
 
@@ -258,14 +277,16 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
    * 既に走ったケースの判定を置き直す。**待っているケースは進めない**
    * （戻って直したことで、勝手に先へ行かれると人が見失う）。
    */
-  const revise = (caseNo: number, humanResult: HumanResult): void => {
+  const revise = (caseNo: number, humanResult: HumanResult): boolean => {
     const before = cases.get(caseNo);
     // 走っていなければ置けない。`aiResult` がその印。
-    if (before?.aiResult === undefined) return;
+    if (before?.aiResult === undefined) return false;
 
     revised.set(caseNo, humanResult);
     patch(caseNo, { result: humanResult, verifiedBy: options.operator.handle });
     publish();
+    // **受け取ったかどうかを返す。**捨てた打鍵を手数に数えると、人が押していない分まで載る。
+    return true;
   };
 
   // シートの見出しが宣言した対象アプリ。「アプリを起動する」の行き先になる。
@@ -342,6 +363,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       run,
       revised,
       touched,
+      typed,
       options.operator,
       options.now ?? (() => new Date()),
     );

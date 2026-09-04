@@ -216,6 +216,9 @@
             "$ref": "#/$defs/humanAction"
           }
         },
+        "humanInputs": {
+          "$ref": "#/$defs/humanInputCounts"
+        },
         "recording": {
           "$ref": "#/$defs/caseRecording"
         },
@@ -396,6 +399,24 @@
           "minimum": 0
         },
         "y": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "humanInputCounts": {
+      "description": "人が道具へ打った、判定まわりの入力回数。**手数（Issue 008 の主指標）を数えるために要る。**\n端末を触った回数は humanActions の長さで数えられるが、判定を置いた打鍵はどこにも残っていなかった。所要時間で差が出なかったときに、どこで食っているかを切り分ける材料になる。\n\nverdict が 2 以上のケースは置き直したケース。多いなら、そこは画面が分かりにくい。打鍵の無かったケースには付けない（0 を並べると、打った 0 回と未実施が同じ形になる）。",
+      "type": "object",
+      "required": ["verdict", "advance"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "description": "判定を置いた回数（置き直しを含む）。",
+          "type": "integer",
+          "minimum": 0
+        },
+        "advance": {
+          "description": "判定を置かずに次へ送った回数。",
           "type": "integer",
           "minimum": 0
         }

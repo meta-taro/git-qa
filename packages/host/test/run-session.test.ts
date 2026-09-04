@@ -318,6 +318,103 @@ describe('小さく流した映像の座標を、端末の実寸へ戻す', () =
   });
 });
 
+/**
+ * **手数を数える（Issue 008 の主指標）。**
+ *
+ * 「手作業と比べて楽になったか」は所要時間で見るが、差が出なかったときに
+ * **どこで食っているか**を切り分ける材料が要る。端末を触った回数は `humanActions` の
+ * 長さで数えられるのに、**判定を置いた打鍵はどこにも残っていなかった。**
+ *
+ * 置き直しの回数もここに出る。**多いケースは、画面が分かりにくい所。**
+ */
+describe('手数を数える（Issue 008）', () => {
+  const start = (bridge: ReturnType<typeof fakeBridge>) =>
+    startRunSession({
+      adapter: stubAdapter({}),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260904-180000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+  it('判定を置いた回数を数える', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.humanInputs).toEqual({ verdict: 1, advance: 0 });
+  });
+
+  it('置き直した回数も数える（画面が分かりにくい所が出る）', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'FAIL' });
+    await waitFor(() => bridge.states.at(-1)?.cases[0]?.result === 'FAIL', '1 件目の置き直し');
+
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.humanInputs).toEqual({ verdict: 2, advance: 0 });
+  });
+
+  it('置かずに送った打鍵も数える', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'advance', caseNo: 1 });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.humanInputs).toEqual({ verdict: 0, advance: 1 });
+  });
+
+  it('打鍵の無かったケースには付けない（無いことにも意味がある）', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.humanInputs).toBeUndefined();
+  });
+
+  it('まだ走っていないケースへの打鍵は数えない（受け取っていないので）', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 3, humanResult: 'VERIFIED' });
+    await new Promise((r) => setTimeout(r, 30));
+
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[2]?.humanInputs).toBeUndefined();
+  });
+});
+
 describe('判定の置き直し（Issue 013）', () => {
   /**
    * **押し間違いは起きるし、「さっきの見落とした」も起きる。**
