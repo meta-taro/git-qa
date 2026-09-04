@@ -103,7 +103,12 @@ pub fn run() {
     .expect("error while building tauri application")
     .run(|app, event| {
       // 閉じるときに Node 側も道連れにする。残ると端末を掴んだままになる。
-      if let tauri::RunEvent::ExitRequested { .. } = event {
+      // **ExitRequested だけでは足りない。**窓を閉じただけで終わらない経路があり、
+      // Node 側が残って端末を掴んだままになった（2026-09-04・12 個残っていた）。
+      if matches!(
+        event,
+        tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+      ) {
         host::stop(app);
       }
     });

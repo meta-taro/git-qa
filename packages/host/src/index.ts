@@ -6,6 +6,7 @@ export { startRunSession } from './run-session.js';
 export type { RunSession, StartRunSessionOptions } from './run-session.js';
 export type { TauriDevArgsOptions } from './app.js';
 export { fromInvocationDir, runsDir } from './paths.js';
+export { watchParent } from './watch-parent.js';
 export { startSetupServer } from './setup-server.js';
 export type {
   SetupDevice,

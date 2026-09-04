@@ -18,6 +18,7 @@ import { fromInvocationDir, runsDir } from './paths.js';
 import { startRunSession } from './run-session.js';
 import type { RunSession } from './run-session.js';
 import { startSetupServer } from './setup-server.js';
+import { watchParent } from './watch-parent.js';
 
 /**
  * アプリを入口にして起動する（Issue 011 段階 3）。
@@ -127,8 +128,12 @@ if (serveOnly) {
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
   // 親が消えたら道連れにする。残ると端末を掴んだままになる。
+  // **標準入力だけでは足りない。**親が強く落とされると閉じないことがあり、
+  // 実際に数日前のものを含めて 12 個残っていた（2026-09-04）。親の PID も見る。
   process.stdin.on('close', stop);
+  process.stdin.on('end', stop);
   process.stdin.resume();
+  watchParent({ onOrphan: stop });
 } else {
   const child = spawn(
     'pnpm',
