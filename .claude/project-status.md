@@ -433,8 +433,10 @@ webview の console も Node 側のログへ流す。**今日の切り分けは�
 
 ### 端末を触る MCP（2026-09-02）
 
-`packages/mcp`。`device_tap` / `device_swipe` / `device_key` / `device_screenshot` /
-`device_screen_text` / `device_screen_size` の 6 つ。`.mcp.json` に登録済み。
+`packages/mcp`。`device_tap` / `device_swipe` / `device_key` / `device_launch` / `device_type` /
+`device_screenshot` / `device_screen_text` / `device_screen_size` の 8 つ。`.mcp.json` に登録済み。
+（`device_launch` / `device_type` は 2026-09-04 に追加。**語彙に入れたものは道具にも要る** — C40 で
+「アプリを起動する」を語彙へ入れたのに道具が無いと、MCP から動かすときだけ 1 件目で止まる。）
 
 **判定を置く道具は載せていない。**`VERIFIED` を AI が置けるようにした瞬間、
 この製品の芯（C1 / C17）が壊れる。**AI にできるのは操作と取得まで。合否は人だけ。**

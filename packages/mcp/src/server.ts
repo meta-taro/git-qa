@@ -66,6 +66,35 @@ export function createMcpServer(tools: DeviceTools): McpServer {
   );
 
   server.registerTool(
+    'device_launch',
+    {
+      title: 'アプリを起動する',
+      description:
+        '端末側の識別子（Android ならパッケージ名。例 com.android.settings）で起動する。' +
+        '表示名からは起動できない — どのパッケージかは端末と地域で変わるため（C40）。',
+      inputSchema: { app: z.string().min(1) },
+    },
+    async ({ app }) => {
+      await tools.launch(app);
+      return ok(`起動した: ${app}`);
+    },
+  );
+
+  server.registerTool(
+    'device_type',
+    {
+      title: '端末に文字を送る',
+      description:
+        'いま入力先になっている欄へ文字を送る。端末の入力は IME を通らないので ASCII だけ。',
+      inputSchema: { text: z.string() },
+    },
+    async ({ text }) => {
+      await tools.type(text);
+      return ok(`送った: ${text}`);
+    },
+  );
+
+  server.registerTool(
     'device_screenshot',
     { title: '端末の画面を撮る', description: 'いまの画面を PNG で返す。', inputSchema: {} },
     async () => {

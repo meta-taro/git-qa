@@ -144,3 +144,30 @@ describe('createDeviceTools', () => {
     expect(Object.keys(tools)).not.toContain('verify');
   });
 });
+
+/**
+ * **語彙に入れたものは、道具にも要る。**
+ *
+ * 検証シートは「アプリを起動する」から始まる（C40）。それを AI が代わりに動かせるのに、
+ * 端末を触る道具の側に起動が無いと、**MCP から動かすときだけ 1 件目で止まる。**
+ * 文字入力も同じ理由で足す（`device_key` では 1 文字ずつしか送れない）。
+ */
+describe('起動と入力', () => {
+  it('アプリを起動する', async () => {
+    const session = stubSession();
+    const tools = createDeviceTools({ connect: () => Promise.resolve(session) });
+
+    await tools.launch('com.android.settings');
+
+    expect(session.actions).toEqual([{ kind: 'launch', app: 'com.android.settings' }]);
+  });
+
+  it('文字を送る', async () => {
+    const session = stubSession();
+    const tools = createDeviceTools({ connect: () => Promise.resolve(session) });
+
+    await tools.type('battery');
+
+    expect(session.actions).toEqual([{ kind: 'type', text: 'battery' }]);
+  });
+});

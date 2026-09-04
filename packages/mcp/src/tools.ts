@@ -23,6 +23,9 @@ export interface DeviceTools {
   tap(x: number, y: number): Promise<void>;
   swipe(from: Point, to: Point, durationMs: number): Promise<void>;
   key(name: string): Promise<void>;
+  /** アプリを起動する。**`app` は端末側の識別子そのまま**（Android ならパッケージ名・C40）。 */
+  launch(app: string): Promise<void>;
+  type(text: string): Promise<void>;
   screenshot(): Promise<Screenshot>;
   screenText(): Promise<string>;
   screenSize(): Promise<{ width: number; height: number }>;
@@ -60,6 +63,14 @@ export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
 
     async key(name) {
       await (await use()).act({ kind: 'key', key: name });
+    },
+
+    async launch(app) {
+      await (await use()).act({ kind: 'launch', app });
+    },
+
+    async type(text) {
+      await (await use()).act({ kind: 'type', text });
     },
 
     async screenshot() {
