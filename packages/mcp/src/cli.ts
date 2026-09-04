@@ -43,7 +43,7 @@ process.on('SIGTERM', release);
 
 /**
  * git-qa 自身の窓を撮る。**AI が自分の画面を見るための口。**
- * macOS では画面収録とアクセシビリティの許可が要る（許可が無ければ理由が返る）。
+ * macOS では画面収録の許可が要る（許可が無ければ理由が返る）。
  */
 const captureWindow = createWindowCapture({
   run: async (command, args) => (await run(command, [...args])).stdout,

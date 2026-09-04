@@ -85,7 +85,8 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
         description:
           'この道具そのものの窓を PNG で返す（端末の画面ではない）。' +
           '判定の欄に何が出ているか、証跡が書けたかを、人に聞かずに確かめるために使う。' +
-          'mode: window は窓だけ（アクセシビリティの許可が要る）、screen は画面全体。',
+          'mode: window は窓だけ（手前に重なった別アプリは写らない）、screen は画面全体。' +
+          'どちらも画面収録の許可が要る。',
         inputSchema: {
           app: z.string().min(1).optional(),
           mode: z.enum(['window', 'screen']).optional(),

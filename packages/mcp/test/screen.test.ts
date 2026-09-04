@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  boundsScript,
   captureArgs,
   createWindowCapture,
   parseAllowed,
-  parseBounds,
+  parseWindowId,
   screenCaptureAllowedScript,
+  windowIdScript,
 } from '../src/screen.js';
 
 /**
@@ -17,32 +17,57 @@ import {
  * **人に目の代わりをさせない。**
  */
 
-describe('parseBounds', () => {
-  it('AppleScript が返す 4 つの数を読む', () => {
-    expect(parseBounds('12, 34, 800, 600')).toEqual({ x: 12, y: 34, width: 800, height: 600 });
+describe('parseWindowId', () => {
+  it('窓の番号を読む', () => {
+    expect(parseWindowId('217')).toBe(217);
   });
 
   it('窓が見つからないときは undefined（当て推量で撮らない）', () => {
-    expect(parseBounds('')).toBeUndefined();
-    expect(parseBounds('missing value')).toBeUndefined();
+    expect(parseWindowId('')).toBeUndefined();
+    expect(parseWindowId('missing value')).toBeUndefined();
   });
 
-  it('大きさが 0 の窓は撮らない', () => {
-    expect(parseBounds('0, 0, 0, 0')).toBeUndefined();
+  it('番号になっていない返事は読まない', () => {
+    expect(parseWindowId('0')).toBeUndefined();
+    expect(parseWindowId('-1')).toBeUndefined();
+    expect(parseWindowId('21.7')).toBeUndefined();
   });
 });
 
+/**
+ * **画面の四角ではなく、窓そのものを撮る。**
+ *
+ * 2026-09-04、`app_screenshot` が git-qa の絵として**別のプロジェクトのアプリ**を返した。
+ * 窓の位置を聞いて `-R x,y,w,h` で切っていたため、**手前に重なった窓がそのまま入っていた。**
+ * エラーは出ない。前の日の「許可が無いと壁紙が返る」と同じ、**黙って違う絵を返す**壊れ方。
+ *
+ * 証跡に残る絵であり、**リポジトリは public**。無関係なアプリの中身が写る経路は塞ぐ。
+ */
 describe('captureArgs', () => {
-  it('窓の範囲だけを、音も影も無しで撮る', () => {
-    const args = captureArgs({ x: 12, y: 34, width: 800, height: 600 }, '/tmp/a.png');
+  it('窓の番号を指して撮る（音も影も無し）', () => {
+    expect(captureArgs(217, '/tmp/a.png')).toEqual(['-x', '-o', '-l', '217', '/tmp/a.png']);
+  });
 
-    expect(args).toEqual(['-x', '-o', '-R', '12,34,800,600', '/tmp/a.png']);
+  it('画面の四角で切らない（手前に重なった窓を写さない）', () => {
+    expect(captureArgs(217, '/tmp/a.png')).not.toContain('-R');
   });
 });
 
-describe('boundsScript', () => {
+describe('windowIdScript', () => {
+  it('窓の一覧を OS へ直接聞く', () => {
+    expect(windowIdScript('git-qa')).toContain('CGWindowListCopyWindowInfo');
+  });
+
+  it('メニューバーや Dock を掴まない（layer 0 の窓だけ）', () => {
+    expect(windowIdScript('git-qa')).toContain('kCGWindowLayer');
+  });
+
   it('アプリ名をそのまま埋め込まない（引用符を閉じられると別の命令になる）', () => {
-    expect(boundsScript('ev"il')).not.toContain('ev"il');
+    expect(windowIdScript('ev"il')).not.toContain('"ev"il"');
+  });
+
+  it('日本語のアプリ名も落とさない（ターミナル等）', () => {
+    expect(windowIdScript('ターミナル')).toContain('ターミナル');
   });
 });
 
@@ -54,7 +79,7 @@ describe('createWindowCapture', () => {
     const capture = createWindowCapture({
       run: (command, args) => {
         ran.push([command, ...args]);
-        return Promise.resolve(command === 'osascript' ? '12, 34, 800, 600' : '');
+        return Promise.resolve(command === 'osascript' ? '217' : '');
       },
       readFile: () => Promise.resolve(png),
       tmpPath: () => '/tmp/shot.png',
@@ -64,10 +89,10 @@ describe('createWindowCapture', () => {
 
     expect(shot.mimeType).toBe('image/png');
     expect(shot.base64).toBe(Buffer.from(png).toString('base64'));
-    // 1 本目は画面収録の許可を聞く、2 本目が窓の位置。**撮るのは最後。**
+    // 1 本目は画面収録の許可を聞く、2 本目が窓の番号。**撮るのは最後。**
     expect(ran[0]?.[0]).toBe('osascript');
     expect(ran[1]?.[0]).toBe('osascript');
-    expect(ran[2]).toEqual(['screencapture', '-x', '-o', '-R', '12,34,800,600', '/tmp/shot.png']);
+    expect(ran[2]).toEqual(['screencapture', '-x', '-o', '-l', '217', '/tmp/shot.png']);
   });
 
   it('窓が見つからなければ、理由を出す（黙って空の絵を返さない）', async () => {
@@ -82,14 +107,13 @@ describe('createWindowCapture', () => {
 });
 
 /**
- * **窓だけを撮るには、アクセシビリティの許可が要る**（窓の位置を聞くため）。
- * 許可が無い機械でも、画面全体なら撮れる（画面収録の許可だけで足りる）。
- * **撮れないまま黙らない。**どちらが要るのかを言う。
+ * 画面全体は、窓の番号を聞かずに撮れる。
+ * **撮れないまま黙らない。**何が起きたのかを言う。
  */
-describe('許可が足りないとき', () => {
+describe('聞けなかったとき', () => {
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 
-  it('画面全体は、窓の位置を聞かずに撮る', async () => {
+  it('画面全体は、窓の番号を聞かずに撮る', async () => {
     const ran: string[][] = [];
     const capture = createWindowCapture({
       run: (command, args) => {
@@ -102,25 +126,26 @@ describe('許可が足りないとき', () => {
 
     await capture('git-qa', 'screen');
 
-    // **窓の位置は聞かない**（アクセシビリティの許可が要らない）。
-    // 画面収録の許可だけは聞く —— 無いと嘘の絵が返るため。
+    // **窓の番号は聞かない。**画面収録の許可だけは聞く —— 無いと嘘の絵が返るため。
     expect(ran.filter((call) => call[0] === 'osascript')).toHaveLength(1);
     expect(ran.at(-1)).toEqual(['screencapture', '-x', '-o', '/tmp/shot.png']);
   });
 
-  it('窓の位置を聞けなかったら、何の許可が要るかを言う', async () => {
+  it('窓の番号を聞けなかったら、元の理由ごと出す', async () => {
     const capture = createWindowCapture({
-      run: (command) => {
-        if (command === 'osascript') {
-          return Promise.reject(new Error('osascriptには補助アクセスは許可されません。 (-25211)'));
+      run: (command, args) => {
+        if (command === 'osascript' && args.join(' ').includes('CGWindowList')) {
+          return Promise.reject(new Error('osascript が落ちた (-1743)'));
         }
-        return Promise.resolve('');
+        return Promise.resolve('true');
       },
       readFile: () => Promise.resolve(png),
       tmpPath: () => '/tmp/shot.png',
     });
 
-    await expect(capture('git-qa')).rejects.toThrow(/アクセシビリティ/);
+    await expect(capture('git-qa')).rejects.toThrow(/-1743/);
+    // **代わりの手を示す。**言わないと人は動けない。
+    await expect(capture('git-qa')).rejects.toThrow(/screen/);
   });
 });
 

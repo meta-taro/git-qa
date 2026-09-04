@@ -35,6 +35,42 @@ export function parseAllowed(stdout: string): boolean | undefined {
   return undefined;
 }
 
+/**
+ * 窓の番号（CGWindowID）を聞く JXA。
+ *
+ * 位置と大きさではなく**番号**を聞く。四角で切ると手前の窓が写り込むため（`captureArgs` の注記）。
+ *
+ * - `kCGWindowListOptionOnScreenOnly`（1）は**手前から奥の順**で返る。だから最初の 1 つが最前面
+ * - `kCGWindowLayer === 0` で普通の窓だけに絞る。メニューバー・Dock・影は掴まない
+ * - 1 ピクセルの窓を除く。畳まれた窓・出来かけの窓を掴むと、真っ白な絵が返る
+ * - `kCGWindowOwnerName` は画面収録の許可が要らない（許可が要るのは `kCGWindowName` のほう）
+ *
+ * **アプリ名をそのまま埋め込まない。**引用符を閉じられると、その先が別の命令になる
+ * （product-baseline §21「ユーザー入力を信用しない」）。`JSON.stringify` は JS の文字列
+ * リテラルとして安全に閉じるので、`ターミナル` のような名前も落とさずに渡せる。
+ */
+export function windowIdScript(app: string): string {
+  return [
+    'ObjC.bindFunction("CGWindowListCopyWindowInfo", ["id", ["unsigned int", "unsigned int"]]);',
+    `var want = ${JSON.stringify(app)};`,
+    'var list = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo(1, 0));',
+    'var hit = list.filter(function (w) {',
+    '  return w.kCGWindowOwnerName === want && w.kCGWindowLayer === 0',
+    '    && w.kCGWindowBounds.Width > 1 && w.kCGWindowBounds.Height > 1;',
+    '})[0];',
+    'hit ? String(hit.kCGWindowNumber) : "missing value";',
+  ].join('\n');
+}
+
+/** `217` を読む。**当て推量で撮らない**ので、番号になっていなければ undefined。 */
+export function parseWindowId(stdout: string): number | undefined {
+  const answer = stdout.trim();
+  if (!/^\d+$/.test(answer)) return undefined;
+  const id = Number(answer);
+  // 0 は kCGNullWindowID（窓ではない）。これで撮ると画面全体が返る。
+  return id > 0 ? id : undefined;
+}
+
 /** 許可が無いときに出す文。**どこで許可するか、何が要るかまで言う。** */
 const DENIED =
   '画面収録の許可が無い。このままだと macOS は、エラーを返さずに' +
@@ -43,51 +79,16 @@ const DENIED =
   'この道具を動かしているアプリ（ターミナル等）を許可する。' +
   '**許可したあと、そのアプリを一度終了して開き直すまで効かない。**';
 
-export interface WindowBounds {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-
 /**
- * 窓の位置と大きさを聞く AppleScript。
+ * `-x` 無音・`-o` 影なし・`-l` **窓そのもの**を撮る。
  *
- * **アプリ名をそのまま埋め込まない。**引用符を閉じられると、その先が別の命令になる
- * （product-baseline §21「ユーザー入力を信用しない」）。
+ * **`-R x,y,w,h`（画面の四角）を使ってはいけない。**四角は画面の領域であって窓ではないので、
+ * 手前に重なった別アプリがそのまま入る。2026-09-04、git-qa の絵として**別プロジェクトの
+ * アプリの窓**が返った。エラーは出ない —— 前日の「許可が無いと壁紙が返る」と同じ、
+ * **黙って違う絵を返す**壊れ方。証跡に残る絵であり、**リポジトリは public。**
  */
-export function boundsScript(app: string): string {
-  const safe = app.replace(/[^A-Za-z0-9 ._-]/g, '');
-  return [
-    'tell application "System Events"',
-    `  if not (exists process "${safe}") then return "missing value"`,
-    `  tell process "${safe}"`,
-    '    if (count of windows) is 0 then return "missing value"',
-    '    set p to position of window 1',
-    '    set s to size of window 1',
-    '    return (item 1 of p as text) & ", " & (item 2 of p as text) & ", " & (item 1 of s as text) & ", " & (item 2 of s as text)',
-    '  end tell',
-    'end tell',
-  ].join('\n');
-}
-
-/** `12, 34, 800, 600` を読む。**当て推量で撮らない**ので、読めなければ undefined。 */
-export function parseBounds(stdout: string): WindowBounds | undefined {
-  const numbers = stdout
-    .trim()
-    .split(',')
-    .map((part) => Number(part.trim()));
-  if (numbers.length !== 4 || numbers.some((n) => !Number.isFinite(n))) return undefined;
-  const [x, y, width, height] = numbers as [number, number, number, number];
-  // 大きさの無い窓は撮れない（畳まれている・出来かけ）。
-  if (width <= 0 || height <= 0) return undefined;
-  return { x, y, width, height };
-}
-
-/** `-x` 無音・`-o` 影なし。**窓の範囲だけ**を撮る（他のアプリを写さない）。 */
-export function captureArgs(bounds: WindowBounds, path: string): string[] {
-  const { x, y, width, height } = bounds;
-  return ['-x', '-o', '-R', `${String(x)},${String(y)},${String(width)},${String(height)}`, path];
+export function captureArgs(windowId: number, path: string): string[] {
+  return ['-x', '-o', '-l', String(windowId), path];
 }
 
 export interface Screenshot {
@@ -102,10 +103,10 @@ export interface WindowCaptureOptions {
 }
 
 /**
- * 撮る範囲。
+ * 撮る範囲。窓だけを撮るか、画面全体を撮るか。
  *
- * **窓だけを撮るにはアクセシビリティの許可が要る**（窓の位置を聞くため）。
- * 許可が無い機械でも、画面全体なら撮れる（画面収録の許可だけで足りる）。
+ * どちらも要るのは**画面収録の許可だけ**。窓の番号を聞くのに追加の許可は要らない
+ * （`kCGWindowOwnerName` は画面収録の許可の範囲内）。
  */
 export type CaptureMode = 'window' | 'screen';
 
@@ -135,27 +136,25 @@ export function createWindowCapture(
     if (allowed === false) throw new Error(DENIED);
 
     const path = options.tmpPath();
-    // 画面全体は、窓の位置を聞かずに撮れる（アクセシビリティの許可が要らない）。
+    // 画面全体は、窓の番号を聞かずに撮れる。
     if (mode === 'screen') return shoot(['-x', '-o', path]);
 
     let stdout: string;
     try {
-      stdout = await options.run('osascript', ['-e', boundsScript(app)]);
+      stdout = await options.run('osascript', ['-l', 'JavaScript', '-e', windowIdScript(app)]);
     } catch (error: unknown) {
-      // **握り潰さない。**何の許可が足りないのかを言う。言わないと人は動けない。
+      // **握り潰さない。**何が起きたのかと、代わりの手を言う。言わないと人は動けない。
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `窓の位置を聞けない（アクセシビリティの許可が要る。` +
-          `システム設定 → プライバシーとセキュリティ → アクセシビリティ）。` +
-          `画面全体でよければ mode に screen を指定する。元の理由: ${detail}`,
+        `窓の番号を聞けない。画面全体でよければ mode に screen を指定する。元の理由: ${detail}`,
       );
     }
 
-    const bounds = parseBounds(stdout);
-    if (bounds === undefined) {
+    const windowId = parseWindowId(stdout);
+    if (windowId === undefined) {
       // **黙って空の絵を返さない。**撮れなかったことと、何も出ていないことは別。
       throw new Error(`窓が見つからない: ${app}（起動しているかを確かめる）`);
     }
-    return shoot(captureArgs(bounds, path));
+    return shoot(captureArgs(windowId, path));
   };
 }
