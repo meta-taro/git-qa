@@ -626,3 +626,65 @@ describe('startRunSession — 対象アプリ', () => {
     expect(adapter.actions).toEqual([{ kind: 'launch', app: 'com.android.settings' }]);
   });
 });
+
+/**
+ * **置いた判定が保存されないなら、この製品は何もしていない。**
+ *
+ * 配布物（`.app`）は `--serve` で動くが、その経路には `run.json` を書く処理が無かった。
+ * 人が 5 件を置いても、どこにも残らないまま終わっていた（2026-09-04・実機で踏んだ）。
+ * 保存は実行の一部として持つ。**そして、どこへ置いたかを人に見せる。**
+ */
+describe('startRunSession — 証跡の保存', () => {
+  it('置き終わったら保存して、その場所を画面へ出す', async () => {
+    const bridge = fakeBridge();
+    const saved: unknown[] = [];
+    const session = await startRunSession({
+      adapter: stubAdapter({}),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-150000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+      saveRun: (run) => {
+        saved.push(run);
+        return Promise.resolve('/home/me/runs/20260902-150000/run.json');
+      },
+    });
+
+    for (const no of [1, 2, 3]) {
+      await waitFor(awaitingIs(bridge, no), `${String(no)} 件目の打鍵待ち`);
+      bridge.send({ kind: 'verdict', caseNo: no, humanResult: 'VERIFIED' });
+    }
+    await session.done;
+    await session.close();
+
+    expect(saved).toHaveLength(1);
+    expect(bridge.states.at(-1)?.runJsonPath).toBe('/home/me/runs/20260902-150000/run.json');
+  });
+
+  it('保存に失敗したら、黙らずに理由を出す', async () => {
+    const bridge = fakeBridge();
+    const session = await startRunSession({
+      adapter: stubAdapter({}),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-150000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+      saveRun: () => Promise.reject(new Error('EROFS: read-only file system')),
+    });
+
+    for (const no of [1, 2, 3]) {
+      await waitFor(awaitingIs(bridge, no), `${String(no)} 件目の打鍵待ち`);
+      bridge.send({ kind: 'verdict', caseNo: no, humanResult: 'VERIFIED' });
+    }
+    // **置いた判定そのものは失わない。**保存に失敗しても、中身は返る。
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases.map((c) => c.result)).toEqual(['VERIFIED', 'VERIFIED', 'VERIFIED']);
+    expect(bridge.states.at(-1)?.saveError).toContain('EROFS');
+  });
+});

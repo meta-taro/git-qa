@@ -1,6 +1,9 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { fromInvocationDir } from '../src/paths.js';
+import { fromInvocationDir, runsDir } from '../src/paths.js';
 
 /**
  * `pnpm --filter @git-qa/host exec ...` は**作業ディレクトリをパッケージへ移す。**
@@ -23,5 +26,26 @@ describe('fromInvocationDir', () => {
     expect(fromInvocationDir('/tmp/a.tsv', { INIT_CWD: '/repo' }, '/repo/packages/host')).toBe(
       '/tmp/a.tsv',
     );
+  });
+});
+
+/**
+ * **書けない所へ証跡を書こうとしない。**
+ *
+ * Finder から `.app` を起動すると作業ディレクトリが `/` になる。そのまま `runs/` を
+ * 作ろうとすると `/runs` になり、macOS では書けない。**5 件の判定を置いたあとに
+ * 保存で落ちるのが、いちばん高くつく壊れ方。**
+ *
+ * 書けない場所だったときは、人が開ける所（書類フォルダ）へ置く。
+ */
+describe('証跡の置き場', () => {
+  it('打った場所が普通のディレクトリなら、その下に置く', () => {
+    expect(runsDir('runs', { INIT_CWD: '/home/me/project' })).toBe('/home/me/project/runs');
+  });
+
+  it('作業ディレクトリが / なら、書類フォルダの下へ逃がす', () => {
+    const path = runsDir('runs', {}, '/');
+
+    expect(path).toBe(join(homedir(), 'Documents', 'git-qa', 'runs'));
   });
 });

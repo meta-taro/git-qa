@@ -220,3 +220,28 @@ describe('見ているケース（カーソル）を出す（Issue 013）', () =
     expect(column('verdict').textContent).toContain('空のメモは保存できない');
   });
 });
+
+/**
+ * **保存されたかどうかが分からないまま終わらせない。**
+ *
+ * 配布物では `run.json` を書く処理が無く、人が 5 件を置いても何も残らなかった
+ * （2026-09-04・実機で踏んだ）。書けたなら場所を、書けなかったなら理由を、画面に出す。
+ */
+describe('証跡の行方', () => {
+  const finished = (extra: Partial<SessionState>): SessionState => {
+    const { awaiting: _awaiting, ...rest } = state;
+    return { ...rest, phase: 'finished', ...extra };
+  };
+
+  it('書けた場所を出す', () => {
+    renderSession(root, finished({ runJsonPath: '/Users/me/Documents/git-qa/runs/x/run.json' }));
+
+    expect(column('verdict').textContent).toContain('/Users/me/Documents/git-qa/runs/x/run.json');
+  });
+
+  it('書けなかったら理由を出す（黙って消さない）', () => {
+    renderSession(root, finished({ saveError: 'EROFS: read-only file system' }));
+
+    expect(column('verdict').textContent).toContain('EROFS');
+  });
+});

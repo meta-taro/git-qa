@@ -36,6 +36,13 @@ export interface SessionState {
    * 端末の画面が消えている、繋ぎ直せない、といったことを人へ伝えるために使う。
    */
   readonly liveError?: string;
+  /**
+   * 証跡（`run.json`）を書いた場所。**置いた判定がどこに残ったかを人へ見せる。**
+   * 見せないと、保存されたのかどうかが分からないまま終わる（実機で踏んだ）。
+   */
+  readonly runJsonPath?: string;
+  /** 証跡を書けなかった理由。**黙って消さない。** */
+  readonly saveError?: string;
   /** 人の判定を待っているケース番号。待っていなければ持たない。 */
   readonly awaiting?: number;
   readonly cases: readonly SessionCase[];

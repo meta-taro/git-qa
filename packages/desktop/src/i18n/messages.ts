@@ -33,6 +33,8 @@ const ja = {
   'key.move.note': '見るだけ。判定は動かない',
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
+  'verdict.saved': '証跡を書いた:',
+  'verdict.saveFailed': '証跡を書けなかった:',
 
   'typing.placeholder': '端末に文字を打ち込む（英数字のみ。日本語は送れない）',
   'typing.send': '送る',
@@ -109,6 +111,8 @@ const en: Record<keyof typeof ja, string> = {
   'key.move.note': 'Only moves what you are looking at',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
+  'verdict.saved': 'Evidence written to:',
+  'verdict.saveFailed': 'Could not write evidence:',
 
   'typing.placeholder': 'Type into the device (ASCII only; Japanese cannot be sent)',
   'typing.send': 'Send',

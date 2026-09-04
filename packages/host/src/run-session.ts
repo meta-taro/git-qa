@@ -44,6 +44,11 @@ export interface StartRunSessionOptions {
   readonly startBridge?: (options: LiveBridgeOptions) => Promise<LiveBridge>;
   /** 画面へ渡すシートの場所。**人が開くための道** なので、絶対パスが望ましい。 */
   readonly sheetPath?: string;
+  /**
+   * 証跡を書く。**置いた判定が保存されないなら、この製品は何もしていない。**
+   * 書いた場所は画面へ出す。渡さなければ書かない（検査で使う）。
+   */
+  readonly saveRun?: (run: Run) => Promise<string>;
   readonly now?: () => Date;
 }
 
@@ -119,6 +124,9 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   );
   let phase: SessionPhase = 'running';
   let awaiting: number | undefined;
+  /** 証跡を書いた場所と、書けなかった理由。**どちらも人に見せる。** */
+  let runJsonPath: string | undefined;
+  let saveError: string | undefined;
   /** 映像が止まった理由。**黙って真っ黒にしない。** */
   let liveError: string | undefined;
 
@@ -132,6 +140,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
         ? { sheetPath: options.sheetRef.path }
         : { sheetPath: options.sheetPath }),
       ...(liveError === undefined ? {} : { liveError }),
+      ...(runJsonPath === undefined ? {} : { runJsonPath }),
+      ...(saveError === undefined ? {} : { saveError }),
       cases: [...cases.values()],
     };
     live.bridge.publish(state);
@@ -323,18 +333,28 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     runCase,
     askHuman,
     ...(options.now === undefined ? {} : { now: options.now }),
-  }).then((run) => {
+  }).then(async (run) => {
     phase = 'finished';
     awaiting = undefined;
     publish();
     // **後から置き直したものを、証跡へ反映する。**置き直せるのに残らないなら意味がない。
-    return applyHumanTrace(
+    const final = applyHumanTrace(
       run,
       revised,
       touched,
       options.operator,
       options.now ?? (() => new Date()),
     );
+    if (options.saveRun !== undefined) {
+      try {
+        runJsonPath = await options.saveRun(final);
+      } catch (error: unknown) {
+        // **握り潰さない。**保存できなかったことは、人が知らないと取り返せない。
+        saveError = error instanceof Error ? error.message : String(error);
+      }
+      publish();
+    }
+    return final;
   });
 
   publish();

@@ -147,6 +147,8 @@ function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | 
   if (awaiting === undefined) {
     headline.textContent = t(state.phase === 'finished' ? 'verdict.finished' : 'verdict.running');
     target.append(headline);
+    // **置いた判定がどこへ行ったかを出す。**出さないと、保存されたのか分からないまま終わる。
+    target.append(...renderEvidence(doc, state));
     if (state.phase !== 'finished') target.append(renderKeyHelp(doc, false));
     return;
   }
@@ -173,6 +175,29 @@ function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | 
   }
 
   target.append(renderKeyHelp(doc, true));
+}
+
+/**
+ * 証跡の行方を出す。**書けたなら場所を、書けなかったなら理由を。**
+ *
+ * 配布物には書く処理が無く、人が 5 件を置いても何も残らないまま終わっていた
+ * （2026-09-04・実機で踏んだ）。**保存されたかどうかが分からないまま終わらせない。**
+ */
+function renderEvidence(doc: Document, state: SessionState): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  if (state.runJsonPath !== undefined) {
+    const saved = doc.createElement('p');
+    saved.className = 'verdict-evidence';
+    saved.textContent = `${t('verdict.saved')} ${state.runJsonPath}`;
+    out.push(saved);
+  }
+  if (state.saveError !== undefined) {
+    const failed = doc.createElement('p');
+    failed.className = 'session-error';
+    failed.textContent = `${t('verdict.saveFailed')} ${state.saveError}`;
+    out.push(failed);
+  }
+  return out;
 }
 
 /**

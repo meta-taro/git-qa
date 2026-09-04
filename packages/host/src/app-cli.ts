@@ -14,7 +14,7 @@ import type { Run } from '@git-qa/core';
 
 import { tauriDevArgs } from './app.js';
 import { findSheets, keepRunnableSheets } from './find-sheets.js';
-import { fromInvocationDir } from './paths.js';
+import { fromInvocationDir, runsDir } from './paths.js';
 import { startRunSession } from './run-session.js';
 import type { RunSession } from './run-session.js';
 import { startSetupServer } from './setup-server.js';
@@ -98,6 +98,18 @@ const setup = await startSetupServer({
       // （unknown のまま残ると「誰が保証したか」が読めないので、画面側で入力を促す）。
       operator: { handle: operator ?? process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
       readScreenText: readAndroidScreenText,
+      // **保存は実行の一部。**配布物（--serve）には書く処理が無く、人が置いた判定が
+      // どこにも残らないまま終わっていた（2026-09-04・実機で踏んだ）。
+      // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
+      saveRun: async (run) => {
+        const path = await writeRunJson(runsDir('runs'), run);
+        const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
+        console.log(`[git-qa] 証跡: ${path}`);
+        console.log(
+          `[git-qa] ${String(run.cases.length)} 件中 ${String(placed)} 件を人が見て置いた`,
+        );
+        return path;
+      },
     });
 
     finished = session.done;
@@ -136,13 +148,9 @@ if (serveOnly) {
   await new Promise<void>((resolve) => child.on('close', () => resolve()));
 
   if (finished !== undefined) {
-    const run = await finished;
+    // 保存は `saveRun` が済ませている（置き終わった時点で書く。画面を閉じるまで待たない）。
+    await finished;
     await session?.close();
-    // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
-    const path = await writeRunJson(fromInvocationDir('runs'), run);
-    console.log(`[git-qa] 証跡: ${path}`);
-    const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
-    console.log(`[git-qa] ${String(run.cases.length)} 件中 ${String(placed)} 件を人が見て置いた`);
   }
 
   await setup.close();
