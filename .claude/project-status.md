@@ -810,3 +810,18 @@ adb -s <serial> shell svc power stayon false                          # 元に�
   理由を画面に出して止まる。`adb` と同じ扱いの外部前提として README に書いた
 - **ウィンドウを完全に隠すと、macOS が画面の時計を止める。**戻ってきたら取り直すようにしたが、
   隠している間は状態が進まない
+- **node の CPU 種別が node_modules と食い違うと、MCP が黙って死ぬ**（2026-09-04 夕に踏んだ）。
+  Terminal.app が Rosetta で動いているため、この端末の `nodebrew install` は **M1 なのに x86_64 版**
+  を取ってくる。9/4 16:59 に `current` が v22.23.2（arm64）から **v24.11.1（x86_64）** へ切り替わり、
+  arm64 で入れてあった `node_modules` と食い違って `Cannot find module @rollup/rollup-darwin-x64` で
+  `vite-node` が即死。Claude Code 側からは `git-qa (CONNECTION_CLOSED)` としか見えなかった。
+  **直し方**: `pnpm install`（今の node に合う native を取り直す。9/4 に実施し `pnpm verify` 通過）。
+  **node を切り替えたら毎回必要**。根っこを断つなら Finder →
+  `/System/Applications/Utilities/Terminal.app` → 情報を見る → 「Rosetta を使用して開く」を外して
+  Terminal を再起動（**人の操作。Claude Code のセッションは切れる**）
+
+```bash
+sysctl -n sysctl.proc_translated                 # 1 なら Rosetta の下にいる
+file "$(readlink -f "$(which node)")"            # x86_64 / arm64 のどちらか
+ls node_modules/.pnpm | grep rollup-darwin       # 入っている native がどちらか
+```
