@@ -4,6 +4,7 @@ import {
   boundsCenter,
   escapeInputText,
   findElementCenter,
+  focusedField,
   inputCommands,
   keycode,
   parseDeviceList,
@@ -225,8 +226,23 @@ describe('parseWakefulness — 端末の画面が点いているか', () => {
 });
 
 describe('起動', () => {
-  it('解決できた起動先を am start へ落とす', () => {
-    expect(inputCommands({ kind: 'launch', component: 'com.android.settings/.Settings' })).toEqual([
+  /**
+   * **起動は、必ず同じ所から始まる。**
+   *
+   * `am start` だけだと、前に開いていた画面が再開する端末がある
+   * （ASUS Zenfone / Android 15 で実測。エミュレータは先頭に戻る）。
+   * 同じシートが端末によって違う所から始まると、**通ったり落ちたりする理由が分からなくなる。**
+   * だから、いったん止めてから起動する。
+   */
+  it('いったん止めてから起動する', () => {
+    expect(
+      inputCommands({
+        kind: 'launch',
+        app: 'com.android.settings',
+        component: 'com.android.settings/.Settings',
+      }),
+    ).toEqual([
+      ['shell', 'am', 'force-stop', 'com.android.settings'],
       ['shell', 'am', 'start', '-n', 'com.android.settings/.Settings'],
     ]);
   });
@@ -243,5 +259,35 @@ describe('起動', () => {
 
   it('端末に無ければ undefined（勝手な既定を返さない）', () => {
     expect(parseResolvedActivity('No activity found\n')).toBeUndefined();
+  });
+});
+
+/**
+ * **送った文字が、そのまま入るとは限らない。**
+ *
+ * 実機（ASUS Zenfone / Android 15・日本語）で `input text wifi` を送ったところ、
+ * 端末には「うぃふぃ」が入った。日本語 IME を通っている。
+ * 変換されたことに気づかずに送り直すと、**人の端末に二重に打ち込む**ことになる。
+ */
+describe('入力先の欄を読む', () => {
+  const dump = (attrs: string) =>
+    `<hierarchy rotation="0"><node index="0" ${attrs} bounds="[0,0][10,10]" /></hierarchy>`;
+
+  it('焦点のある欄の文字を返す', () => {
+    expect(focusedField(dump('text="うぃふぃ" focused="true" password="false"'))).toEqual({
+      text: 'うぃふぃ',
+      password: false,
+    });
+  });
+
+  it('伏せ字の欄はそう分かる（中身が見えないのは当たり前なので、責めない）', () => {
+    expect(focusedField(dump('text="••••" focused="true" password="true"'))).toEqual({
+      text: '••••',
+      password: true,
+    });
+  });
+
+  it('焦点が無ければ undefined', () => {
+    expect(focusedField(dump('text="x" focused="false" password="false"'))).toBeUndefined();
   });
 });

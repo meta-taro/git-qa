@@ -20,7 +20,16 @@ import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-and
 const enabled = process.env['GIT_QA_ANDROID_E2E'] === '1';
 const serial = process.env['GIT_QA_ANDROID_SERIAL'];
 
-const SHEET_PATH = fileURLToPath(new URL('../../../sheets/android-settings.tsv', import.meta.url));
+/**
+ * 当てるシート。**端末の言語で変わる**ので差し替えられるようにしてある。
+ * 既定は英語表示の端末用。日本語表示なら `sheets/android-settings-ja.tsv` を渡す。
+ */
+const SHEET_PATH = fileURLToPath(
+  new URL(
+    `../../../${process.env['GIT_QA_E2E_SHEET'] ?? 'sheets/android-settings.tsv'}`,
+    import.meta.url,
+  ),
+);
 
 describe.skipIf(!enabled)('配っているシートが実機で通る', () => {
   it('5 件すべて、AI だけで PASS まで行く', { timeout: 180_000 }, async () => {

@@ -71,8 +71,11 @@ export type ResolvedAction =
     }
   | { readonly kind: 'type'; readonly text: string; readonly at?: Point }
   | { readonly kind: 'key'; readonly key: string }
-  /** 起動先は端末に聞いて解決済み。`com.example.app/.MainActivity` の形。 */
-  | { readonly kind: 'launch'; readonly component: string };
+  /**
+   * 起動先は端末に聞いて解決済み。`component` は `com.example.app/.MainActivity` の形。
+   * `app` はいったん止めるために要る（**起動は必ず同じ所から始まる**）。
+   */
+  | { readonly kind: 'launch'; readonly app: string; readonly component: string };
 
 /**
  * 1 つの操作を `adb shell` の引数列へ。**複数になることがある**
@@ -103,7 +106,13 @@ export function inputCommands(action: ResolvedAction): string[][] {
     case 'key':
       return [['shell', 'input', 'keyevent', keycode(action.key)]];
     case 'launch':
-      return [['shell', 'am', 'start', '-n', action.component]];
+      // **いったん止めてから起動する。**`am start` だけだと、前に開いていた画面を
+      // 再開する端末がある（ASUS Zenfone / Android 15 で実測）。同じシートが端末によって
+      // 違う所から始まると、通ったり落ちたりする理由が分からなくなる。
+      return [
+        ['shell', 'am', 'force-stop', action.app],
+        ['shell', 'am', 'start', '-n', action.component],
+      ];
   }
 }
 
@@ -217,4 +226,29 @@ export function parseResolvedActivity(stdout: string): string | undefined {
     .at(-1);
   if (last === undefined) return undefined;
   return /^[a-zA-Z][\w.]*\/[\w.$]+$/.test(last) ? last : undefined;
+}
+
+/** 焦点のある入力欄。**送った文字がそのまま入ったかを見るために要る。** */
+export interface FocusedField {
+  readonly text: string;
+  /** 伏せ字の欄。**中身が見えないのは当たり前**なので、入っていなくても責めない。 */
+  readonly password: boolean;
+}
+
+/**
+ * いま焦点のある欄を読む。
+ *
+ * 実機（ASUS Zenfone / Android 15・日本語）で `input text wifi` を送ったところ、
+ * 端末には「うぃふぃ」が入った。**日本語 IME を通っている。**
+ * 変換されたことに気づかずに送り直すと、人の端末へ二重に打ち込むことになる。
+ */
+export function focusedField(xml: string): FocusedField | undefined {
+  for (const node of xml.matchAll(/<node\b[^>]*>/g)) {
+    const tag = node[0];
+    if (!/\bfocused="true"/.test(tag)) continue;
+    const text = /\btext="([^"]*)"/.exec(tag);
+    if (text === null) continue;
+    return { text: text[1] ?? '', password: /\bpassword="true"/.test(tag) };
+  }
+  return undefined;
 }

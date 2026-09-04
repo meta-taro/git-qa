@@ -6,6 +6,7 @@ export {
   boundsCenter,
   escapeInputText,
   findElementCenter,
+  focusedField,
   inputCommands,
   keycode,
   parseDeviceList,

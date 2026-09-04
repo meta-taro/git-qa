@@ -19,6 +19,7 @@ import type {
 import type { AdbDevice } from './adb.js';
 import {
   findElementCenter,
+  focusedField,
   inputCommands,
   parseDeviceList,
   parseResolvedActivity,
@@ -395,12 +396,48 @@ function createSession(deps: SessionDeps): TargetSession {
    * **入らないまま終わっても落とさない。**伏せ字の欄のように、入れても画面に出ない欄がある。
    * 入ったかどうかは、このあと期待結果を見るところで判断される。
    */
-  const ensureTyped = async (text: string, textCommand: readonly string[]): Promise<void> => {
-    if (screenText(await dumpHierarchy()).includes(text)) return;
-    // **送り直すのは 1 回だけ。**入れても画面に出ない欄（伏せ字）で繰り返すと、
-    // 見えないまま何度も打ち込むことになる。
+  const ensureTyped = async (
+    text: string,
+    textCommand: readonly string[],
+    before: string | undefined,
+  ): Promise<void> => {
+    const xml = await dumpHierarchy();
+    if (screenText(xml).includes(text)) return;
+
+    const field = focusedField(xml);
+    // **伏せ字の欄は責めない。**中身が見えないのは当たり前で、入っていないとは言えない。
+    if (field?.password === true) return;
+
+    // 欄の中身が「空でもなく、送った文字でもない」ものに変わっている。
+    // **端末の入力方式が変換している。**ここで送り直すと、人の端末に二重に打ち込む。
+    if (field !== undefined && field.text !== '' && field.text !== before) {
+      throw new AdapterError(
+        KIND,
+        `送った文字がそのまま入らない（端末の入力方式が変換している）。` +
+          `送った: ${JSON.stringify(text)} / 入った: ${JSON.stringify(field.text)}`,
+      );
+    }
+
+    // 何も入っていない。届かなかったのだから、**1 回だけ**送り直す。
     await adbRun(textCommand, serial);
     await sleep(settleMs);
+  };
+
+  /**
+   * 画面が点いていることを確かめる。**消えていたら、そこで止める。**
+   *
+   * 消えている画面でも `uiautomator dump` は前の中身を返し、`am start` も静かに通る。
+   * そのまま進めると**本当は失敗していないのに FAIL として証跡に残る** — いちばん悪い壊れ方。
+   * 実機（ASUS Zenfone / Android 15）で実際に起きた（2026-09-04）。
+   *
+   * **こちらから勝手に点けない。**点けても鍵が掛かっていれば同じ所で止まるうえ、
+   * 人の端末の状態を、頼まれていないのに変えることになる。
+   */
+  const assertAwake = async (): Promise<void> => {
+    const power = await adbRun(['shell', 'dumpsys', 'power'], serial).catch(() => new Uint8Array());
+    if (parseWakefulness(new TextDecoder().decode(power)) === 'asleep') {
+      throw new AdapterError(KIND, '端末の画面が消えている。点けてから実行すること');
+    }
   };
 
   const dumpHierarchy = async (): Promise<string> => {
@@ -426,7 +463,7 @@ function createSession(deps: SessionDeps): TargetSession {
       case 'key':
         return { kind: 'key', key: action.key };
       case 'launch':
-        return { kind: 'launch', component: await resolveLaunch(action.app) };
+        return { kind: 'launch', app: action.app, component: await resolveLaunch(action.app) };
     }
   };
 
@@ -440,15 +477,21 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action) {
       ensureOpen();
+      await assertAwake();
       const resolved = await resolveAction(action);
       const commands = inputCommands(resolved);
+      // 送る前の欄の中身。**あとで「変換されたのか、届かなかったのか」を分けるのに要る。**
+      const before =
+        resolved.kind === 'type' && resolved.text !== ''
+          ? focusedField(await dumpHierarchy())?.text
+          : undefined;
       for (const args of commands) {
         await adbRun(args, serial);
       }
       // 押した直後の画面は、まだ前の画面。**次の操作を送る前に落ち着かせる。**
       await sleep(settleMs);
       if (resolved.kind === 'type' && resolved.text !== '') {
-        await ensureTyped(resolved.text, commands.at(-1) ?? []);
+        await ensureTyped(resolved.text, commands.at(-1) ?? [], before);
       }
     },
 
@@ -474,6 +517,8 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async observe(): Promise<Observation> {
       ensureOpen();
+      // **消えた画面を「見た」ことにしない。**dump は消えていても前の中身を返す。
+      await assertAwake();
       // 生のまま返す。コアは解釈しない（C24）。
       return { kind: KIND, capturedAt: now().toISOString(), raw: await dumpHierarchy() };
     },

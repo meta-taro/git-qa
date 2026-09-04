@@ -615,12 +615,10 @@ describe('起動', () => {
 
     await session.act({ kind: 'launch', app: 'com.android.settings' });
 
-    expect(runner.ran.at(-1)?.slice(-5)).toEqual([
-      'shell',
-      'am',
-      'start',
-      '-n',
-      'com.android.settings/.Settings',
+    const am = runner.ran.filter((a) => a.includes('am')).map((a) => a.slice(-3).join(' '));
+    expect(am).toEqual([
+      'am force-stop com.android.settings',
+      'start -n com.android.settings/.Settings',
     ]);
   });
 
@@ -732,10 +730,16 @@ describe('画面が落ち着くのを待つ', () => {
  * だから時間ではなく、**入ったかどうかを見て、入っていなければもう一度送る。**
  */
 describe('入力が入ったことを確かめる', () => {
+  const empty = () =>
+    `<?xml version='1.0' encoding='UTF-8'?>
+<hierarchy rotation="0">
+  <node index="0" text="" focused="true" password="false" class="android.widget.EditText" bounds="[0,0][100,50]" />
+</hierarchy>`;
+
   const typed = (text: string) =>
     `<?xml version='1.0' encoding='UTF-8'?>
 <hierarchy rotation="0">
-  <node index="0" text="${text}" class="android.widget.EditText" bounds="[0,0][100,50]" />
+  <node index="0" text="${text}" focused="true" password="false" class="android.widget.EditText" bounds="[0,0][100,50]" />
 </hierarchy>`;
 
   const runnerWithDumps = (dumps: string[]) => {
@@ -761,8 +765,9 @@ describe('入力が入ったことを確かめる', () => {
       sleep: () => Promise.resolve(),
     }).connect();
 
-  it('入っていなければ、もう一度送る', async () => {
-    const runner = runnerWithDumps([typed('Search settings'), typed('battery')]);
+  it('欄が空のままなら、届かなかったのでもう一度送る', async () => {
+    // 送る前も送ったあとも空。**届いていない。**
+    const runner = runnerWithDumps([empty(), empty(), typed('battery')]);
     const session = await connect(runner);
 
     await session.act({ kind: 'type', text: 'battery' });
@@ -772,7 +777,7 @@ describe('入力が入ったことを確かめる', () => {
   });
 
   it('入っていれば、二度送らない（二重入力にしない）', async () => {
-    const runner = runnerWithDumps([typed('battery')]);
+    const runner = runnerWithDumps([empty(), typed('battery')]);
     const session = await connect(runner);
 
     await session.act({ kind: 'type', text: 'battery' });
@@ -783,9 +788,91 @@ describe('入力が入ったことを確かめる', () => {
 
   it('何度送っても入らないなら、諦めて先へ進む（勝手に落とさない）', async () => {
     // 伏せ字の欄のように、入れても画面に出ない欄がある。**入らない＝失敗ではない。**
-    const runner = runnerWithDumps([typed('Search settings')]);
+    // 送る前も後も空のまま。送り直しても入らない。**入らない＝失敗ではない。**
+    const runner = runnerWithDumps([empty()]);
     const session = await connect(runner);
 
     await expect(session.act({ kind: 'type', text: 'battery' })).resolves.toBeUndefined();
+  });
+
+  /**
+   * **端末の入力方式が、送った文字を変えてしまうことがある。**
+   * 実機（ASUS Zenfone / Android 15・日本語）で `wifi` を送ったら「うぃふぃ」が入った。
+   * 気づかずに送り直すと、**人の端末に二重に打ち込む**ことになる（実際にそうなった）。
+   */
+  const field = (text: string, password = false) =>
+    `<hierarchy rotation="0"><node index="0" text="${text}" focused="true" password="${String(password)}" class="android.widget.EditText" bounds="[0,0][10,10]" /></hierarchy>`;
+
+  it('別の文字に変わっていたら、送り直さずに理由を出す', async () => {
+    const runner = runnerWithDumps([field(''), field('うぃふぃ')]);
+    const session = await connect(runner);
+
+    await expect(session.act({ kind: 'type', text: 'wifi' })).rejects.toThrow(/うぃふぃ/);
+    const sent = runner.ran.filter((a) => a.includes('text') && a.includes('wifi'));
+    expect(sent).toHaveLength(1);
+  });
+
+  it('伏せ字の欄は責めない（中身が見えないのは当たり前）', async () => {
+    const runner = runnerWithDumps([field('', true), field('••••', true)]);
+    const session = await connect(runner);
+
+    await expect(session.act({ kind: 'type', text: 'wifi' })).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * **画面が消えたまま走らせると、1 件目が FAIL になる。**
+ *
+ * 消えている画面でも `uiautomator dump` は前の中身を返し、`am start` も静かに通る。
+ * つまり**本当は失敗していないのに、失敗として証跡に残る** — いちばん悪い壊れ方。
+ * 実機（ASUS Zenfone / Android 15）で実際にこれが起きた（2026-09-04）。
+ *
+ * 映像を出すときには既に見ていたが（`liveView.open`）、操作と画面読みでは見ていなかった。
+ */
+describe('画面が消えていたら、そう言う', () => {
+  const asleep = () =>
+    fakeRunner({
+      'shell dumpsys power': {
+        code: 0,
+        stdout: new TextEncoder().encode('  mWakefulness=Asleep\n'),
+        stderr: '',
+      },
+    });
+
+  const connect = async (runner: ReturnType<typeof fakeRunner>) =>
+    createAndroidAdapter({
+      build,
+      runner,
+      now: () => new Date('2026-09-02T00:00:00Z'),
+      sleep: () => Promise.resolve(),
+    }).connect();
+
+  it('操作しようとしたら止める', async () => {
+    const session = await connect(asleep());
+
+    await expect(session.act({ kind: 'tap', target: { at: 'point', x: 1, y: 2 } })).rejects.toThrow(
+      /画面が消えている/,
+    );
+  });
+
+  it('画面を読もうとしたら止める（消えた画面を「見た」ことにしない）', async () => {
+    const session = await connect(asleep());
+
+    await expect(session.observe()).rejects.toThrow(/画面が消えている/);
+  });
+
+  it('起きていれば、そのまま通す', async () => {
+    const runner = fakeRunner({
+      'shell dumpsys power': {
+        code: 0,
+        stdout: new TextEncoder().encode('  mWakefulness=Awake\n'),
+        stderr: '',
+      },
+    });
+    const session = await connect(runner);
+
+    await expect(
+      session.act({ kind: 'tap', target: { at: 'point', x: 1, y: 2 } }),
+    ).resolves.toBeUndefined();
   });
 });
