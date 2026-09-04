@@ -301,3 +301,58 @@ describe('始められない理由を画面に出す', () => {
     expect(root.querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe('false');
   });
 });
+
+/**
+ * **最近開いたシートを出す。**
+ *
+ * ホームの下を漁るのをやめた（`sheetSearchRoots`）ので、探索で見つかるのは
+ * git-qa 専用の置き場と作業ディレクトリだけになった。**リポジトリの中のシートは
+ * 探索に掛からない**ので、その人が前に開いたものを覚えて出す。
+ */
+describe('最近開いた検証シート', () => {
+  const render = (options: {
+    sheets: readonly string[];
+    recent?: readonly string[];
+  }): HTMLElement => {
+    const root = document.createElement('div');
+    document.body.replaceChildren(root);
+    renderColumns(root);
+    renderSetup(
+      root,
+      { ...idle, sheets: [...options.sheets] },
+      {
+        onStart: () => {},
+        operator: 'metataro',
+        ...(options.recent === undefined ? {} : { recentSheets: options.recent }),
+      },
+    );
+    return root;
+  };
+
+  const listed = (root: HTMLElement): string[] =>
+    [...root.querySelectorAll('.setup-sheet')].map((el) => el.textContent ?? '');
+
+  it('探索で見つからなくても、前に開いたものは一覧に出る', () => {
+    const root = render({ sheets: [], recent: ['/repo/git-qa/sheets/a.tsv'] });
+
+    expect(listed(root)).toContain('/repo/git-qa/sheets/a.tsv');
+  });
+
+  it('前に開いたものが先に並ぶ', () => {
+    const root = render({ sheets: ['/dedicated/x.tsv'], recent: ['/repo/a.tsv'] });
+
+    expect(listed(root)[0]).toBe('/repo/a.tsv');
+  });
+
+  it('探索でも見つかったものは、二重に並べない', () => {
+    const root = render({ sheets: ['/repo/a.tsv'], recent: ['/repo/a.tsv'] });
+
+    expect(listed(root)).toEqual(['/repo/a.tsv']);
+  });
+
+  it('探索が空でも、前に開いたものがあれば始められる', () => {
+    const root = render({ sheets: [], recent: ['/repo/a.tsv'] });
+
+    expect(root.querySelector<HTMLButtonElement>('.setup-start')?.disabled).toBe(false);
+  });
+});

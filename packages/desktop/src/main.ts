@@ -7,6 +7,7 @@ import { defaultStore, readSetting, writeSetting } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import { fetchSetupState, pickSheet, requestStart, resolveSetupUrl } from './setup/client.js';
+import { readRecentSheets, rememberSheet, writeRecentSheets } from './setup/recent.js';
 import { isTypingHandle, nextDrawing } from './setup/redraw.js';
 import { renderSetup } from './setup/view.js';
 import type { ConnectionStatus } from './onboarding/index.js';
@@ -239,6 +240,11 @@ if (liveUrl !== undefined) {
     const setupUrl = url;
     /** 人が自分で選んだ検証シート。一覧に無くてもこれで始められる。 */
     let pickedSheet: string | undefined;
+    /**
+     * 最近開いた検証シート。**ホームの下を漁るのをやめた代わりの口。**
+     * 探索が届くのは専用の置き場と作業ディレクトリだけなので、ここから足す。
+     */
+    let recentSheets = readRecentSheets(defaultStore());
     /** 置いた人のハンドル。**覚えておく**（毎回打たせない）。 */
     let operator = readSetting('git-qa.operator', defaultStore()) ?? '';
     /**
@@ -272,12 +278,16 @@ if (liveUrl !== undefined) {
 
       renderSetup(app, state, {
         ...(pickedSheet === undefined ? {} : { pickedSheet }),
+        recentSheets,
         operator,
         onOperatorChange: (handle) => {
           operator = handle;
           writeSetting('git-qa.operator', handle, defaultStore());
         },
         onStart: (params) => {
+          // **開いたものを覚える。**次からは探索に頼らずここへ出す。
+          recentSheets = rememberSheet(recentSheets, params.sheetPath);
+          writeRecentSheets(defaultStore(), recentSheets);
           requestStart(setupUrl, params).catch((error: unknown) => {
             showSessionError(app, error instanceof Error ? error.message : String(error));
           });

@@ -1,4 +1,5 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { assertRunnableSheet, parseTestSpecTsv } from '@git-qa/core';
@@ -87,4 +88,43 @@ export async function keepRunnableSheets(paths: readonly string[]): Promise<stri
     }),
   );
   return kept.filter((path): path is string => path !== undefined);
+}
+
+/**
+ * 検証シートを探す場所。
+ *
+ * **ホームの下を漁らない。**2026-09-04 まで `~/Documents` / `~/Desktop` / `~/Downloads` を
+ * 6 段まで辿っており、`.tsv` を 46 個開いて読み、**34 枚を絶対パスのまま画面へ並べていた**
+ * （git-qa のものは 2 枚。残りは他プロジェクト）。**検証ツールが隣の案件の構成を映すのは実害。**
+ *
+ * 見るのは 2 つだけ。**配布物を Finder から開くと作業ディレクトリが `/` になる**ので、
+ * そのときは git-qa 専用の置き場（証跡を書く所と同じ）を見る。
+ * ここに無いものは「別の場所から選ぶ…」で人が 1 回選び、以後は「最近開いた」に載る。
+ */
+export function sheetSearchRoots(workingDir: string, home: string = homedir()): string[] {
+  const dedicated = join(home, 'Documents', 'git-qa', 'sheets');
+  if (workingDir === '/' || workingDir === '') return [dedicated];
+  return [workingDir, dedicated];
+}
+
+/**
+ * 更新が新しい順に、決めた数だけ。
+ *
+ * **一覧は少しでよい。**全部出すと読む量が増えるだけで、選ぶのが遅くなる。
+ * 読めなくなっていたものは**落とさずに後ろへ回す**（消えたのか、権限なのかは、ここでは分からない）。
+ */
+export async function newestFirst(paths: readonly string[], limit: number): Promise<string[]> {
+  const timed = await Promise.all(
+    paths.map(async (path) => {
+      try {
+        return { path, at: (await stat(path)).mtimeMs };
+      } catch {
+        return { path, at: Number.NEGATIVE_INFINITY };
+      }
+    }),
+  );
+  return timed
+    .sort((a, b) => b.at - a.at)
+    .slice(0, limit)
+    .map((entry) => entry.path);
 }

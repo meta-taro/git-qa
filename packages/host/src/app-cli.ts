@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
 
 import {
   createAndroidAdapter,
@@ -13,7 +12,7 @@ import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
 import { tauriDevArgs } from './app.js';
-import { findSheets, keepRunnableSheets } from './find-sheets.js';
+import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
 import { startRunSession } from './run-session.js';
 import type { RunSession } from './run-session.js';
@@ -48,29 +47,23 @@ const runIdFrom = (at: Date): string => {
 const workingDir = fromInvocationDir('.');
 
 /**
- * 検証シートを探す場所。
- *
- * **配布物を Finder から起動すると、作業ディレクトリが `/` になる**（実機で
- * 「検証シートが無い」と出た）。そのときは、よくある置き場所を見る。
- * どちらにせよ、見つからなければ人が自分で選べる。
+ * 検証シートを探す場所。**ホームの下は漁らない**（`sheetSearchRoots` に理由がある）。
  */
-const sheetRoots =
-  workingDir === '/'
-    ? ['Documents', 'Desktop', 'Downloads'].map((dir) => join(homedir(), dir))
-    : [workingDir];
+const sheetRoots = sheetSearchRoots(workingDir, homedir());
+
+/** 一覧に出す数。**少し出す。**残りは「別の場所から選ぶ…」と「最近開いた」で足りる。 */
+const SHEET_LIMIT = 5;
 let session: RunSession | undefined;
 let finished: Promise<Run> | undefined;
 
 const setup = await startSetupServer({
   listDevices: async () => (await listAndroidDevices()).map((d) => ({ ...d })),
   findSheets: async () =>
-    keepRunnableSheets(
-      (
-        await Promise.all(
-          // home の下は 1 段深く見る。**プロジェクトの中の `docs/test-specs/` まで届かせる。**
-          sheetRoots.map((root) => findSheets(root, workingDir === '/' ? { maxDepth: 6 } : {})),
-        )
-      ).flat(),
+    newestFirst(
+      await keepRunnableSheets(
+        (await Promise.all(sheetRoots.map((root) => findSheets(root)))).flat(),
+      ),
+      SHEET_LIMIT,
     ),
 
   start: async ({ serial, sheetPath, operator }) => {

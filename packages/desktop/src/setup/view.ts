@@ -22,6 +22,13 @@ export interface RenderSetupOptions {
   /** 人が選んだシート。一覧に無くてもこれで始められる。 */
   readonly pickedSheet?: string;
   /**
+   * 最近開いた検証シート。
+   *
+   * **ホームの下を漁るのをやめた代わりの口。**探索が届くのは git-qa 専用の置き場と
+   * 作業ディレクトリだけなので、リポジトリの中のシートはここから出る。
+   */
+  readonly recentSheets?: readonly string[];
+  /**
    * 置いた人のハンドル。**`unknown` のまま証跡に残ると「誰が保証したか」が読めない**ので、
    * 空のままでは始められないようにする。
    */
@@ -110,7 +117,12 @@ export function renderSetup(
   // 既定は 1 つ目。**1 台・1 枚しか無ければ、選ぶ手間を作らない。**
   // 人が自分で選んだものがあれば、そちらが優先。
   const defaultSerial = state.devices[0]?.serial;
-  const defaultSheet = options.pickedSheet ?? state.sheets[0];
+  /**
+   * 一覧に出すシート。**前に開いたものを先に並べる**（探索で届かない場所にあることが多い）。
+   * 同じものを二重に並べない。
+   */
+  const sheets = [...new Set([...(options.recentSheets ?? []), ...state.sheets])];
+  const defaultSheet = options.pickedSheet ?? sheets[0];
 
   const section = doc.createElement('div');
   section.className = 'setup';
@@ -214,14 +226,12 @@ export function renderSetup(
   section.append(sheetHeading);
 
   // **自分で選んだものも一覧に出す。**選んだのに画面に出ないと、選べたのか分からない。
-  const sheets = [
-    ...(options.pickedSheet === undefined || state.sheets.includes(options.pickedSheet)
-      ? []
-      : [options.pickedSheet]),
-    ...state.sheets,
-  ];
+  const listed =
+    options.pickedSheet === undefined || sheets.includes(options.pickedSheet)
+      ? sheets
+      : [options.pickedSheet, ...sheets];
 
-  if (sheets.length === 0) {
+  if (listed.length === 0) {
     const empty = doc.createElement('p');
     empty.className = 'setup-empty';
     empty.textContent = t('setup.sheet.none');
@@ -230,7 +240,7 @@ export function renderSetup(
     section.append(
       pickList(
         doc,
-        sheets.map((path) => ({ value: path, label: path })),
+        listed.map((path) => ({ value: path, label: path })),
         'setup-sheet',
         'path',
         defaultSheet,

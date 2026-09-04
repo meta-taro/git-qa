@@ -1,9 +1,14 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { findSheets, keepRunnableSheets } from '../src/find-sheets.js';
+import {
+  findSheets,
+  keepRunnableSheets,
+  newestFirst,
+  sheetSearchRoots,
+} from '../src/find-sheets.js';
 
 /**
  * 検証シートの候補を探す（Issue 011 段階 3）。
@@ -127,5 +132,80 @@ describe('AI 用の作業場は覗かない', () => {
     await writeFile(join(root, '.claude', 'templates', 'standard.tsv'), 'x', 'utf8');
 
     await expect(findSheets(root)).resolves.toEqual([]);
+  });
+});
+
+/**
+ * **検証ツールが、無関係な案件のディレクトリ構成を画面へ並べてはいけない。**
+ *
+ * 2026-09-04、人が一覧を見て「セキュリティ上とか、印象が悪い」。実測すると、
+ * `~/Documents` / `~/Desktop` / `~/Downloads` を 6 段まで漁り、`.tsv` を **46 個開いて読み**、
+ * **34 枚を絶対パスのまま画面に並べていた**（うち git-qa のものは 2 枚。
+ * md-business 23 / MPMA 4 / dbboard 3 / browser-sync-agent 2）。
+ *
+ * 会社の端末で起動すると、隣の案件の構成が画面に出る。画面共有にも証跡にも載る。
+ */
+describe('探す場所', () => {
+  const home = '/Users/someone';
+
+  it('Finder から起動しても、ホームの下を漁らない', () => {
+    // 配布物を Finder から開くと作業ディレクトリが `/` になる。
+    const roots = sheetSearchRoots('/', home);
+
+    expect(roots).not.toContain(home);
+    for (const dir of ['Documents', 'Desktop', 'Downloads']) {
+      expect(roots).not.toContain(join(home, dir));
+    }
+  });
+
+  it('Finder から起動したときは、git-qa 専用の置き場だけを見る', () => {
+    expect(sheetSearchRoots('/', home)).toEqual([join(home, 'Documents', 'git-qa', 'sheets')]);
+  });
+
+  it('リポジトリの中から起動したときは、その作業ディレクトリを見る', () => {
+    expect(sheetSearchRoots('/work/git-qa', home)).toContain('/work/git-qa');
+  });
+
+  it('作業ディレクトリが取れないときも、ホームの下を漁らない', () => {
+    expect(sheetSearchRoots('', home)).toEqual([join(home, 'Documents', 'git-qa', 'sheets')]);
+  });
+});
+
+/**
+ * **一覧は少しでよい。**全部出すと、選ぶのに読む量が増えるだけで、
+ * しかも無関係なものが混ざる。人の言い分:「最近開いた／最近作られたものを少し出すのがよい」。
+ */
+describe('newestFirst', () => {
+  it('更新が新しい順に並べ、決めた数で切る', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'git-qa-recent-'));
+    const paths: string[] = [];
+    for (const [index, name] of ['old.tsv', 'mid.tsv', 'new.tsv'].entries()) {
+      const path = join(dir, name);
+      await writeFile(path, 'x', 'utf8');
+      // 触った時刻を明示的にずらす。**書いた順に頼らない。**
+      await utimes(path, new Date(1000 + index * 1000), new Date(1000 + index * 1000));
+      paths.push(path);
+    }
+
+    expect(await newestFirst(paths, 2)).toEqual([join(dir, 'new.tsv'), join(dir, 'mid.tsv')]);
+  });
+
+  it('数が足りなければ、あるだけ返す', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'git-qa-recent-'));
+    const path = join(dir, 'only.tsv');
+    await writeFile(path, 'x', 'utf8');
+
+    expect(await newestFirst([path], 5)).toEqual([path]);
+  });
+
+  it('読めなくなっていたものは、落とさずに後ろへ回す', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'git-qa-recent-'));
+    const path = join(dir, 'here.tsv');
+    await writeFile(path, 'x', 'utf8');
+
+    expect(await newestFirst([join(dir, 'gone.tsv'), path], 5)).toEqual([
+      path,
+      join(dir, 'gone.tsv'),
+    ]);
   });
 });
