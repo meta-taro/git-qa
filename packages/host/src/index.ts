@@ -15,5 +15,5 @@ export type {
   StartSetupServerOptions,
   StartedRun,
 } from './setup-server.js';
-export { findSheets } from './find-sheets.js';
+export { findSheets, keepRunnableSheets } from './find-sheets.js';
 export type { FindSheetsOptions } from './find-sheets.js';

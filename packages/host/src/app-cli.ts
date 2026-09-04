@@ -13,7 +13,7 @@ import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
 import { tauriDevArgs } from './app.js';
-import { findSheets } from './find-sheets.js';
+import { findSheets, keepRunnableSheets } from './find-sheets.js';
 import { fromInvocationDir } from './paths.js';
 import { startRunSession } from './run-session.js';
 import type { RunSession } from './run-session.js';
@@ -63,12 +63,14 @@ let finished: Promise<Run> | undefined;
 const setup = await startSetupServer({
   listDevices: async () => (await listAndroidDevices()).map((d) => ({ ...d })),
   findSheets: async () =>
-    (
-      await Promise.all(
-        // home の下は 1 段深く見る。**プロジェクトの中の `docs/test-specs/` まで届かせる。**
-        sheetRoots.map((root) => findSheets(root, workingDir === '/' ? { maxDepth: 6 } : {})),
-      )
-    ).flat(),
+    keepRunnableSheets(
+      (
+        await Promise.all(
+          // home の下は 1 段深く見る。**プロジェクトの中の `docs/test-specs/` まで届かせる。**
+          sheetRoots.map((root) => findSheets(root, workingDir === '/' ? { maxDepth: 6 } : {})),
+        )
+      ).flat(),
+    ),
 
   start: async ({ serial, sheetPath, operator }) => {
     const text = await readFile(sheetPath, 'utf8');
