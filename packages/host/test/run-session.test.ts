@@ -652,6 +652,9 @@ describe('映像が止まった理由を画面へ伝える', () => {
   /**
    * **橋は生のバイト列を流すので、途中で理由を差し込めない。**
    * 黙って終わると、画面は真っ黒のまま何も言えない（実機で踏んだ）。
+   *
+   * 落ちてすぐには投げない —— **繋ぎ直しに行く**（Issue 014）。戻らないまま上限に達したら投げる。
+   * どちらの間も、理由は実行の状態に載っている。
    */
   it('映像が落ちたら、その理由が実行の状態に載る', async () => {
     const bridge = fakeBridge();
@@ -664,6 +667,7 @@ describe('映像が止まった理由を画面へ伝える', () => {
       operator: { handle: 'octocat' },
       readScreenText: () => Promise.resolve('保存しました'),
       startBridge: bridge.start,
+      reconnect: { intervalMs: 1, limitMs: 5, sleep: () => Promise.resolve() },
     });
 
     // 橋が映像を読み始めた時点で落ちる。**理由は上へ投げつつ、控えも残す。**

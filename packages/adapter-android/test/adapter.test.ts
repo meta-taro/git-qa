@@ -576,6 +576,34 @@ describe('映像が 1 枚も来なかったとき', () => {
     await expect(drainAll(session.liveView.frames!())).rejects.toThrow(/画面が消えている/);
   });
 
+  /**
+   * **検証中にケーブルが抜けることがある**（実物を使った人の報告・Issue 014）。
+   * そのとき出ていたのは「screenrecord が映像を 1 枚も返さずに終わった」で、
+   * **抜けたことが人に伝わらなかった。**挿し直せば戻る、と言えるようにする。
+   */
+  it('端末が居なくなっていたら、ケーブルの話をする', async () => {
+    const overrides: Record<string, CommandResult> = {};
+    const runner = fakeRunner(overrides);
+    runner.chunks = [];
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      liveView: { mode: 'h264-stream' },
+    }).connect();
+    await session.liveView.open();
+
+    // ケーブルが抜けた。adb からも見えなくなる。
+    overrides['devices'] = {
+      code: 0,
+      stdout: new TextEncoder().encode('List of devices attached\n'),
+      stderr: '',
+    };
+
+    await expect(drainAll(session.liveView.frames!())).rejects.toThrow(
+      /ケーブル[\s\S]*emulator-5554|emulator-5554[\s\S]*ケーブル/,
+    );
+  });
+
   it('画面は点いているのに来ないなら、そちらの理由を言う', async () => {
     const runner = fakeRunner({
       'shell dumpsys power': {

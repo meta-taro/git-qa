@@ -50,6 +50,12 @@ export interface StartRunSessionOptions {
    * 書いた場所は画面へ出す。渡さなければ書かない（検査で使う）。
    */
   readonly saveRun?: (run: Run) => Promise<string>;
+  /** 映像の繋ぎ直し（Issue 014）。**待たない検査のために差し替えられるようにしてある。** */
+  readonly reconnect?: {
+    readonly intervalMs?: number;
+    readonly limitMs?: number;
+    readonly sleep?: (ms: number) => Promise<void>;
+  };
   readonly now?: () => Date;
 }
 
@@ -118,6 +124,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   const live = await startLiveSession({
     adapter: options.adapter,
     ...(options.startBridge === undefined ? {} : { startBridge: options.startBridge }),
+    ...(options.reconnect === undefined ? {} : { reconnect: options.reconnect }),
     onLiveError: (message) => {
       // 人へ伝える道は制御チャネルしか無い（橋は生のバイト列を流している）。
       liveError = message;

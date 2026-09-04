@@ -281,7 +281,24 @@ function createSession(deps: SessionDeps): TargetSession {
                     if (!liveOpen) return;
                     if (seen === 0) {
                       // 1 枚も来ずに終わった。**繋ぎ直しを繰り返すと、黙ったまま回り続ける。**
-                      // **まず画面の状態を見る。**消えていれば、それが理由（実機で踏んだ）。
+
+                      // **まず端末が居るかを見る**（Issue 014）。抜けていれば、画面の話は意味が無い。
+                      // 検証中にケーブルが抜けることがある。そのとき「screenrecord が映像を
+                      // 1 枚も返さずに終わった」と言っても、**人は何をすればいいか分からない。**
+                      const listed = parseDeviceList(
+                        new TextDecoder().decode(
+                          await adbRun(['devices']).catch(() => new Uint8Array()),
+                        ),
+                      );
+                      if (!listed.some((d) => d.serial === serial && d.state === 'device')) {
+                        throw new AdapterError(
+                          KIND,
+                          `端末が見つからない（${serial ?? '不明'}）。` +
+                            'ケーブルが抜けていないかを見て、挿し直すこと',
+                        );
+                      }
+
+                      // **画面の状態を見る。**消えていれば、それが理由（実機で踏んだ）。
                       const power = await adbRun(['shell', 'dumpsys', 'power'], serial).catch(
                         () => new Uint8Array(),
                       );

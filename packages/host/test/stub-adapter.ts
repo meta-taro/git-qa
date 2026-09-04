@@ -17,6 +17,8 @@ export interface StubTrace {
   readonly closed: string[];
   /** 受けた操作。順番のまま。 */
   readonly actions: Action[];
+  /** 映像を読み始めた回数。**繋ぎ直しに来たかどうか。** */
+  frameStarts(): number;
 }
 
 /**
@@ -30,11 +32,18 @@ export function stubAdapter(options: {
   failOpen?: boolean;
   /** 映像を読み始めた時点で落ちる（画面が消えている等）。 */
   failFrames?: string;
+  /**
+   * `failFrames` で落ちる回数。**ケーブルを抜いて挿し直した**状況を作るために要る
+   * （n 回落ちて、その後は流れる）。省略すると毎回落ちる。
+   */
+  failFramesTimes?: number;
   screen?: { width: number; height: number };
 }): TargetAdapter & StubTrace {
   const opened: string[] = [];
   const closed: string[] = [];
   const actions: Action[] = [];
+  /** 映像を読み始めた回数。**繋ぎ直しに来たかどうか**がこれで分かる。 */
+  let frameStarts = 0;
   const mode = options.mode ?? 'h264-stream';
   const chunks = options.chunks ?? [nal(7), nal(8), nal(5), nal(1)];
 
@@ -61,7 +70,11 @@ export function stubAdapter(options: {
             return {
               // eslint-disable-next-line @typescript-eslint/require-await -- 同期の中身を非同期の口へ
               async *[Symbol.asyncIterator]() {
-                if (options.failFrames !== undefined) throw new Error(options.failFrames);
+                frameStarts += 1;
+                const times = options.failFramesTimes ?? Number.POSITIVE_INFINITY;
+                if (options.failFrames !== undefined && frameStarts <= times) {
+                  throw new Error(options.failFrames);
+                }
                 for (const c of chunks) yield c;
               },
             };
@@ -115,5 +128,6 @@ export function stubAdapter(options: {
     opened,
     closed,
     actions,
+    frameStarts: () => frameStarts,
   };
 }
