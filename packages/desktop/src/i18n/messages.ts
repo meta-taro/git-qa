@@ -32,9 +32,15 @@ const ja = {
   'key.next': '次のケースを見る',
   'key.move.note': '見るだけ。判定は動かない',
   'verdict.running': 'AI が操作している。判定はまだ置けない',
-  'verdict.finished': 'この実行は終わった',
+  'verdict.finished': '検証は終了しました',
   'setup.operator.rule':
     '英数字とハイフンだけ（先頭は英数字・39 文字まで）。証跡に残る名前なので、日本語は使えない',
+  'flash.verified': '合格',
+  'flash.fail': '不合格',
+  'flash.blocked': '判断できない',
+  'flash.skip': '今回は見ない',
+  'flash.autoPass': 'AI の判定のまま（人は見ていない）',
+
   'verdict.saved': '証跡を書いた:',
   'verdict.saveFailed': '証跡を書けなかった:',
 
@@ -117,9 +123,15 @@ const en: Record<keyof typeof ja, string> = {
   'key.next': 'Look at the next case',
   'key.move.note': 'Only moves what you are looking at',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
-  'verdict.finished': 'This run has finished',
+  'verdict.finished': 'This run has finished.',
   'setup.operator.rule':
     'Letters, digits and hyphens only (must start with a letter or digit, up to 39 characters).',
+  'flash.verified': 'Pass',
+  'flash.fail': 'Fail',
+  'flash.blocked': 'Cannot judge',
+  'flash.skip': 'Skipped',
+  'flash.autoPass': "The AI's own result (no one watched)",
+
   'verdict.saved': 'Evidence written to:',
   'verdict.saveFailed': 'Could not write evidence:',
 

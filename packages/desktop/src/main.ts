@@ -15,6 +15,7 @@ import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { humanInputFor, nextCursor } from './session/cursor.js';
+import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
 import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics.js';
@@ -393,13 +394,16 @@ function startControl(controlUrl: string): void {
     const input = humanInputFor(command, cursor ?? latest?.awaiting);
     if (input === undefined) return;
 
+    // **押した直後に、置いたものを前面へ出す。**押し間違いに気づけるのはここだけ。
+    flashVerdict(app, command.kind === 'advance' ? 'AUTO_PASS' : command.humanResult);
+
     sendHumanInput(controlUrl, input).catch((error: unknown) => {
       showSessionError(app, error instanceof Error ? error.message : String(error));
     });
   };
 
   window.addEventListener('keydown', (event) => {
-    // **文字を打っている最中の `v` を、判定にしない。**
+    // **文字を打っている最中の `d` を、判定にしない。**
     if (shouldIgnoreKeyPress(event.target)) return;
     const command = commandForKey(event);
     if (command === undefined) return;

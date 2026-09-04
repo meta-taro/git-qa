@@ -12,13 +12,13 @@ import { KEY_BINDINGS, commandForKey, shouldIgnoreKeyPress } from '../../src/ses
  */
 
 describe('commandForKey', () => {
-  it('v で VERIFIED を置く', () => {
-    expect(commandForKey({ key: 'v' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
+  it('d で VERIFIED を置く', () => {
+    expect(commandForKey({ key: 'd' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
   });
 
   it('f / b / s で FAIL / BLOCKED / SKIP を置く', () => {
     expect(commandForKey({ key: 'f' })).toEqual({ kind: 'verdict', humanResult: 'FAIL' });
-    expect(commandForKey({ key: 'b' })).toEqual({ kind: 'verdict', humanResult: 'BLOCKED' });
+    expect(commandForKey({ key: 'a' })).toEqual({ kind: 'verdict', humanResult: 'BLOCKED' });
     expect(commandForKey({ key: 's' })).toEqual({ kind: 'verdict', humanResult: 'SKIP' });
   });
 
@@ -33,13 +33,13 @@ describe('commandForKey', () => {
   });
 
   it('大文字でも同じ（Shift を押したまま打っても効く）', () => {
-    expect(commandForKey({ key: 'V' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
+    expect(commandForKey({ key: 'D' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
   });
 
   it('修飾キー付きは受け取らない（OS や webview の操作を奪わない）', () => {
-    expect(commandForKey({ key: 'v', metaKey: true })).toBeUndefined();
-    expect(commandForKey({ key: 'v', ctrlKey: true })).toBeUndefined();
-    expect(commandForKey({ key: 'v', altKey: true })).toBeUndefined();
+    expect(commandForKey({ key: 'd', metaKey: true })).toBeUndefined();
+    expect(commandForKey({ key: 'd', ctrlKey: true })).toBeUndefined();
+    expect(commandForKey({ key: 'd', altKey: true })).toBeUndefined();
   });
 
   it('割り当てていないキーは何もしない', () => {
@@ -91,5 +91,35 @@ describe('shouldIgnoreKeyPress — 文字を打っている最中は判定に取
   it('画面のどこでもない所は、判定として扱う', () => {
     expect(shouldIgnoreKeyPress(document.createElement('div'))).toBe(false);
     expect(shouldIgnoreKeyPress(null)).toBe(false);
+  });
+});
+
+/**
+ * **意味が反転するキーを作らない。**
+ *
+ * 2026-09-04、左手をホーム段に置いたまま操作する前提で A S D F へ寄せた。
+ * そのとき `f` を合格にすると「不合格 → 合格」の反転になる。**この製品でいちばん
+ * 壊してはいけない値なので採らなかった。**外れた `v` / `b` は、押しても何も起きない。
+ */
+describe('左手ホーム段への割り当て', () => {
+  it('f の意味は不合格のまま', () => {
+    expect(commandForKey({ key: 'f' })).toEqual({ kind: 'verdict', humanResult: 'FAIL' });
+  });
+
+  it('s の意味は「今回は見ない」のまま', () => {
+    expect(commandForKey({ key: 's' })).toEqual({ kind: 'verdict', humanResult: 'SKIP' });
+  });
+
+  it('外れた v と b は、押しても何も起きない', () => {
+    expect(commandForKey({ key: 'v' })).toBeUndefined();
+    expect(commandForKey({ key: 'b' })).toBeUndefined();
+  });
+
+  it('割り当ては A S D F と Space だけ（右手を要求しない）', () => {
+    const typed = KEY_BINDINGS.map((binding) => binding.key).filter(
+      (key) => !key.startsWith('Arrow'),
+    );
+
+    expect(new Set(typed)).toEqual(new Set(['a', 's', 'd', 'f', ' ']));
   });
 });

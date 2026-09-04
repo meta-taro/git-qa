@@ -2,6 +2,7 @@ import type { SessionCase, SessionState } from '@git-qa/core/session';
 
 import { t } from '../i18n/current.js';
 import { KEY_BINDINGS } from './keys.js';
+import { markFor } from './marks.js';
 
 /**
  * 左にケース一覧、右に判定とキー一覧を描く。
@@ -47,6 +48,15 @@ function caseItem(
   label.className = 'case-title';
   label.textContent = `${String(subject.no)}. ${subject.title}`;
 
+  /**
+   * 判定の記号。**色が付くのは「人が見たもの」だけ**（`marks.ts`）。
+   * 一覧を眺めただけで、人が見た所と AI が言っただけの所が分かる。
+   */
+  const mark = doc.createElement('span');
+  mark.className = 'case-mark';
+  mark.textContent = markFor(subject.result);
+  mark.setAttribute('aria-hidden', 'true');
+
   const status = doc.createElement('span');
   status.className = 'case-status';
   // **空欄は空欄のまま出す**（product-baseline §19）。まだ確定していないものを埋めない。
@@ -57,7 +67,7 @@ function caseItem(
         ? subject.result
         : `${subject.result} / ${subject.verifiedBy}`;
 
-  item.append(label, status);
+  item.append(mark, label, status);
   return item;
 }
 

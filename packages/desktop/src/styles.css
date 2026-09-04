@@ -62,6 +62,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* 判定を前面に出すための基準（`.verdict-flash`）。 */
+  position: relative;
   /* カラムの区切り。色は決めていないので、文字色から作る。 */
   outline: 1px solid color-mix(in srgb, currentColor 20%, transparent);
 }
@@ -135,6 +137,12 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   font-weight: 600;
+}
+
+/* 記号と判定のあいだ。**題名が伸びる**ので、記号は左、判定は右に留まる。 */
+.case-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .case-status {
@@ -513,4 +521,46 @@ body {
   background: transparent;
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 6px;
+}
+
+/*
+ * 置いた判定を、押した直後に前面へ出す。
+ * **押し間違いに気づけるのはここだけ**（隣り合わせは必ずできるが、出せば毎回気づける）。
+ * 色は足さない（DESIGN.md「独自の配色を持たない」）。**色は記号（🟢 🔴 🟡 ⚪ ⬜）が持つ。**
+ */
+.verdict-flash {
+  position: absolute;
+  inset-inline: 0;
+  top: 40%;
+  z-index: 2;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  /* 映像の上に載るので、地を敷かないと読めない。**OS の地の色を使う。** */
+  background: color-mix(in srgb, Canvas 88%, transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .verdict-flash {
+    animation: verdict-flash-in 120ms ease-out;
+  }
+}
+
+@keyframes verdict-flash-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* ケース一覧の記号。**色は記号が持つ**ので、ここでは幅だけ揃える。 */
+.case-mark {
+  flex: none;
+  width: 1.5em;
+  text-align: center;
 }

@@ -34,10 +34,26 @@ export interface KeyBinding {
   readonly noteKey: MessageKey;
 }
 
+/**
+ * 割り当ては **左手をホーム段（A S D F）に置いたまま動かさない**ことを前提にする
+ * （2026-09-04・実物を触った人の指定）。
+ *
+ * ```
+ *   a   s   d   f      Space
+ *  小指 薬指 中指 人差指   親指
+ * ```
+ *
+ * **内側 2 つ（`d` `f`）が「自分の目で見て決めた」、外側 2 つ（`a` `s`）が
+ * 「決められなかった・見ない」。**
+ *
+ * `f` を合格にすると人差し指が最頻になって効率は良いが、**`f` の意味が
+ * 「不合格 → 合格」へ反転する。**この製品でいちばん壊してはいけない値なので採らない。
+ * 頭文字の対応（`f` = FAIL / `s` = SKIP）もそのまま残る。
+ */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
-  { key: 'v', labelKey: 'key.verified', noteKey: 'key.verified.note' },
+  { key: 'd', labelKey: 'key.verified', noteKey: 'key.verified.note' },
   { key: 'f', labelKey: 'key.fail', noteKey: 'key.fail.note' },
-  { key: 'b', labelKey: 'key.blocked', noteKey: 'key.blocked.note' },
+  { key: 'a', labelKey: 'key.blocked', noteKey: 'key.blocked.note' },
   { key: 's', labelKey: 'key.skip', noteKey: 'key.skip.note' },
   { key: ' ', labelKey: 'key.advance', noteKey: 'key.advance.note' },
   { key: 'ArrowUp', labelKey: 'key.prev', noteKey: 'key.move.note' },
@@ -45,9 +61,9 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
 ];
 
 const VERDICTS: Readonly<Record<string, HumanResult>> = {
-  v: 'VERIFIED',
+  d: 'VERIFIED',
   f: 'FAIL',
-  b: 'BLOCKED',
+  a: 'BLOCKED',
   s: 'SKIP',
 };
 

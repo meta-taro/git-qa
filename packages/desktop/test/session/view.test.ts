@@ -121,7 +121,7 @@ describe('renderSession', () => {
     renderSession(root, { ...rest, phase: 'finished' });
 
     expect(column('cases').querySelectorAll('.case-item[aria-current="true"]')).toHaveLength(0);
-    expect(column('verdict').textContent).toContain('終わ');
+    expect(column('verdict').textContent).toContain('終了');
   });
 });
 
@@ -135,7 +135,7 @@ describe('判定はクリックでも置ける', () => {
 
     const buttons = root.querySelectorAll<HTMLButtonElement>('.key-action');
     expect(buttons.length).toBeGreaterThanOrEqual(5);
-    expect([...buttons].map((b) => b.dataset['key'])).toContain('v');
+    expect([...buttons].map((b) => b.dataset['key'])).toContain('d');
   });
 
   it('押すと、同じ打鍵として扱われる', () => {
@@ -143,9 +143,9 @@ describe('判定はクリックでも置ける', () => {
     renderSession(root, state);
     installVerdictButtons(root, (key) => pressed.push(key));
 
-    root.querySelector<HTMLButtonElement>('.key-action[data-key="v"]')?.click();
+    root.querySelector<HTMLButtonElement>('.key-action[data-key="d"]')?.click();
 
-    expect(pressed).toEqual(['v']);
+    expect(pressed).toEqual(['d']);
   });
 
   it('人の番でないときは押せない（AI の操作中に判定を置かせない）', () => {
