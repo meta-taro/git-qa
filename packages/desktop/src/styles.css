@@ -433,6 +433,31 @@ body {
   font-weight: 600;
 }
 
+/*
+ * ハンドルの規則。ふだんは控えめに置く。
+ * **規則を破っているときは、同じ文が強く出る**（`data-bad`）。
+ * 色は足さない（DESIGN.md「独自の配色を持たない」）ので、太さと縦罫で差を付ける。
+ */
+.setup-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+.setup-hint[data-bad='true'] {
+  padding-left: 0.5rem;
+  font-weight: 600;
+  border-left: 2px solid currentColor;
+  opacity: 1;
+}
+
+/* なぜ始められないか。**押せないボタンの真下に置く。** */
+.setup-blocked {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
 /* 端末へ文字を送る欄。**中央のカラムの下に置く**（映像のすぐ下で打てるように）。 */
 .typing {
   order: 1;

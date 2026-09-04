@@ -78,6 +78,25 @@ function picked(column: HTMLElement, className: string, attribute: string): stri
   return found?.dataset[attribute];
 }
 
+/**
+ * なぜ始められないのか。**押せないボタンは、理由まで出して初めて意味がある。**
+ *
+ * 2026-09-04、人が実物を開いて「検証開始ボタン押せないですね」と言った。
+ * 保存されていたハンドルが `めたたろ`（日本語）で、C45 の入口の検査が弾いていた。
+ * **弾いたのは正しい。**出していなかったのは、弾いた理由のほう。
+ */
+function blockedReason(
+  handle: string,
+  serial: string | undefined,
+  sheet: string | undefined,
+): string | undefined {
+  if (handle === '') return t('setup.blocked.operator.empty');
+  if (!isValidHandle(handle)) return t('setup.blocked.operator.bad');
+  if (serial === undefined) return t('setup.blocked.device');
+  if (sheet === undefined) return t('setup.blocked.sheet');
+  return undefined;
+}
+
 export function renderSetup(
   root: HTMLElement,
   state: SetupState,
@@ -119,11 +138,26 @@ export function renderSetup(
   operatorRule.className = 'setup-hint';
   operatorRule.textContent = t('setup.operator.rule');
 
+  /**
+   * ハンドル・端末・シートの状態を、画面の 3 箇所へ同時に反映する。
+   * **押せるかどうか（ボタン）・規則を破っているか（印）・なぜ始まらないか（文）**を
+   * 別々に更新すると、どれかが取り残される。
+   */
+  const reflect = (handle: string): void => {
+    // 準備中は、ボタンの文字（「準備しています…」）が理由を兼ねる。
+    const reason =
+      state.phase === 'starting' ? undefined : blockedReason(handle, defaultSerial, defaultSheet);
+    start.disabled = state.phase === 'starting' || reason !== undefined;
+    operatorRule.dataset['bad'] = handle !== '' && !isValidHandle(handle) ? 'true' : 'false';
+    blocked.textContent = reason ?? '';
+    // **空の行を置かない。**理由が無いときに間だけが空くのは、何かを見落とした形に見える。
+    if (reason === undefined) blocked.remove();
+    else section.append(blocked);
+  };
+
   operator.addEventListener('input', () => {
     const handle = operator.value.trim();
-    start.disabled =
-      !isValidHandle(handle) || defaultSerial === undefined || defaultSheet === undefined;
-    operatorRule.dataset['bad'] = handle !== '' && !isValidHandle(handle) ? 'true' : 'false';
+    reflect(handle);
     options.onOperatorChange?.(handle);
   });
 
@@ -139,14 +173,15 @@ export function renderSetup(
   start.type = 'button';
   start.className = 'setup-start';
   start.textContent = state.phase === 'starting' ? t('setup.starting') : t('setup.start');
-  // **選べていないなら押させない。**押しても始まらないボタンは、壊れて見える。
-  start.disabled =
-    state.phase === 'starting' ||
-    defaultSerial === undefined ||
-    defaultSheet === undefined ||
-    // **誰が置いたか分からない証跡を作らない。**
-    // 規則に合わないハンドルもここで止める。通すと、置き終わったあとの保存で落ちる。
-    !isValidHandle((options.operator ?? '').trim());
+
+  /**
+   * 押せない理由。**選べていないなら押させない**が、黙って死んだボタンにはしない。
+   * **誰が置いたか分からない証跡を作らない**ので、規則に合わないハンドルもここで止める
+   * （通すと、置き終わったあとの保存で落ちる）。
+   */
+  const blocked = doc.createElement('p');
+  blocked.className = 'setup-blocked';
+
   start.addEventListener('click', () => {
     const serial = picked(column, 'setup-device', 'serial');
     // 一覧から選ばれていなければ、人が自分で選んだものを使う。
@@ -214,6 +249,10 @@ export function renderSetup(
   }
 
   section.append(start);
+
+  // **保存済みの値を戻したときも印を立てる。**打ち始めるまで黙っていては遅い。
+  // 組み上がってから当てるので、理由の行はボタンの下に入る。
+  reflect((options.operator ?? '').trim());
 
   if (state.error !== undefined) {
     // 黙って戻さない。**なぜ始まらなかったのかが人に見えなくなる。**

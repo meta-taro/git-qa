@@ -58,6 +58,11 @@ const ja = {
   'setup.pick': '別の場所から選ぶ…',
   'setup.start': '検証を開始する',
   'setup.starting': '準備しています…',
+  'setup.blocked.operator.empty': 'ハンドルを入れると始められる（0 の欄）',
+  'setup.blocked.operator.bad':
+    'ハンドルが規則に合っていないので始められない（0 の欄。英数字とハイフンだけ）',
+  'setup.blocked.device': '端末が見えていないので始められない（1 の欄）',
+  'setup.blocked.sheet': '検証シートが選べていないので始められない（2 の欄）',
   'setup.failed': '始められなかった: {message}',
 
   'onboarding.title': 'はじめかた',
@@ -139,6 +144,11 @@ const en: Record<keyof typeof ja, string> = {
   'setup.pick': 'Choose another file…',
   'setup.start': 'Start verifying',
   'setup.starting': 'Getting ready…',
+  'setup.blocked.operator.empty': 'Enter your handle to start (field 0)',
+  'setup.blocked.operator.bad':
+    'That handle does not match the rule, so this cannot start (field 0: letters, digits and hyphens only)',
+  'setup.blocked.device': 'No device is visible, so this cannot start (field 1)',
+  'setup.blocked.sheet': 'No test sheet is selected, so this cannot start (field 2)',
   'setup.failed': 'Could not start: {message}',
 
   'onboarding.title': 'Getting started',

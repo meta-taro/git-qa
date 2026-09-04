@@ -222,3 +222,82 @@ describe('担当者ハンドルの規則', () => {
     expect(root.querySelector<HTMLButtonElement>('.setup-start')?.disabled).toBe(false);
   });
 });
+
+/**
+ * **押せないボタンは、押せない理由まで出して初めて意味がある。**
+ *
+ * 2026-09-04、人が実物を開いて「検証開始ボタン押せないですね」と言った。
+ * 保存されていたハンドルが `めたたろ`（日本語）で、C45 の入口の検査が弾いていた。
+ * **弾いたこと自体は正しい。**出していなかったのは、弾いた理由。
+ *
+ * 上の「何が書けるのかを画面に出す」は**規則の文が常に出ている**ことしか見ておらず、
+ * 規則を破っている状態でも同じ文が出るので、この壊れ方を通していた。
+ */
+describe('始められない理由を画面に出す', () => {
+  const render = (handle: string, state: SetupState = idle): HTMLElement => {
+    const root = document.createElement('div');
+    document.body.replaceChildren(root);
+    renderColumns(root);
+    renderSetup(root, state, { onStart: () => {}, operator: handle });
+    return root;
+  };
+
+  it('規則を破っているハンドルは、起動直後から破っていると分かる', () => {
+    // 保存済みの値を戻したときも印が要る。**打ち始めるまで黙っていては遅い。**
+    expect(render('めたたろ').querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe(
+      'true',
+    );
+  });
+
+  it('規則に合うハンドルなら、破っている印は立たない', () => {
+    expect(render('metataro').querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe(
+      'false',
+    );
+  });
+
+  it('印を立てるだけでなく、見た目が変わる規則が CSS にある', async () => {
+    // **dataset を立てても CSS が見ていなければ、人の目には何も起きない。**
+    // 実際にそうなっていた（`data-bad` を見る規則が 1 行も無かった）。
+    // **happy-dom が `URL` を差し替えている**ので、`new URL()` の結果は node の fs が受け取らない。
+    // 作業ディレクトリも呼び出し方で変わるため、このファイルの位置から辿る。
+    const { readFile } = await import('node:fs/promises');
+    const url = await import('node:url');
+    const path = await import('node:path');
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const css = await readFile(path.resolve(here, '../../src/styles.css'), 'utf8');
+    expect(css).toContain("[data-bad='true']");
+  });
+
+  it('ハンドルが規則に合わないときは、そう名指しで出す', () => {
+    expect(render('めたたろ').querySelector('.setup-blocked')?.textContent).toContain('ハンドル');
+  });
+
+  it('ハンドルが空のときも、何をすれば始まるかを出す', () => {
+    expect(render('').querySelector('.setup-blocked')?.textContent).toContain('ハンドル');
+  });
+
+  it('端末が見えていないときは、端末だと名指しで出す', () => {
+    const blocked = render('metataro', { ...idle, devices: [] }).querySelector('.setup-blocked');
+    expect(blocked?.textContent).toContain('端末');
+  });
+
+  it('検証シートが無いときは、シートだと名指しで出す', () => {
+    const blocked = render('metataro', { ...idle, sheets: [] }).querySelector('.setup-blocked');
+    expect(blocked?.textContent).toContain('検証シート');
+  });
+
+  it('始められるときは、理由を出さない', () => {
+    expect(render('metataro').querySelector('.setup-blocked')).toBeNull();
+  });
+
+  it('打ち直して規則に合えば、理由がその場で消える', () => {
+    const root = render('めたたろ');
+    const operator = root.querySelector<HTMLInputElement>('.setup-operator')!;
+
+    operator.value = 'metataro';
+    operator.dispatchEvent(new Event('input'));
+
+    expect(root.querySelector('.setup-blocked')).toBeNull();
+    expect(root.querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe('false');
+  });
+});
