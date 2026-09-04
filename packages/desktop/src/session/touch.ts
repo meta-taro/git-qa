@@ -38,6 +38,9 @@ export function devicePoint(params: DevicePointParams): { x: number; y: number }
   const x = Math.round((params.clientX - originX) / scale);
   const y = Math.round((params.clientY - originY) / scale);
 
+  // **測れなかった値を通さない。**NaN は大小の比較がすべて偽になるので、
+  // 下の境界の判定をすり抜けて端末へ届いてしまう。
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
   // 余白と枠の外。人は黒い所を押している。
   if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return undefined;
   return { x, y };

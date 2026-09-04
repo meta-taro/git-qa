@@ -35,6 +35,10 @@ describe('devicePoint', () => {
     expect(point).toBeUndefined();
   });
 
+  it('測れない値は送らない（NaN が境界の判定をすり抜ける）', () => {
+    expect(devicePoint({ clientX: Number.NaN, clientY: 400, rect, canvas })).toBeUndefined();
+  });
+
   it('枠の外は送らない', () => {
     expect(
       devicePoint({ clientX: rect.left - 10, clientY: rect.top + 10, rect, canvas }),

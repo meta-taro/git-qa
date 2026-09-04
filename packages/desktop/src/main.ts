@@ -1,4 +1,4 @@
-import type { SessionState } from '@git-qa/core/session';
+import type { HumanInput, SessionState } from '@git-qa/core/session';
 
 import { attachConsoleToLog } from './console-log.js';
 import { setLocale, t } from './i18n/current.js';
@@ -19,6 +19,7 @@ import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics
 import { startMenuActions } from './session/menu-actions.js';
 import { installTextSender } from './session/typing.js';
 import { installDeviceTouch } from './session/touch.js';
+import { installDeviceWheel } from './session/wheel.js';
 import { installVerdictButtons, renderSession, showSessionError } from './session/view.js';
 import { createLivePlayer } from './live/player.js';
 import { liveStreamUrlFromLocation, openLiveStream, pumpLiveStream } from './live/stream.js';
@@ -185,15 +186,14 @@ const startSession = (live: string, control: string | undefined): void => {
   startLiveView(root, live, (canvas) => {
     // **人が端末を触れるようにする**（Issue 013）。実行に繋がっているときだけ。
     if (control === undefined) return;
-    installDeviceTouch({
-      canvas,
-      state: () => latest,
-      send: (input) => {
-        sendHumanInput(control, input).catch((error: unknown) => {
-          showSessionError(root, error instanceof Error ? error.message : String(error));
-        });
-      },
-    });
+    const send = (input: HumanInput): void => {
+      sendHumanInput(control, input).catch((error: unknown) => {
+        showSessionError(root, error instanceof Error ? error.message : String(error));
+      });
+    };
+    installDeviceTouch({ canvas, state: () => latest, send });
+    // **長い画面の下を見られるようにする。**タップとなぞるだけでは届かない。
+    installDeviceWheel({ canvas, state: () => latest, send });
   }).catch((error: unknown) => {
     // **映らない理由を画面に出す。**console だけだと人には見えず、待ち続けることになる。
     console.error('[live-view]', error);
