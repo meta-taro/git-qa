@@ -506,7 +506,7 @@ webview の console も Node 側のログへ流す。**今日の切り分けは�
 
 | | |
 |---|---|
-| テスト | **618 件・全て通過**（端末を繋ぐと **627 件**）＋ Rust 2 件 |
+| テスト | **620 件・全て通過**（端末を繋ぐと **629 件**）＋ Rust 2 件 |
 | カバレッジ | statements **82.06%** / branch 91.13%（目安 80%） |
 | ビルド | `pnpm verify` に含めた（webview 向けの配布物が実際に作れること） |
 | 個人情報チェック | `bash .github/scripts/oss-privacy-check.sh` → OK |
