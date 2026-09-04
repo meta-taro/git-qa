@@ -595,3 +595,197 @@ describe('映像が 1 枚も来なかったとき', () => {
     await expect(drainAll(session.liveView.frames!())).rejects.toThrow(/1 枚も返さずに終わった/);
   });
 });
+
+describe('起動', () => {
+  it('起動先を端末に聞いてから am start する', async () => {
+    const runner = fakeRunner({
+      'shell cmd package resolve-activity --brief com.android.settings': {
+        code: 0,
+        stdout: new TextEncoder().encode(
+          'priority=0 isDefault=true\ncom.android.settings/.Settings\n',
+        ),
+        stderr: '',
+      },
+    });
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      now: () => new Date('2026-09-02T00:00:00Z'),
+    }).connect();
+
+    await session.act({ kind: 'launch', app: 'com.android.settings' });
+
+    expect(runner.ran.at(-1)?.slice(-5)).toEqual([
+      'shell',
+      'am',
+      'start',
+      '-n',
+      'com.android.settings/.Settings',
+    ]);
+  });
+
+  it('端末に無いアプリは、触らずに理由を出す', async () => {
+    const runner = fakeRunner({
+      'shell cmd package resolve-activity --brief com.example.nope': {
+        code: 0,
+        stdout: new TextEncoder().encode('No activity found\n'),
+        stderr: '',
+      },
+    });
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      now: () => new Date('2026-09-02T00:00:00Z'),
+    }).connect();
+
+    await expect(session.act({ kind: 'launch', app: 'com.example.nope' })).rejects.toThrow(
+      /com\.example\.nope/,
+    );
+    expect(
+      runner.ran.map((a) => a.join(' ')).filter((c) => c.startsWith('shell am start')),
+    ).toEqual([]);
+  });
+});
+
+/**
+ * **画面はすぐには変わらない。**
+ *
+ * 押した直後に次の操作を送ると、まだ前の画面にいる。文字を送っても行き先が無く、
+ * 黙って捨てられる（2026-09-04 の実機実行で 5 件目がこれで FAIL した）。
+ * ここは人が待つのと同じで、**少し待ってから次へ行く。**
+ */
+describe('画面が落ち着くのを待つ', () => {
+  it('操作のあいだに待つ', async () => {
+    const waited: number[] = [];
+    const session = await createAndroidAdapter({
+      build,
+      runner: fakeRunner(),
+      now: () => new Date('2026-09-02T00:00:00Z'),
+      sleep: (ms) => {
+        waited.push(ms);
+        return Promise.resolve();
+      },
+    }).connect();
+
+    await session.act({ kind: 'tap', target: { at: 'point', x: 1, y: 2 } });
+
+    expect(waited.length).toBeGreaterThan(0);
+  });
+
+  it('まだ出ていない要素は、少し待って探し直す', async () => {
+    // 1 回目の dump には無く、2 回目に出てくる画面。
+    let dumps = 0;
+    const runner = fakeRunner();
+    const inner = runner.run.bind(runner);
+    runner.run = (command: string, args: readonly string[]) => {
+      if (args.join(' ').includes('cat /sdcard/git-qa-window-dump.xml')) {
+        dumps += 1;
+        return Promise.resolve({
+          code: 0,
+          stdout: new TextEncoder().encode(dumps === 1 ? '<hierarchy rotation="0" />' : DUMP),
+          stderr: '',
+        });
+      }
+      return inner(command, args);
+    };
+
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      now: () => new Date('2026-09-02T00:00:00Z'),
+      sleep: () => Promise.resolve(),
+    }).connect();
+
+    await session.act({ kind: 'tap', target: { at: 'element', ref: '保存' } });
+
+    expect(dumps).toBeGreaterThan(1);
+    expect(runner.ran.at(-1)?.slice(-4)).toEqual(['input', 'tap', '200', '240']);
+  });
+
+  it('待っても出てこなければ、見つからないと言う', async () => {
+    const runner = fakeRunner({
+      'shell cat /sdcard/git-qa-window-dump.xml': {
+        code: 0,
+        stdout: new TextEncoder().encode('<hierarchy rotation="0" />'),
+        stderr: '',
+      },
+    });
+    const session = await createAndroidAdapter({
+      build,
+      runner,
+      now: () => new Date('2026-09-02T00:00:00Z'),
+      sleep: () => Promise.resolve(),
+    }).connect();
+
+    await expect(
+      session.act({ kind: 'tap', target: { at: 'element', ref: '保存' } }),
+    ).rejects.toThrow(/保存/);
+  });
+});
+
+/**
+ * **送った文字は、黙って捨てられることがある。**
+ *
+ * 画面が切り替わった直後は、入力先がまだ受け取れる状態になっていない。
+ * 実測（エミュレータ・2026-09-04）では 0.5 秒待っても入らず、1.0 秒で入った。
+ * **待つ長さを決め打ちにすると、端末が変わった瞬間に破れる。**
+ * だから時間ではなく、**入ったかどうかを見て、入っていなければもう一度送る。**
+ */
+describe('入力が入ったことを確かめる', () => {
+  const typed = (text: string) =>
+    `<?xml version='1.0' encoding='UTF-8'?>
+<hierarchy rotation="0">
+  <node index="0" text="${text}" class="android.widget.EditText" bounds="[0,0][100,50]" />
+</hierarchy>`;
+
+  const runnerWithDumps = (dumps: string[]) => {
+    const runner = fakeRunner();
+    const inner = runner.run.bind(runner);
+    let i = 0;
+    runner.run = (command: string, args: readonly string[]) => {
+      if (args.join(' ').includes('cat /sdcard/git-qa-window-dump.xml')) {
+        const xml = dumps[Math.min(i, dumps.length - 1)] ?? '';
+        i += 1;
+        return Promise.resolve({ code: 0, stdout: new TextEncoder().encode(xml), stderr: '' });
+      }
+      return inner(command, args);
+    };
+    return runner;
+  };
+
+  const connect = async (runner: ReturnType<typeof fakeRunner>) =>
+    createAndroidAdapter({
+      build,
+      runner,
+      now: () => new Date('2026-09-02T00:00:00Z'),
+      sleep: () => Promise.resolve(),
+    }).connect();
+
+  it('入っていなければ、もう一度送る', async () => {
+    const runner = runnerWithDumps([typed('Search settings'), typed('battery')]);
+    const session = await connect(runner);
+
+    await session.act({ kind: 'type', text: 'battery' });
+
+    const sent = runner.ran.filter((a) => a.includes('text') && a.includes('battery'));
+    expect(sent).toHaveLength(2);
+  });
+
+  it('入っていれば、二度送らない（二重入力にしない）', async () => {
+    const runner = runnerWithDumps([typed('battery')]);
+    const session = await connect(runner);
+
+    await session.act({ kind: 'type', text: 'battery' });
+
+    const sent = runner.ran.filter((a) => a.includes('text') && a.includes('battery'));
+    expect(sent).toHaveLength(1);
+  });
+
+  it('何度送っても入らないなら、諦めて先へ進む（勝手に落とさない）', async () => {
+    // 伏せ字の欄のように、入れても画面に出ない欄がある。**入らない＝失敗ではない。**
+    const runner = runnerWithDumps([typed('Search settings')]);
+    const session = await connect(runner);
+
+    await expect(session.act({ kind: 'type', text: 'battery' })).resolves.toBeUndefined();
+  });
+});

@@ -23,6 +23,11 @@ export interface SheetCaseRunnerOptions {
    * （Android のアクセシビリティツリーと Web の DOM は同じものではない・C8）。
    */
   readonly readScreenText: (session: TargetSession) => Promise<string>;
+  /**
+   * シートの見出し（`# 対象:`）が宣言した対象アプリの識別子。
+   * 「アプリを起動する」の行き先になる。**無ければその手順は保留になる。**
+   */
+  readonly app?: string;
   readonly stepsColumn?: string;
   readonly expectationColumn?: string;
 }
@@ -84,7 +89,10 @@ export function createSheetCaseRunner(
   const expectationColumn = options.expectationColumn ?? EXPECTATION_COLUMN;
 
   return async (ctx: CaseContext): Promise<CaseVerdict> => {
-    const planned = planSteps(ctx.subject.row.cells[stepsColumn] ?? '');
+    const planned = planSteps(
+      ctx.subject.row.cells[stepsColumn] ?? '',
+      options.app === undefined ? {} : { app: options.app },
+    );
     const held = holdBeforeTouching(planned);
     if (held !== undefined) return held;
 

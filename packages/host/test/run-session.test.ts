@@ -588,3 +588,41 @@ describe('映像が止まった理由を画面へ伝える', () => {
     await session.close();
   });
 });
+
+/**
+ * **シートの見出しが宣言した対象アプリを、実行器へ渡す。**
+ * ここが繋がっていないと「アプリを起動する」が必ず保留になり、
+ * どの検証シートも 1 件目で止まる（2026-09-02 の実行記録がその形だった）。
+ */
+describe('startRunSession — 対象アプリ', () => {
+  const LAUNCH_SHEET = parseTestSpecTsv(
+    [
+      '#! md-business:test-spec-tsv/v1',
+      '# 対象: com.android.settings',
+      'No.:number!\t項目!\t手順:multiline!\t期待結果:multiline!',
+      '1\tアプリが起動する\tアプリを起動する\t「保存しました」と表示される',
+      '',
+    ].join('\n'),
+  );
+
+  it('見出しの「対象」を起動先にする', async () => {
+    const bridge = fakeBridge();
+    const adapter = stubAdapter({});
+    const session = await startRunSession({
+      adapter,
+      sheet: LAUNCH_SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260902-150000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('保存しました'),
+      startBridge: bridge.start,
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await session.done;
+    await session.close();
+
+    expect(adapter.actions).toEqual([{ kind: 'launch', app: 'com.android.settings' }]);
+  });
+});

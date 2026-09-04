@@ -7,6 +7,7 @@ import {
   inputCommands,
   keycode,
   parseDeviceList,
+  parseResolvedActivity,
   parseScreenSize,
   parseWakefulness,
   screenText,
@@ -220,5 +221,27 @@ describe('parseWakefulness — 端末の画面が点いているか', () => {
 
   it('読めなければ unknown（勝手に決めない）', () => {
     expect(parseWakefulness('なにか')).toBe('unknown');
+  });
+});
+
+describe('起動', () => {
+  it('解決できた起動先を am start へ落とす', () => {
+    expect(inputCommands({ kind: 'launch', component: 'com.android.settings/.Settings' })).toEqual([
+      ['shell', 'am', 'start', '-n', 'com.android.settings/.Settings'],
+    ]);
+  });
+
+  it('resolve-activity の出力から起動先を取る', () => {
+    const stdout = [
+      'priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true',
+      'com.android.settings/.Settings',
+      '',
+    ].join('\n');
+
+    expect(parseResolvedActivity(stdout)).toBe('com.android.settings/.Settings');
+  });
+
+  it('端末に無ければ undefined（勝手な既定を返さない）', () => {
+    expect(parseResolvedActivity('No activity found\n')).toBeUndefined();
   });
 });

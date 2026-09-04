@@ -1,0 +1,15 @@
+#! md-business:test-spec-tsv/v1
+# タイトル: Android 設定アプリ 検証シート
+# 文書番号: TEST-git-qa-002
+# 対象: com.android.settings
+# 版: 0.1.0
+# ステータス: 未実施
+# 凡例: 結果は OK / NG / 保留 / 未実施 から選択。未入力セルは空のまま。
+#@ note どの Android 端末にも入っている「設定」アプリを相手に、git-qa の一本道を最後まで通すためのシート。架空アプリではなく実物を触る。画面の文字は端末の言語設定によって変わるので、日本語表示の端末では手順の鉤括弧の中を書き換える。
+#@ style 結果 OK=#e7f6ec NG=#fcebec 保留=#fdf3e2
+No.:number!	区分	項目!	手順:multiline!	期待結果:multiline!	結果:enum(OK|NG|保留|未実施)!	実施日:date	担当	関連Issue:url	備考:multiline
+1	起動	設定アプリが起動する	1. アプリを起動する	「Settings」と表示される	未実施				
+2	移動	アプリの設定を開ける	1. アプリを起動する\n2. 「Apps」をタップする	「Default apps」と表示される	未実施				
+3	移動	電池の設定を開ける	1. アプリを起動する\n2. 「Battery」をタップする	「Battery Saver」と表示される	未実施				
+4	移動	保存領域の設定を開ける	1. アプリを起動する\n2. 「Storage」をタップする	「Free up space」と表示される	未実施				
+5	入力	検索欄に文字を入力できる	1. アプリを起動する\n2. 「Search settings」をタップする\n3. 「battery」と入力する	検索欄に「battery」が残る	未実施				

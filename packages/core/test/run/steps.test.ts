@@ -113,3 +113,56 @@ describe('judgeExpectation — 画面の文字と突き合わせる', () => {
     expect(judgeExpectation(check, 'メモ一覧 0 件')).toBe('FAIL');
   });
 });
+
+/**
+ * **実物の検証シートは、ほぼ必ず 1 行目が「アプリを起動する」で始まる。**
+ * ここが落とせないと、どのシートを持ってきても 1 件目で止まる
+ * （2026-09-02 の実行記録は 5 件とも BLOCKED だった）。
+ *
+ * ただし**アプリ名からパッケージを当てにいかない。**「設定」がどのパッケージかは
+ * 端末と地域で変わる。当てて別のアプリを起動すると、画面は動くので通ったように見える。
+ * **起動先はシートに書いてあるものだけを使う。**
+ */
+describe('planSteps — 起動', () => {
+  it('「アプリを起動する」を、シートが宣言したパッケージの launch に落とす', () => {
+    const [step] = planSteps('1. アプリを起動する', { app: 'com.android.settings' });
+
+    expect(step).toEqual({
+      kind: 'action',
+      text: 'アプリを起動する',
+      action: { kind: 'launch', app: 'com.android.settings' },
+    });
+  });
+
+  it('パッケージ名を直接書いてもよい', () => {
+    expect(planSteps('「com.android.settings」を起動する')).toEqual([
+      {
+        kind: 'action',
+        text: '「com.android.settings」を起動する',
+        action: { kind: 'launch', app: 'com.android.settings' },
+      },
+    ]);
+  });
+
+  it('宣言が無ければ、何を書けばよいかを添えて止まる', () => {
+    const [step] = planSteps('アプリを起動する');
+
+    expect(step).toMatchObject({ kind: 'hold' });
+    expect((step as { reason: string }).reason).toContain('# 対象:');
+  });
+
+  it('宣言がパッケージ名の形でなければ止まる（推測で起動しない）', () => {
+    const [step] = planSteps('アプリを起動する', { app: 'example/sample-notes-app@main' });
+
+    expect(step).toMatchObject({ kind: 'hold' });
+    expect((step as { reason: string }).reason).toContain('example/sample-notes-app@main');
+  });
+
+  it('アプリ名を書かれても当てにいかない', () => {
+    // 「設定」がどのパッケージかは端末と地域で変わる。**当てない。**
+    const [step] = planSteps('設定を起動する', { app: 'com.android.settings' });
+
+    expect(step).toMatchObject({ kind: 'hold', text: '設定を起動する' });
+    expect((step as { reason: string }).reason).toContain('設定');
+  });
+});

@@ -70,7 +70,9 @@ export type ResolvedAction =
       readonly durationMs: number;
     }
   | { readonly kind: 'type'; readonly text: string; readonly at?: Point }
-  | { readonly kind: 'key'; readonly key: string };
+  | { readonly kind: 'key'; readonly key: string }
+  /** 起動先は端末に聞いて解決済み。`com.example.app/.MainActivity` の形。 */
+  | { readonly kind: 'launch'; readonly component: string };
 
 /**
  * 1 つの操作を `adb shell` の引数列へ。**複数になることがある**
@@ -100,6 +102,8 @@ export function inputCommands(action: ResolvedAction): string[][] {
     }
     case 'key':
       return [['shell', 'input', 'keyevent', keycode(action.key)]];
+    case 'launch':
+      return [['shell', 'am', 'start', '-n', action.component]];
   }
 }
 
@@ -197,4 +201,20 @@ export function parseWakefulness(stdout: string): Wakefulness {
   // Dozing（うとうと）も、映像が出ない側として扱う。
   if (value === 'asleep' || value === 'dozing' || value === 'dreaming') return 'asleep';
   return 'unknown';
+}
+
+/**
+ * `cmd package resolve-activity --brief <パッケージ>` の出力から起動先を取る。
+ *
+ * 最後の行が `com.example.app/.MainActivity`。**端末に無ければ `No activity found`。**
+ * 読めないときに既定を返さない — 見当違いのアプリを起動して、通ったように見えるため。
+ */
+export function parseResolvedActivity(stdout: string): string | undefined {
+  const last = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .at(-1);
+  if (last === undefined) return undefined;
+  return /^[a-zA-Z][\w.]*\/[\w.$]+$/.test(last) ? last : undefined;
 }

@@ -38,3 +38,37 @@ describe('tauri.conf.json', () => {
     expect(conf.build.frontendDist).toBe('../dist/web');
   });
 });
+
+/**
+ * macOS は、**使用目的の記述が無いアプリにファイル欄を渡さない。**
+ *
+ * git-qa は Finder から起動されると、検証シートを探しに `~/Documents` `~/Desktop`
+ * `~/Downloads` を見る（`app-cli.ts`）。記述が無いと、そこで黙って 0 件になる
+ * — つまり**「検証シートが選べない」が別の理由でまた起きる。**
+ *
+ * カメラ・マイクは使っていないので**書かない。**使わない許可を先に求めない。
+ */
+describe('Info.plist（macOS の使用目的）', () => {
+  const plist = readFileSync(
+    fileURLToPath(new URL('../src-tauri/Info.plist', import.meta.url)),
+    'utf8',
+  );
+
+  it.each([
+    'NSDocumentsFolderUsageDescription',
+    'NSDesktopFolderUsageDescription',
+    'NSDownloadsFolderUsageDescription',
+  ])('%s がある', (key) => {
+    expect(plist).toContain(`<key>${key}</key>`);
+  });
+
+  it('使っていない許可を求めない', () => {
+    expect(plist).not.toContain('NSCameraUsageDescription');
+    expect(plist).not.toContain('NSMicrophoneUsageDescription');
+  });
+
+  it('記述は「何に使うか」を書く（既定の空文字にしない）', () => {
+    const values = [...plist.matchAll(/<string>([^<]*)<\/string>/g)].map((m) => m[1] ?? '');
+    expect(values.every((v) => v.trim().length >= 10)).toBe(true);
+  });
+});

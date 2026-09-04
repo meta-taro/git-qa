@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS へ渡す使用目的の記述。**書かないと OS がファイル欄を渡さない。**
+
+  git-qa は Finder から起動されると、作業ディレクトリが `/` になるため、検証シート（TSV）を
+  ホームの下から探す（`packages/host/src/app-cli.ts`）。記述が無いと、そこが黙って 0 件になる。
+
+  ここに書いた文が、そのまま許可のダイアログに出る。**何に使うかを書く。**
+  カメラ・マイクは使っていないので書かない（使わない許可を先に求めない）。
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>検証シート（TSV）を探すために、書類フォルダを読みます。読むだけで、書き換えや外部への送信はしません。</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>検証シート（TSV）を探すために、デスクトップを読みます。読むだけで、書き換えや外部への送信はしません。</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>検証シート（TSV）を探すために、ダウンロードフォルダを読みます。読むだけで、書き換えや外部への送信はしません。</string>
+  </dict>
+</plist>

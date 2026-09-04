@@ -102,7 +102,12 @@ export type Action =
       readonly durationMs?: number;
     }
   | { readonly kind: 'type'; readonly text: string; readonly target?: PointerRef }
-  | { readonly kind: 'key'; readonly key: string };
+  | { readonly kind: 'key'; readonly key: string }
+  /**
+   * アプリを起動する。**`app` は対象側の識別子そのまま**（Android ならパッケージ名）。
+   * 表示名からの推測はしない。どのアプリかは、シートに書いてあるものだけを使う。
+   */
+  | { readonly kind: 'launch'; readonly app: string };
 
 /**
  * 録画は実行開始時の設定であって、モードには紐づかない（C11）。

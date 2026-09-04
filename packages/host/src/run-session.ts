@@ -258,7 +258,13 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     publish();
   };
 
-  const runner = createSheetCaseRunner({ readScreenText: options.readScreenText });
+  // シートの見出しが宣言した対象アプリ。「アプリを起動する」の行き先になる。
+  // **無ければその手順は保留になる。**こちらで当てにいかない。
+  const app = options.sheet.meta['対象'];
+  const runner = createSheetCaseRunner({
+    readScreenText: options.readScreenText,
+    ...(app === undefined ? {} : { app }),
+  });
 
   const runCase = async (ctx: CaseContext): Promise<CaseVerdict> => {
     if (aborted !== undefined) {

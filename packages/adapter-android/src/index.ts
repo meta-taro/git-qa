@@ -9,6 +9,7 @@ export {
   inputCommands,
   keycode,
   parseDeviceList,
+  parseResolvedActivity,
   parseScreenSize,
   parseWakefulness,
   screenText,

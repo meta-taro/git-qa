@@ -222,3 +222,35 @@ describe('assertRunnableSheet — 繋ぐ前にシートを見る', () => {
     expect(() => assertRunnableSheet(sheet)).toThrow(/期待結果/);
   });
 });
+
+describe('createSheetCaseRunner — 起動', () => {
+  it('シートが宣言したアプリを起動する', async () => {
+    const { session } = await connect();
+    const acted: unknown[] = [];
+    const spy: TargetSession = {
+      ...session,
+      act: (action) => {
+        acted.push(action);
+        return Promise.resolve();
+      },
+      get isClosed() {
+        return session.isClosed;
+      },
+    };
+    const run = createSheetCaseRunner({
+      readScreenText: () => Promise.resolve('ホーム画面'),
+      app: 'com.android.settings',
+    });
+
+    const verdict = await run(
+      context(
+        spy,
+        { [STEPS_COLUMN]: '1. アプリを起動する', [EXPECTATION_COLUMN]: '「ホーム画面」が出る' },
+        [],
+      ),
+    );
+
+    expect(acted).toEqual([{ kind: 'launch', app: 'com.android.settings' }]);
+    expect(verdict.aiResult).toBe('PASS');
+  });
+});

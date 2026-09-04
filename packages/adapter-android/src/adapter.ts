@@ -21,6 +21,7 @@ import {
   findElementCenter,
   inputCommands,
   parseDeviceList,
+  parseResolvedActivity,
   parseScreenSize,
   parseWakefulness,
   screenText,
@@ -34,6 +35,10 @@ import { createNodeCommandRunner } from './node-runner.js';
 const KIND = 'android';
 const DUMP_PATH = '/sdcard/git-qa-window-dump.xml';
 const DEFAULT_SWIPE_MS = 300;
+/** 押してから画面が変わるまで。実機・エミュレータで測って決めた（2026-09-04）。 */
+const DEFAULT_SETTLE_MS = 500;
+/** 要素が出てくるのを待つ上限。これを超えたら「見つからない」と言う。 */
+const DEFAULT_FIND_TIMEOUT_MS = 3000;
 /** `screenrecord` の上限。これより長くは指定できないので、超える運用では繋ぎ直す。 */
 const SCREENRECORD_MAX_SEC = 180;
 
@@ -67,6 +72,15 @@ export interface AndroidAdapterOptions {
     /** `h264-stream` のときの 1 回あたりの長さ。上限 180 秒。 */
     readonly timeLimitSec?: number;
   };
+  /**
+   * 画面が落ち着くのを待つ時間（ms）。**押した直後の画面は、まだ前の画面。**
+   * 送った文字が行き先を失って黙って捨てられるので、次の操作との間に挟む。
+   */
+  readonly settleMs?: number;
+  /** 要素が出てくるのを待つ上限（ms）。**待っても出てこなければ、見つからないと言う。** */
+  readonly findTimeoutMs?: number;
+  /** 差し替え口。既定は本物のプロセス。テストでは待たない。 */
+  readonly sleep?: (ms: number) => Promise<void>;
   /** 差し替え口。既定は本物のプロセス。 */
   readonly runner?: CommandRunner;
   readonly now?: () => Date;
@@ -147,6 +161,9 @@ interface SessionDeps {
 
 function createSession(deps: SessionDeps): TargetSession {
   const { target, serial, adb, adbRun, runner, scrcpy, now, options } = deps;
+  const settleMs = options.settleMs ?? DEFAULT_SETTLE_MS;
+  const findTimeoutMs = options.findTimeoutMs ?? DEFAULT_FIND_TIMEOUT_MS;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   let closed = false;
 
   const ensureOpen = (): void => {
@@ -333,14 +350,57 @@ function createSession(deps: SessionDeps): TargetSession {
     },
   };
 
+  /**
+   * 要素の位置を出す。**すぐに見つからなくても、少し待って探し直す。**
+   * 画面の切り替えは一瞬では終わらないので、1 回見て無いことを「無い」にしない。
+   * ただし待つのは上限まで。**待ち続けて通ったことにはしない。**
+   */
   const resolve = async (ref: PointerRef): Promise<Point> => {
     if (ref.at === 'point') return { x: ref.x, y: ref.y };
-    const xml = await dumpHierarchy();
-    const found = findElementCenter(xml, ref.ref);
-    if (found === undefined) {
-      throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
+    // 待つ長さではなく**回数**で切る。証跡用の `now` は止めてあることがあり、
+    // 時計で切ると止まらなくなる（実際にテストが無限に回った）。
+    const attempts = Math.max(1, Math.ceil(findTimeoutMs / Math.max(1, settleMs)));
+    for (let i = 0; i < attempts; i += 1) {
+      const found = findElementCenter(await dumpHierarchy(), ref.ref);
+      if (found !== undefined) return found;
+      if (i + 1 < attempts) await sleep(settleMs);
     }
-    return found;
+    throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
+  };
+
+  /**
+   * 起動先を端末に聞く。**入っていなければ触らずに落とす。**
+   * `monkey` は無いパッケージでも終了コード 0 を返すので、在否はここで確かめる。
+   */
+  const resolveLaunch = async (app: string): Promise<string> => {
+    const stdout = await adbRun(
+      ['shell', 'cmd', 'package', 'resolve-activity', '--brief', app],
+      serial,
+    );
+    const component = parseResolvedActivity(new TextDecoder().decode(stdout));
+    if (component === undefined) {
+      throw new AdapterError(KIND, `端末に入っていないか、起動できないアプリ: ${app}`);
+    }
+    return component;
+  };
+
+  /**
+   * 送った文字が入ったことを確かめる。**入っていなければ、もう一度送る。**
+   *
+   * 画面が切り替わった直後は、入力先がまだ受け取れる状態になっていない。
+   * 実測（エミュレータ・2026-09-04）では 0.5 秒待っても入らず、1.0 秒で入った。
+   * **待つ長さを決め打ちにすると、端末が変わった瞬間に破れる**ので、結果を見て決める。
+   *
+   * 送り直すのは文字だけ・**1 回だけ**（前の tap は繰り返さない。押し直すと入力位置が動く）。
+   * **入らないまま終わっても落とさない。**伏せ字の欄のように、入れても画面に出ない欄がある。
+   * 入ったかどうかは、このあと期待結果を見るところで判断される。
+   */
+  const ensureTyped = async (text: string, textCommand: readonly string[]): Promise<void> => {
+    if (screenText(await dumpHierarchy()).includes(text)) return;
+    // **送り直すのは 1 回だけ。**入れても画面に出ない欄（伏せ字）で繰り返すと、
+    // 見えないまま何度も打ち込むことになる。
+    await adbRun(textCommand, serial);
+    await sleep(settleMs);
   };
 
   const dumpHierarchy = async (): Promise<string> => {
@@ -365,6 +425,8 @@ function createSession(deps: SessionDeps): TargetSession {
           : { kind: 'type', text: action.text, at: await resolve(action.target) };
       case 'key':
         return { kind: 'key', key: action.key };
+      case 'launch':
+        return { kind: 'launch', component: await resolveLaunch(action.app) };
     }
   };
 
@@ -378,8 +440,15 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action) {
       ensureOpen();
-      for (const args of inputCommands(await resolveAction(action))) {
+      const resolved = await resolveAction(action);
+      const commands = inputCommands(resolved);
+      for (const args of commands) {
         await adbRun(args, serial);
+      }
+      // 押した直後の画面は、まだ前の画面。**次の操作を送る前に落ち着かせる。**
+      await sleep(settleMs);
+      if (resolved.kind === 'type' && resolved.text !== '') {
+        await ensureTyped(resolved.text, commands.at(-1) ?? []);
       }
     },
 
