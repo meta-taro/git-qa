@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { isValidHandle } from '@git-qa/core';
 import { corsHeaders } from '@git-qa/live-bridge';
 
 /**
@@ -181,6 +182,14 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
         // ハンドルは短い。**個人名やメールを書かせない**（公開リポジトリ・§25）。
         if (operator !== undefined && (typeof operator !== 'string' || operator.length > 64)) {
           res.writeHead(400, cors).end();
+          return;
+        }
+        // **始める前に確かめる。**証跡の schema は ASCII に限っている（C18）。
+        // ここで通すと、5 件置き終わったあとの保存で落ちる — 実際に人の作業が 2 回消えた。
+        if (operator !== undefined && operator !== '' && !isValidHandle(operator)) {
+          res
+            .writeHead(400, { ...cors, 'content-type': 'text/plain; charset=utf-8' })
+            .end('担当者ハンドルは英数字とハイフンだけ（先頭は英数字・39 文字まで）');
           return;
         }
         begin(serial, sheetPath, operator);

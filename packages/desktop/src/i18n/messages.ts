@@ -33,6 +33,8 @@ const ja = {
   'key.move.note': '見るだけ。判定は動かない',
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': 'この実行は終わった',
+  'setup.operator.rule':
+    '英数字とハイフンだけ（先頭は英数字・39 文字まで）。証跡に残る名前なので、日本語は使えない',
   'verdict.saved': '証跡を書いた:',
   'verdict.saveFailed': '証跡を書けなかった:',
 
@@ -111,6 +113,8 @@ const en: Record<keyof typeof ja, string> = {
   'key.move.note': 'Only moves what you are looking at',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished',
+  'setup.operator.rule':
+    'Letters, digits and hyphens only (must start with a letter or digit, up to 39 characters).',
   'verdict.saved': 'Evidence written to:',
   'verdict.saveFailed': 'Could not write evidence:',
 

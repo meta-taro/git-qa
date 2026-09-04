@@ -230,3 +230,45 @@ describe('シート探しの負荷', () => {
     expect(findSheets).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * **始める前にハンドルを確かめる。**
+ *
+ * 証跡の schema は ASCII に限っている（C18）。入口で弾かないと、5 件置き終わった
+ * あとの保存で落ちる。実際にそれが起き、**人が実機で置いた 5 件が 2 回とも消えた**
+ * （2026-09-04）。いちばん高くつく壊れ方なので、始める前に止める。
+ */
+describe('担当者ハンドル', () => {
+  it('英数字でないハンドルでは始めない', async () => {
+    server = await startSetupServer(options({}));
+
+    const response = await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serial: 'emulator-5554',
+        sheetPath: '/repo/a.tsv',
+        operator: 'めたたろ',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('英数字');
+  });
+
+  it('英数字のハンドルなら始まる', async () => {
+    server = await startSetupServer(options({}));
+
+    const response = await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serial: 'emulator-5554',
+        sheetPath: '/repo/a.tsv',
+        operator: 'metataro',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+  });
+});

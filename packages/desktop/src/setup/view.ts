@@ -1,3 +1,4 @@
+import { isValidHandle } from '@git-qa/core/session';
 import { MAIN_COLUMN_ID } from '../columns.js';
 import { t } from '../i18n/current.js';
 import type { SetupState } from './client.js';
@@ -108,10 +109,22 @@ export function renderSetup(
   operator.className = 'setup-operator';
   operator.placeholder = t('setup.operator.placeholder');
   operator.value = options.operator ?? '';
+
+  /**
+   * ハンドルの規則。**証跡の schema が正本**（C18）で、そこは ASCII に限っている。
+   * ここで通すと、5 件置き終わったあとの保存で落ちる
+   * — 実際に人が実機で置いた 5 件が 2 回とも消えた（2026-09-04）。
+   */
+  const operatorRule = doc.createElement('p');
+  operatorRule.className = 'setup-hint';
+  operatorRule.textContent = t('setup.operator.rule');
+
   operator.addEventListener('input', () => {
+    const handle = operator.value.trim();
     start.disabled =
-      operator.value.trim() === '' || defaultSerial === undefined || defaultSheet === undefined;
-    options.onOperatorChange?.(operator.value.trim());
+      !isValidHandle(handle) || defaultSerial === undefined || defaultSheet === undefined;
+    operatorRule.dataset['bad'] = handle !== '' && !isValidHandle(handle) ? 'true' : 'false';
+    options.onOperatorChange?.(handle);
   });
 
   const deviceHeading = doc.createElement('p');
@@ -132,17 +145,18 @@ export function renderSetup(
     defaultSerial === undefined ||
     defaultSheet === undefined ||
     // **誰が置いたか分からない証跡を作らない。**
-    (options.operator ?? '').trim() === '';
+    // 規則に合わないハンドルもここで止める。通すと、置き終わったあとの保存で落ちる。
+    !isValidHandle((options.operator ?? '').trim());
   start.addEventListener('click', () => {
     const serial = picked(column, 'setup-device', 'serial');
     // 一覧から選ばれていなければ、人が自分で選んだものを使う。
     const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
     const handle = operator.value.trim();
-    if (serial === undefined || sheetPath === undefined || handle === '') return;
+    if (serial === undefined || sheetPath === undefined || !isValidHandle(handle)) return;
     options.onStart({ serial, sheetPath, operator: handle });
   });
 
-  section.append(title, operatorHeading, operator, deviceHeading);
+  section.append(title, operatorHeading, operator, operatorRule, deviceHeading);
 
   if (state.devices.length === 0) {
     const empty = doc.createElement('p');

@@ -12,7 +12,18 @@ import type { DeviceTools } from './tools.js';
  *
  * ここは配線なので検査していない。判断のある所は `tools.ts` にあり、そちらは検査してある。
  */
-export function createMcpServer(tools: DeviceTools): McpServer {
+export interface McpServerOptions {
+  /**
+   * git-qa 自身の窓を撮る。**AI が自分の画面を見るための口。**
+   * 無ければ、AI は「画面に何が出ていますか」と人へ聞くしかない。
+   */
+  readonly captureWindow?: (
+    app: string,
+    mode?: 'window' | 'screen',
+  ) => Promise<{ mimeType: 'image/png'; base64: string }>;
+}
+
+export function createMcpServer(tools: DeviceTools, options: McpServerOptions = {}): McpServer {
   const server = new McpServer({ name: 'git-qa', version: '0.0.0' });
 
   const ok = (text: string) => ({ content: [{ type: 'text' as const, text }] });
@@ -64,6 +75,30 @@ export function createMcpServer(tools: DeviceTools): McpServer {
       return ok(`キーを送った: ${key}`);
     },
   );
+
+  if (options.captureWindow !== undefined) {
+    const capture = options.captureWindow;
+    server.registerTool(
+      'app_screenshot',
+      {
+        title: 'git-qa 自身の画面を撮る',
+        description:
+          'この道具そのものの窓を PNG で返す（端末の画面ではない）。' +
+          '判定の欄に何が出ているか、証跡が書けたかを、人に聞かずに確かめるために使う。' +
+          'mode: window は窓だけ（アクセシビリティの許可が要る）、screen は画面全体。',
+        inputSchema: {
+          app: z.string().min(1).optional(),
+          mode: z.enum(['window', 'screen']).optional(),
+        },
+      },
+      async ({ app, mode }) => {
+        const shot = await capture(app ?? 'git-qa', mode);
+        return {
+          content: [{ type: 'image' as const, data: shot.base64, mimeType: shot.mimeType }],
+        };
+      },
+    );
+  }
 
   server.registerTool(
     'device_launch',

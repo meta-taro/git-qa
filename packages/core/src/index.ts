@@ -38,6 +38,7 @@ export {
   createSheetCaseRunner,
 } from './run/case-runner.js';
 export type { SheetCaseRunnerOptions } from './run/case-runner.js';
+export { HANDLE_RULE, isValidHandle } from './run/handle.js';
 export { judgeExpectation, planExpectation, planSteps } from './run/steps.js';
 export type {
   ExpectationCheck,

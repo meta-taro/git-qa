@@ -187,3 +187,38 @@ describe('置いた人（ハンドル）を入れる', () => {
     });
   });
 });
+
+/**
+ * **始める前にハンドルを確かめる。**
+ *
+ * 証跡の schema は ASCII に限っている（C18）。ここで通すと、5 件置き終わったあとの
+ * 保存で落ちる。実際にそれが起き、**人が実機で置いた 5 件が 2 回とも消えた**（2026-09-04）。
+ */
+describe('担当者ハンドルの規則', () => {
+  const withHandle = (handle: string): HTMLElement => {
+    const root = document.createElement('div');
+    document.body.replaceChildren(root);
+    renderColumns(root);
+    renderSetup(root, idle, { onStart: () => {}, operator: handle });
+    return root;
+  };
+
+  it('日本語のハンドルでは始められない', () => {
+    const root = withHandle('めたたろ');
+
+    const start = root.querySelector<HTMLButtonElement>('.setup-start');
+    expect(start?.disabled).toBe(true);
+  });
+
+  it('何が書けるのかを画面に出す（押せない理由を黙らせない）', () => {
+    const root = withHandle('めたたろ');
+
+    expect(root.textContent).toContain('英数字');
+  });
+
+  it('英数字なら始められる', () => {
+    const root = withHandle('metataro');
+
+    expect(root.querySelector<HTMLButtonElement>('.setup-start')?.disabled).toBe(false);
+  });
+});
