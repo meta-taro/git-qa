@@ -108,3 +108,52 @@ export function createBidiClient(socket: CdpSocket): BidiClient {
     close: () => socket.close(),
   };
 }
+
+/**
+ * BiDi が返す値を、素の値へ戻す。
+ *
+ * **CDP と違うのはここ。**CDP は `returnByValue` で素の値をくれるが、
+ * BiDi は**型つき**で返す。オブジェクトは**組の並び**になる。
+ *
+ * 実測（2026-09-06・Firefox 155.0）:
+ * ```
+ * document.title → {"type":"string","value":"Example Domain"}
+ * ({a:1})        → {"type":"object","value":[["a",{"type":"number","value":1}]]}
+ * ```
+ *
+ * **戻さないと、画面の文字が空になる。**実際に DOM が 0 文字で返ってきた。
+ * **知らない型は undefined。**中途半端に読むと、読めたことになってしまう。
+ */
+export function fromRemoteValue(remote: unknown): unknown {
+  if (!isRecord(remote)) return undefined;
+
+  switch (remote['type']) {
+    case 'string':
+    case 'number':
+    case 'boolean':
+      return remote['value'];
+    case 'null':
+      return null;
+    case 'undefined':
+      return undefined;
+    case 'array': {
+      const items = remote['value'];
+      return Array.isArray(items) ? items.map(fromRemoteValue) : undefined;
+    }
+    case 'object': {
+      const pairs = remote['value'];
+      if (!Array.isArray(pairs)) return undefined;
+      const out: Record<string, unknown> = {};
+      for (const entry of pairs as unknown[]) {
+        if (!Array.isArray(entry) || entry.length < 2) continue;
+        const pair = entry as unknown[];
+        const key = pair[0];
+        if (typeof key !== 'string') continue;
+        out[key] = fromRemoteValue(pair[1]);
+      }
+      return out;
+    }
+    default:
+      return undefined;
+  }
+}

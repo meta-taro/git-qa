@@ -22,7 +22,7 @@ export { readWebScreenText } from './screen-text.js';
 export type { WebObservation } from './screen-text.js';
 export { findElementScript, parseFoundPoint } from './find.js';
 export type { FoundPoint } from './find.js';
-export { createBidiClient } from './bidi.js';
+export { createBidiClient, fromRemoteValue } from './bidi.js';
 export type { BidiClient } from './bidi.js';
 export { createFirefoxAdapter } from './firefox-adapter.js';
 export type { FirefoxAdapterOptions } from './firefox-adapter.js';

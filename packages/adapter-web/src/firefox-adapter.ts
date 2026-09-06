@@ -17,7 +17,7 @@ import type {
   TargetSession,
 } from '@git-qa/core';
 
-import { createBidiClient } from './bidi.js';
+import { createBidiClient, fromRemoteValue } from './bidi.js';
 import type { BidiClient } from './bidi.js';
 import { findElementScript, parseFoundPoint } from './find.js';
 import {
@@ -165,7 +165,7 @@ export function createFirefoxAdapter(options: FirefoxAdapterOptions): TargetAdap
             awaitPromise: false,
           })
           .catch(() => undefined);
-        const ua = (agent?.['result'] as { value?: unknown } | undefined)?.value;
+        const ua = fromRemoteValue(agent?.['result']);
         const version =
           typeof ua === 'string' ? (/Firefox\/[\d.]+/.exec(ua)?.[0] ?? undefined) : undefined;
         const label = version === undefined ? 'Mozilla Firefox' : `Mozilla Firefox（${version}）`;
@@ -218,7 +218,8 @@ function createSession(deps: SessionDeps): TargetSession {
       awaitPromise: false,
       resultOwnership: 'none',
     });
-    return (result['result'] as { value?: unknown } | undefined)?.value;
+    // **BiDi は型つきで返す。**素の値へ戻さないと、画面の文字が空になる。
+    return fromRemoteValue(result['result']);
   };
 
   const liveView: LiveView = {

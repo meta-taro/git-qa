@@ -278,7 +278,8 @@ pnpm run:sheet sheets/android-settings.tsv
 | **Chrome** | ✅ **実測**（証跡に `Google Chrome（Chrome/152.0.7977.77）` が残った） |
 | Edge / Brave / Opera / Vivaldi / Chromium | ⏳ 候補に入れてある。**中身が Chromium なので同じ仕組みで動く。未実測** |
 | **その他のブラウザ**（セキュリティソフト付属など） | ⏳ 実行ファイルの場所を指定して使う。**中身が Chromium なら動く。未実測** |
-| Firefox / Safari | ❌ **まだ無い**（別プロトコル・Issue 018） |
+| **Firefox** | ✅ **実測**（155.0・シート 3 件が通った。**WebDriver BiDi**・依存なし） |
+| Safari | ❌ **まだ無い**（Issue 018） |
 | **Android 実機・エミュレータ** | ✅ **実測**（実機で一本道が通っている） |
 | **デスクトップアプリ**（macOS） | ✅ **実測**（Tauri アプリで PASS が出た。配布物からはまだ選べない） |
 | iOS / Windows | ❌ **まだ無い**（Issue 001 / build-windows は建てただけ） |
