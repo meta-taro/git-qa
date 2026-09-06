@@ -8,6 +8,9 @@
       "path": "./packages/adapter-android"
     },
     {
+      "path": "./packages/adapter-web"
+    },
+    {
       "path": "./packages/live-bridge"
     },
     {
