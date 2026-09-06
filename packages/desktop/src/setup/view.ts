@@ -98,14 +98,8 @@ function blockedReason(
   sheet: string | undefined,
 ): string | undefined {
   if (handle === '') return t('setup.blocked.operator.empty');
-  if (!isValidHandle(handle)) {
-    // **規則を読ませるのではなく、目の前の値の何が駄目かを言う。**
-    // 同じ人が同じ所で 2 度止まった（2026-09-04 / 09-06）。どちらも入っていたのは `めたたろ`。
-    // 規則の文（英数字とハイフンだけ）は出ていたが、**IME を切る所までは書いていなかった。**
-    return /[^\u0020-\u007e]/.test(handle)
-      ? t('setup.blocked.operator.notAscii')
-      : t('setup.blocked.operator.bad');
-  }
+  // **日本語のハンドルは通る**（C53）。弾くのは空白・区切り・長すぎるものだけ。
+  if (!isValidHandle(handle)) return t('setup.blocked.operator.bad');
   if (serial === undefined) return t('setup.blocked.device');
   if (sheet === undefined) return t('setup.blocked.sheet');
   return undefined;

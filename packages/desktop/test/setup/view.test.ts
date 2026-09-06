@@ -203,17 +203,25 @@ describe('担当者ハンドルの規則', () => {
     return root;
   };
 
-  it('日本語のハンドルでは始められない', () => {
-    const root = withHandle('めたたろ');
+  it('空白の入ったハンドルでは始められない', () => {
+    // **日本語は通る**（C53）。弾くのは空白・区切り・長すぎるものだけ。
+    const root = withHandle('めた たろ');
 
     const start = root.querySelector<HTMLButtonElement>('.setup-start');
     expect(start?.disabled).toBe(true);
   });
 
-  it('何が書けるのかを画面に出す（押せない理由を黙らせない）', () => {
+  it('日本語のハンドルなら始められる', () => {
     const root = withHandle('めたたろ');
 
-    expect(root.textContent).toContain('英数字');
+    const start = root.querySelector<HTMLButtonElement>('.setup-start');
+    expect(start?.disabled).toBe(false);
+  });
+
+  it('何が書けるのかを画面に出す（押せない理由を黙らせない）', () => {
+    const root = withHandle('めた たろ');
+
+    expect(root.textContent).toContain('空白');
   });
 
   it('英数字なら始められる', () => {
@@ -244,7 +252,7 @@ describe('始められない理由を画面に出す', () => {
 
   it('規則を破っているハンドルは、起動直後から破っていると分かる', () => {
     // 保存済みの値を戻したときも印が要る。**打ち始めるまで黙っていては遅い。**
-    expect(render('めたたろ').querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe(
+    expect(render('めた たろ').querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe(
       'true',
     );
   });
@@ -290,34 +298,30 @@ describe('始められない理由を画面に出す', () => {
   });
 
   it('ハンドルが規則に合わないときは、そう名指しで出す', () => {
-    expect(render('めたたろ').querySelector('.setup-blocked')?.textContent).toContain('ハンドル');
+    expect(render('めた たろ').querySelector('.setup-blocked')?.textContent).toContain('ハンドル');
   });
 
   /**
-   * **理由を出したのに、同じ人が同じ所で 2 度止まった**（2026-09-06）。
+   * **日本語のハンドルで始められる**（C53・2026-09-06）。
    *
-   * 出していたのは `ハンドルが規則に合っていないので始められない（0 の欄。英数字とハイフンだけ）`。
-   * 規則は書いてあるが、**いま入っている値の何が悪いのか**は書いていない。
-   * 入っていたのは `めたたろ` —— IME を切り忘れて打っただけ。
-   *
-   * **規則を読ませるのではなく、目の前の値の何が駄目かを言う。**
+   * 人が実物の前で 2 度止まり、2 度目に「いやです。ただちに修正しなさい」と言った。
+   * 止めていたのは規則のほうで、**直すべきだったのも規則のほう。**
    */
-  it('日本語が入っているときは、日本語だと名指しで出す', () => {
-    const blocked = render('めたたろ').querySelector('.setup-blocked')?.textContent ?? '';
-
-    expect(blocked).toContain('日本語');
-    // **次に何をすればいいか。**IME を切る所まで言わないと、また同じ所で止まる。
-    expect(blocked).toContain('IME');
-    // 打てる例が要る。規則の文だけでは、何を打てばいいかが分からない。
-    expect(blocked).toContain('octocat');
+  it('日本語のハンドルなら、始められない理由は出ない', () => {
+    expect(render('めたたろ').querySelector('.setup-blocked')).toBeNull();
   });
 
-  it('日本語ではない規則違反は、そちらの言い方をする', () => {
-    // 記号や先頭のハイフン。**日本語の話をされても直せない。**
-    const blocked = render('-bad_handle').querySelector('.setup-blocked')?.textContent ?? '';
+  it('日本語のハンドルでも、破っている印は立たない', () => {
+    expect(render('めたたろ').querySelector<HTMLElement>('.setup-hint')?.dataset['bad']).toBe(
+      'false',
+    );
+  });
 
-    expect(blocked).not.toContain('日本語');
-    expect(blocked).toContain('英数字');
+  it('空白や区切りが入っていたら、そこを名指しで出す', () => {
+    const blocked = render('めた たろ').querySelector('.setup-blocked')?.textContent ?? '';
+
+    // **規則を読ませるのではなく、目の前の値の何が駄目かを言う。**
+    expect(blocked).toContain('空白');
   });
 
   it('ハンドルが空のときも、何をすれば始まるかを出す', () => {

@@ -40,7 +40,7 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': '検証は終了しました',
   'setup.operator.rule':
-    '英数字とハイフンだけ（先頭は英数字・39 文字まで）。証跡に残る名前なので、日本語は使えない',
+    '39 文字まで。空白と / \\ は使えない。個人名ではなく、名乗る名前を入れる（証跡に残る）',
   'flash.verified': '合格',
   'flash.fail': '不合格',
   'flash.blocked': '判断できない',
@@ -63,7 +63,7 @@ const ja = {
 
   'setup.title': '検証の準備',
   'setup.operator': '0. あなたのハンドル（証跡に「誰が見たか」として残る）',
-  'setup.operator.placeholder': '個人名ではなくハンドル（例: octocat）',
+  'setup.operator.placeholder': '個人名ではなく、名乗る名前（例: めたたろ / octocat）',
   'setup.device': '1. 端末を選ぶ',
   'setup.device.none': '端末が見えていない。USB で繋ぐか、エミュレータを起動する',
   'setup.sheet': '2. 検証シートを選ぶ',
@@ -72,13 +72,10 @@ const ja = {
   'setup.start': '検証を開始する',
   'setup.starting': '準備しています…',
   'setup.blocked.operator.empty': 'ハンドルを入れると始められる（0 の欄）',
-  'setup.blocked.operator.bad':
-    'ハンドルが規則に合っていないので始められない（0 の欄。英数字とハイフンだけ）',
   // **規則を読ませるのではなく、目の前の値の何が駄目かを言う。**
-  // 同じ人が同じ所で 2 度止まった。どちらも IME を切り忘れて打っただけだった
-  'setup.blocked.operator.notAscii':
-    'ハンドルに日本語が入っているので始められない（0 の欄）。' +
-    'IME を切って、英数字とハイフンだけで入れ直す（例: octocat）',
+  'setup.blocked.operator.bad':
+    'ハンドルに空白か区切り（/ \\）が入っているか、39 文字を超えているので始められない（0 の欄）',
+
   'setup.blocked.device': '端末が見えていないので始められない（1 の欄）',
   'setup.blocked.sheet': '検証シートが選べていないので始められない（2 の欄）',
   'setup.failed': '始められなかった: {message}',
@@ -170,10 +167,8 @@ const en: Record<keyof typeof ja, string> = {
   'setup.starting': 'Getting ready…',
   'setup.blocked.operator.empty': 'Enter your handle to start (field 0)',
   'setup.blocked.operator.bad':
-    'That handle does not match the rule, so this cannot start (field 0: letters, digits and hyphens only)',
-  'setup.blocked.operator.notAscii':
-    'That handle contains characters outside ASCII, so this cannot start (field 0). ' +
-    'Turn off your IME and use letters, digits and hyphens only (e.g. octocat)',
+    'That handle has whitespace or a separator (/ \\), or is longer than 39 characters, so this cannot start (field 0)',
+
   'setup.blocked.device': 'No device is visible, so this cannot start (field 1)',
   'setup.blocked.sheet': 'No test sheet is selected, so this cannot start (field 2)',
   'setup.failed': 'Could not start: {message}',

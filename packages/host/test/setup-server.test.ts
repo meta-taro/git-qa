@@ -239,7 +239,8 @@ describe('シート探しの負荷', () => {
  * （2026-09-04）。いちばん高くつく壊れ方なので、始める前に止める。
  */
 describe('担当者ハンドル', () => {
-  it('英数字でないハンドルでは始めない', async () => {
+  it('空白の入ったハンドルでは始めない', async () => {
+    // **日本語は通る**（C53）。弾くのは空白・区切り・長すぎるものだけ。
     server = await startSetupServer(options({}));
 
     const response = await fetch(`${server.url}/start`, {
@@ -248,12 +249,12 @@ describe('担当者ハンドル', () => {
       body: JSON.stringify({
         serial: 'emulator-5554',
         sheetPath: '/repo/a.tsv',
-        operator: 'めたたろ',
+        operator: 'めた たろ',
       }),
     });
 
     expect(response.status).toBe(400);
-    expect(await response.text()).toContain('英数字');
+    expect(await response.text()).toContain('ハンドル');
   });
 
   it('英数字のハンドルなら始まる', async () => {
