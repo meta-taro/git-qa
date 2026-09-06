@@ -39,6 +39,11 @@ export interface TauriDevArgsOptions {
   readonly controlUrl?: string;
   /** 端末とシートを選ぶ口。**アプリを入口にするときに渡す**（Issue 011 段階 3）。 */
   readonly setupUrl?: string;
+  /**
+   * 流れてくる映像の種類。**画面側では決められない**ので渡す。
+   * Android は H.264、ウェブはブラウザの画像 1 枚ずつ（C54）。
+   */
+  readonly liveKind?: 'h264' | 'images';
 }
 
 /**
@@ -57,6 +62,8 @@ export function tauriDevArgs(
   // 繋いでいないのに口があるように見せない。画面側は `?control=` の有無で振る舞いを変える。
   if (options.controlUrl !== undefined) target.searchParams.set('control', options.controlUrl);
   if (options.setupUrl !== undefined) target.searchParams.set('setup', options.setupUrl);
+  // 既定は H.264（Android）。**知らせないと、画面はブラウザの絵を H.264 として復号しようとする。**
+  if (options.liveKind === 'images') target.searchParams.set('livekind', 'images');
 
   return ['dev', '--config', JSON.stringify({ build: { devUrl: target.toString() } })];
 }

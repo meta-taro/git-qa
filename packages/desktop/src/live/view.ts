@@ -7,7 +7,8 @@ import type { DecodedFrame } from './player.js';
 
 export interface LiveSurface {
   readonly canvas: HTMLCanvasElement;
-  draw(frame: DecodedFrame): void;
+  /** WebCodecs の `VideoFrame` でも、ブラウザの `ImageBitmap` でも描ける。 */
+  draw(frame: DecodedFrame | ImageBitmap): void;
   /** 枠を外して、説明文へ戻す。 */
   unmount(): void;
 }
@@ -69,8 +70,17 @@ export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions):
     draw(frame) {
       // 端末の実寸に合わせる。**引き伸ばすと、人が見て判断する材料が歪む。**
       // 実寸は最初の絵が来るまで分からないので、来た時点で合わせ直す。
-      const w = frame.displayWidth;
-      const h = frame.displayHeight;
+      //
+      // **名前が 2 つある。**WebCodecs の VideoFrame は `displayWidth`、
+      // ブラウザの画面（ImageBitmap・ウェブ検証）は `width`。どちらも実寸なので両方見る。
+      const sized = frame as {
+        displayWidth?: number;
+        displayHeight?: number;
+        width?: number;
+        height?: number;
+      };
+      const w = sized.displayWidth ?? sized.width;
+      const h = sized.displayHeight ?? sized.height;
       if (w !== undefined && h !== undefined && (canvas.width !== w || canvas.height !== h)) {
         canvas.width = w;
         canvas.height = h;

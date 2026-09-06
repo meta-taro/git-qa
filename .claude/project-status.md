@@ -929,8 +929,28 @@ roadmap の 17 行目にあった「技術的な難易度で順番が決まっ�
 2. **背面のタブは画面を配れない**（`Not attached to an active page`）。`Page.bringToFront` を先に呼ぶ
 3. **静的なページは絵が 1 枚しか来ない。**「来ない」と「壊れた」は別
 
-**まだ人には見せられない。**画面（webview）が画像フレームを描けない（受け取る側が H.264 しか
-知らない）。入口（`pnpm live:web <url>`）も無い。**そこが次。**
+### 同日 — **中央カラムに、動くページが出た**
+
+```
+pnpm live:web http://127.0.0.1:8731/clock.html
+```
+
+時計のページで確かめた。撮った 2 枚で **13:00:34 → 13:00:39**。**進んでいる。**
+「1 枚出た」ではなく、ライブで流れている。
+
+- 画面側は `createImagePlayer`。**復号器は要らない** —— 1 枚を `createImageBitmap` で描くだけ
+- **どちらの映像かは画面側では決められない。**Node が `?livekind=images` で知らせる
+- 実寸の名前が 2 つある（`VideoFrame` は `displayWidth`、`ImageBitmap` は `width`）。両方見る
+
+**そちらのページで試せます。**
+
+```
+pnpm live:web http://localhost:3000/     # ローカル
+pnpm live:web https://<CF のページ>/      # 公開 URL
+```
+
+**まだ無いのは、判定を置く道。**`pnpm live:web` は映像だけで、シートを走らせる所は
+繋いでいない。**そこが次。**
 
 ## 未完了の作業
 

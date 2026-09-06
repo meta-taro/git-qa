@@ -25,7 +25,13 @@ import { installDeviceTouch } from './session/touch.js';
 import { installDeviceWheel } from './session/wheel.js';
 import { installVerdictButtons, renderSession, showSessionError } from './session/view.js';
 import { createLivePlayer } from './live/player.js';
-import { liveStreamUrlFromLocation, openLiveStream, pumpLiveStream } from './live/stream.js';
+import { createImagePlayer } from './live/images.js';
+import {
+  liveKindFromLocation,
+  liveStreamUrlFromLocation,
+  openLiveStream,
+  pumpLiveStream,
+} from './live/stream.js';
 import { mountLiveView, showLiveViewError } from './live/view.js';
 import { createWebCodecsDecoder, isLiveViewSupported } from './live/webcodecs.js';
 import './styles.css';
@@ -139,27 +145,41 @@ async function startLiveView(
   onboarding = 'running';
   renderOnboarding(container, onboarding);
 
-  diagnostics.canDecode = await isLiveViewSupported();
-  if (diagnostics.canDecode !== true) {
-    // engine ごとに違う（macOS の WebKit で実際に落ちた・ADR 0002）。黙って空の枠にしない。
-    throw new Error(t('live.unsupported'));
+  // **相手によって映像の形が違う。**Android は H.264、ウェブはブラウザの画像 1 枚ずつ（C54）。
+  const kind = liveKindFromLocation(window.location.search);
+
+  if (kind === 'h264') {
+    diagnostics.canDecode = await isLiveViewSupported();
+    if (diagnostics.canDecode !== true) {
+      // engine ごとに違う（macOS の WebKit で実際に落ちた・ADR 0002）。黙って空の枠にしない。
+      throw new Error(t('live.unsupported'));
+    }
   }
 
   // 実寸は最初の絵が来た時点で合わせ直す（view.ts）。ここは仮の大きさ。
   const surface = mountLiveView(container, { width: 1080, height: 2220 });
   onCanvas(surface.canvas);
-  const player = createLivePlayer({
-    createDecoder: createWebCodecsDecoder,
-    onFrame: (frame) => {
-      diagnostics.decoded += 1;
-      surface.draw(frame);
-      diagnostics.drawn += 1;
-      diagnostics.lastFrameAt = Date.now();
-      diagnostics.canvas = { width: surface.canvas.width, height: surface.canvas.height };
-    },
-  });
 
-  livePlayer = player;
+  const drew = (frame: Parameters<typeof surface.draw>[0]): void => {
+    diagnostics.decoded += 1;
+    surface.draw(frame);
+    diagnostics.drawn += 1;
+    diagnostics.lastFrameAt = Date.now();
+    diagnostics.canvas = { width: surface.canvas.width, height: surface.canvas.height };
+  };
+
+  const player =
+    kind === 'images'
+      ? createImagePlayer({
+          decode: (bytes) =>
+            createImageBitmap(new Blob([bytes as BlobPart], { type: 'image/jpeg' })),
+          onFrame: drew,
+          // **黙って捨てない。**1 枚描けなかった理由は、後から原因を絞るのに要る。
+          onError: (message) => console.error('[git-qa] 絵を描けなかった', message),
+        })
+      : createLivePlayer({ createDecoder: createWebCodecsDecoder, onFrame: drew });
+
+  if (kind === 'h264') livePlayer = player as ReturnType<typeof createLivePlayer>;
 
   // 受け取ったバイト数を数える。**0 なら橋まで届いていない**（画面の問題ではない）。
   const counted = (await openLiveStream(url)).pipeThrough(

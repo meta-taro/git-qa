@@ -13,10 +13,28 @@ export function liveStreamUrlFromLocation(search: string): string | undefined {
   return localHttpUrlFromLocation(search, 'live');
 }
 
-/** 届いた順に再生へ渡す。ストリームが尽きたら `end()` する。 */
+/**
+ * 流れてくる映像の種類。
+ *
+ * **画面側では決められない。**Android は H.264、ウェブはブラウザの画像 1 枚ずつで、
+ * どちらを流しているかを知っているのは繋いだ Node 側だけ。
+ * **読めない値は既定へ落とす**（知らない種類を勝手に描こうとしない）。
+ */
+export type LiveKind = 'h264' | 'images';
+
+export function liveKindFromLocation(search: string): LiveKind {
+  return new URLSearchParams(search).get('livekind') === 'images' ? 'images' : 'h264';
+}
+
+/**
+ * 届いた順に再生へ渡す。ストリームが尽きたら `end()` する。
+ *
+ * **どちらの映像かをここでは問わない。**使うのは `push` と `end` だけで、
+ * H.264 の再生（`player.ts`）でも、ブラウザの絵（`images.ts`）でも同じ形で渡せる。
+ */
 export async function pumpLiveStream(
   stream: ReadableStream<Uint8Array>,
-  player: LivePlayer,
+  player: Pick<LivePlayer, 'push' | 'end'>,
   signal?: AbortSignal,
 ): Promise<void> {
   const reader = stream.getReader();
