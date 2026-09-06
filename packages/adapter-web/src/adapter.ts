@@ -16,6 +16,7 @@ import { createCdpClient } from './cdp.js';
 import type { CdpClient } from './cdp.js';
 import { launchBrowser } from './browser.js';
 import type { RunningBrowser } from './browser.js';
+import { findElementScript, parseFoundPoint } from './find.js';
 import { httpOriginFromWs, pickPageTarget } from './launch.js';
 import type { BrowserTarget } from './launch.js';
 import { createScreencast } from './screencast.js';
@@ -172,15 +173,24 @@ function createSession(deps: SessionDeps): TargetSession {
     async observe(): Promise<Observation> {
       ensureOpen();
       // **DOM をそのまま持つ。**共通の木へ潰すと、潰した時点で情報が落ちる（C24）。
+      //
+      // あわせて**ブラウザが出した「読める文字」**（`innerText`）も持つ。
+      // HTML から自分で剥がすと `<script>` の中身や `display: none` の文字まで
+      // 「表示されている」ことになり、**通ってはいけないケースが通る。**
       const result = await cdp.send('Runtime.evaluate', {
-        expression: 'document.documentElement.outerHTML',
+        expression:
+          '({ html: document.documentElement.outerHTML, text: document.body ? document.body.innerText : "" })',
         returnByValue: true,
       });
       const value = (result['result'] as { value?: unknown } | undefined)?.value;
+      const observed = value as { html?: unknown; text?: unknown } | undefined;
       return {
         kind: KIND,
         capturedAt: now().toISOString(),
-        raw: typeof value === 'string' ? value : '',
+        raw: {
+          html: typeof observed?.html === 'string' ? observed.html : '',
+          text: typeof observed?.text === 'string' ? observed.text : '',
+        },
       };
     },
 
@@ -210,6 +220,26 @@ function createSession(deps: SessionDeps): TargetSession {
   };
 }
 
+/**
+ * 画面の文字から、触る場所を決める。
+ *
+ * 実物の検証シートは「「保存」をクリックする」と書く。**座標では書かない。**
+ * 見つからなければ、Android 側と同じ言い方で落ちる（人が次に何をすればよいか分かる形）。
+ */
+async function resolvePoint(cdp: CdpClient, ref: PointerRef): Promise<{ x: number; y: number }> {
+  if (ref.at === 'point') return { x: ref.x, y: ref.y };
+
+  const result = await cdp.send('Runtime.evaluate', {
+    expression: findElementScript(ref.ref),
+    returnByValue: true,
+  });
+  const point = parseFoundPoint((result['result'] as { value?: unknown } | undefined)?.value);
+  if (point === undefined) {
+    throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
+  }
+  return point;
+}
+
 /** 人と AI の操作を、ブラウザの言葉へ移す。 */
 async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   if (action.kind === 'launch') {
@@ -219,6 +249,19 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   }
 
   if (action.kind === 'type') {
+    // 入力先が書かれていれば、そこを触ってから送る（欄が違うと、打った文字が消える）。
+    if (action.target !== undefined) {
+      const point = await resolvePoint(cdp, action.target);
+      for (const type of ['mousePressed', 'mouseReleased'] as const) {
+        await cdp.send('Input.dispatchMouseEvent', {
+          type,
+          x: point.x,
+          y: point.y,
+          button: 'left',
+          clickCount: 1,
+        });
+      }
+    }
     // **IME を通らない Android と違い、ブラウザはそのまま入る。**日本語も送れる。
     await cdp.send('Input.insertText', { text: action.text });
     return;
@@ -231,7 +274,9 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   }
 
   if (action.kind === 'tap') {
-    const point = pointOf(action.target);
+    const point = await resolvePoint(cdp, action.target);
+    // **触る前に、そこへポインタを動かす。**hover でしか出ないものがある。
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
     for (const type of ['mousePressed', 'mouseReleased'] as const) {
       await cdp.send('Input.dispatchMouseEvent', {
         type,
@@ -245,8 +290,8 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   }
 
   // swipe。ブラウザではスクロールとして送る（指でなぞる相手ではない）。
-  const from = pointOf(action.from);
-  const to = pointOf(action.to);
+  const from = await resolvePoint(cdp, action.from);
+  const to = await resolvePoint(cdp, action.to);
   await cdp.send('Input.dispatchMouseEvent', {
     type: 'mouseWheel',
     x: from.x,
@@ -254,12 +299,4 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
     deltaX: from.x - to.x,
     deltaY: from.y - to.y,
   });
-}
-
-function pointOf(ref: PointerRef): { x: number; y: number } {
-  if (ref.at !== 'point') {
-    // 要素の指定はまだ持っていない。**できないことを黙って別の所へ流さない。**
-    throw new AdapterError(KIND, `ウェブではまだ座標でしか触れない（来たもの: ${ref.at}）`);
-  }
-  return { x: ref.x, y: ref.y };
 }

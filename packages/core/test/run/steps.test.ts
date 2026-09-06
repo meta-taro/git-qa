@@ -166,3 +166,56 @@ describe('planSteps — 起動', () => {
     expect((step as { reason: string }).reason).toContain('設定');
   });
 });
+
+/**
+ * **ウェブのシートが 1 件目で止まった**（2026-09-06・実測）。
+ *
+ * `pnpm run:sheet:web` で見本のシートを走らせたら、1 行目「ページを起動する」が
+ * `どのアプリを起動するか決められない: ページ。パッケージ名（例 com.example.app）で書く`
+ * で判断保留になった。**Android のパッケージ名しか通していなかった。**
+ *
+ * C40 と同じ形。**どのシートを持ってきても 1 件目で止まる**状態だった。
+ */
+describe('ウェブの起動（Issue 015）', () => {
+  const target = 'http://127.0.0.1:8731/page.html';
+
+  it('「ページを起動する」で、シートが宣言した URL へ行く', () => {
+    const planned = planSteps('ページを起動する', { app: target });
+
+    expect(planned).toEqual([
+      { kind: 'action', text: 'ページを起動する', action: { kind: 'launch', app: target } },
+    ]);
+  });
+
+  it('「ページを開く」でも同じ', () => {
+    expect(planSteps('ページを開く', { app: target })[0]).toEqual({
+      kind: 'action',
+      text: 'ページを開く',
+      action: { kind: 'launch', app: target },
+    });
+  });
+
+  it('URL がそのまま書いてあれば、そこへ行く', () => {
+    expect(planSteps('https://example.com/ を開く', { app: target })[0]).toEqual({
+      kind: 'action',
+      text: 'https://example.com/ を開く',
+      action: { kind: 'launch', app: 'https://example.com/' },
+    });
+  });
+
+  /** **見出しが無いのに「ページを起動する」と書かれたら、当て推量で開かない。** */
+  it('見出しに URL が無ければ、どこへ行くか決めない', () => {
+    const planned = planSteps('ページを起動する');
+
+    expect(planned[0]?.kind).toBe('hold');
+    expect((planned[0] as { reason: string }).reason).toMatch(/# 対象:/);
+  });
+
+  it('アプリの言い方は今までどおり（Android を壊さない）', () => {
+    expect(planSteps('アプリを起動する', { app: 'com.example.app' })[0]).toEqual({
+      kind: 'action',
+      text: 'アプリを起動する',
+      action: { kind: 'launch', app: 'com.example.app' },
+    });
+  });
+});

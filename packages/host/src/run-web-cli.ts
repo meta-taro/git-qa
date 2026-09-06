@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-android';
+import { createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
 import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
 
 import { startRunSession } from './run-session.js';
@@ -10,9 +10,11 @@ import { fromInvocationDir } from './paths.js';
 import { tauriDevArgs } from './app.js';
 
 /**
- * 検証シートを 1 本走らせる。**一本道**（Issue 004）。
+ * ウェブページで検証シートを 1 本走らせる（Issue 015 / C54）。
  *
- *   pnpm run:sheet <検証シート.tsv>
+ *   pnpm run:sheet:web <検証シート.tsv>
+ *
+ * 行き先はシートの見出し `# 対象:` が宣言した URL。**ここで別の場所へ行かない**（C40）。
  *
  * **ここは配線なので検査していない。**判断のある所（手順の解釈・判断保留の条件・
  * 打鍵の受け渡し・遷移）は `@git-qa/core` と `run-session.ts` にあり、そちらは検査してある。
@@ -20,7 +22,7 @@ import { tauriDevArgs } from './app.js';
 
 const sheetPath = process.argv[2] ?? process.env['GIT_QA_SHEET'];
 if (sheetPath === undefined) {
-  console.error('使い方: pnpm run:sheet <検証シート.tsv>');
+  console.error('使い方: pnpm run:sheet:web <検証シート.tsv>');
   process.exit(1);
 }
 
@@ -44,17 +46,27 @@ try {
 }
 const sheet = parseTestSpecTsv(text);
 
+/**
+ * 見る場所。**シートが宣言したものを使う**（C40）。
+ * 引数で渡された場合だけ、そちらを優先する（同じシートを検証環境へ当てるため）。
+ */
+const target = process.argv[3] ?? sheet.meta['対象'];
+if (target === undefined || !/^https?:\/\//.test(target)) {
+  console.error(
+    '[git-qa] 見る場所が分からない。シートの見出しに「# 対象: http://localhost:3000/」を書くか、' +
+      '2 つ目の引数で URL を渡す',
+  );
+  process.exit(1);
+}
+
 const session = await startRunSession({
-  adapter: createAndroidAdapter({
-    build: {
-      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
-    },
-    // 枠の中に描く方式（C27 の方式 A / C32）。別窓ではない。
-    liveView: { mode: 'h264-stream' },
-    ...(process.env['GIT_QA_ANDROID_SERIAL'] === undefined
+  adapter: createWebAdapter({
+    build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+    // 同じ幅で見ないと、崩れの有無を比べられない。
+    size: { width: 1280, height: 900 },
+    ...(process.env['GIT_QA_BROWSER'] === undefined
       ? {}
-      : { serial: process.env['GIT_QA_ANDROID_SERIAL'] }),
+      : { browserPath: process.env['GIT_QA_BROWSER'] }),
   }),
   sheet,
   sheetRef: {
@@ -68,9 +80,10 @@ const session = await startRunSession({
   // 画面のメニューから開けるようにする。解決済みの絶対パスを渡す。
   sheetPath: resolvedSheet,
   operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
-  readScreenText: readAndroidScreenText,
+  readScreenText: readWebScreenText,
 });
 
+console.log(`[git-qa] 見る場所: ${target}`);
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
 console.log('[git-qa] 画面で v=VERIFIED / f=FAIL / b=BLOCKED / s=SKIP / Space=置かずに次へ');
 
@@ -81,7 +94,8 @@ const child = spawn(
     '@git-qa/desktop',
     'exec',
     'tauri',
-    ...tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl }),
+    // **画面側では映像の種類を決められない。**ブラウザの絵だと知らせる（C54）。
+    ...tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl, liveKind: 'images' }),
   ],
   { stdio: 'inherit' },
 );

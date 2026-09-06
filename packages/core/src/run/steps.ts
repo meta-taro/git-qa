@@ -27,8 +27,9 @@ export type PlannedStep = PlannedAction | PlannedHold;
 
 export interface PlanOptions {
   /**
-   * シートの見出し（`# 対象:`）が宣言した対象アプリの識別子。
-   * Android ならパッケージ名。**無ければ「アプリを起動する」は保留になる。**
+   * シートの見出し（`# 対象:`）が宣言した対象の識別子。
+   * Android ならパッケージ名、ウェブなら URL。
+   * **無ければ「アプリを起動する」「ページを開く」は保留になる。**
    */
   readonly app?: string;
 }
@@ -44,9 +45,18 @@ const TYPE_ONLY = /^「(?<text>[^」]*)」と入力する$/;
 const TAP = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:タップ|クリック)する?$/;
 
 /** `「X」を起動する` / `X を起動する` */
-const LAUNCH = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:起動|開始)する$/;
+const LAUNCH = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))\s*を(?:(?:起動|開始)する|開く)$/;
 /** シートの見出しが宣言したアプリを指す言い方。**特定のアプリ名は含めない。** */
 const THE_APP = /^(?:対象)?アプリ(?:ケーション)?$/;
+/**
+ * ウェブの言い方。**実物のシートは「ページを開く」と書く。**
+ *
+ * 2026-09-06、見本のシートが 1 行目「ページを起動する」で止まった。
+ * Android のパッケージ名しか通していなかったのが理由（C40 と同じ形）。
+ */
+const THE_PAGE = /^(?:対象)?(?:ページ|画面|サイト)$/;
+/** そのまま書かれた行き先。**`# 対象:` が無くてもここだけは決まる。** */
+const URL_ID = /^https?:\/\/\S+$/;
 /**
  * 対象側の識別子として通す形。Android のパッケージ名（`com.example.app`）。
  * **表示名（「設定」）は通さない。**どのパッケージかは端末と地域で変わるので、
@@ -83,15 +93,24 @@ function planType(text: string, target: string | undefined): PlannedStep {
  * 実物の検証シートは、ほぼ必ず 1 行目が「アプリを起動する」で始まる。
  * ここを落とせないと、どのシートも 1 件目で止まる（2026-09-02 の実行記録がその形だった）。
  */
-function planLaunch(named: string, app: string | undefined, text: string): PlannedStep {
-  if (APP_ID.test(named)) {
+function planLaunch(rawName: string, app: string | undefined, text: string): PlannedStep {
+  // 書き手は「URL を開く」と空けて書く。**前後の空白で行き先を見失わない。**
+  const named = rawName.trim();
+
+  // 行き先がそのまま書いてある（パッケージ名でも URL でも）。
+  if (APP_ID.test(named) || URL_ID.test(named)) {
     return { kind: 'action', text, action: { kind: 'launch', app: named } };
   }
-  if (!THE_APP.test(named)) {
+
+  // 「アプリ」「ページ」のように**対象そのもの**を指している。見出しが宣言した先へ行く（C40）。
+  const theTarget = THE_APP.test(named) || THE_PAGE.test(named);
+  if (!theTarget) {
     return {
       kind: 'hold',
       text,
-      reason: `どのアプリを起動するか決められない: ${named}。パッケージ名（例 com.example.app）で書く`,
+      reason:
+        `どこを開くか決められない: ${named}。` +
+        'パッケージ名（例 com.example.app）か URL（例 http://localhost:3000/）で書く',
     };
   }
   if (app === undefined) {
@@ -99,13 +118,17 @@ function planLaunch(named: string, app: string | undefined, text: string): Plann
       kind: 'hold',
       text,
       reason:
-        '起動するアプリが分からない。シートの見出し「# 対象:」にパッケージ名（例 com.example.app）を書く',
+        '開く先が分からない。シートの見出し「# 対象:」に' +
+        'パッケージ名（例 com.example.app）か URL（例 http://localhost:3000/）を書く',
     };
+  }
+  if (APP_ID.test(app) || URL_ID.test(app)) {
+    return { kind: 'action', text, action: { kind: 'launch', app } };
   }
   return {
     kind: 'hold',
     text,
-    reason: `シートの見出し「# 対象:」がパッケージ名の形ではない: ${app}`,
+    reason: `シートの見出し「# 対象:」が、パッケージ名でも URL でもない: ${app}`,
   };
 }
 
@@ -125,7 +148,11 @@ function planOneStep(text: string, app: string | undefined): PlannedStep {
   if (launch?.groups) {
     const named = launch.groups['target'] ?? launch.groups['bare'] ?? '';
     return planLaunch(
-      THE_APP.test(named) && app !== undefined && APP_ID.test(app) ? app : named,
+      (THE_APP.test(named) || THE_PAGE.test(named)) &&
+        app !== undefined &&
+        (APP_ID.test(app) || URL_ID.test(app))
+        ? app
+        : named,
       app,
       text,
     );
