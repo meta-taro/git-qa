@@ -13,7 +13,7 @@
  * **実行ファイルの場所を直に指定する。**中身が Chromium なら、それで動く。
  * **名前を数え上げに行かない** —— 数えきれないし、増える。
  */
-export type BrowserKind = 'chrome' | 'edge' | 'brave' | 'chromium';
+export type BrowserKind = 'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'chromium';
 
 /** どこを探すか。**先に見つかったものを使う。**無ければ、無いと言って止まる。 */
 const CANDIDATES: Record<BrowserKind, readonly string[]> = {
@@ -34,6 +34,16 @@ const CANDIDATES: Record<BrowserKind, readonly string[]> = {
     'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
     '/usr/bin/brave-browser',
   ],
+  opera: [
+    '/Applications/Opera.app/Contents/MacOS/Opera',
+    'C:\\Program Files\\Opera\\opera.exe',
+    '/usr/bin/opera',
+  ],
+  vivaldi: [
+    '/Applications/Vivaldi.app/Contents/MacOS/Vivaldi',
+    'C:\\Program Files\\Vivaldi\\Application\\vivaldi.exe',
+    '/usr/bin/vivaldi',
+  ],
   chromium: ['/Applications/Chromium.app/Contents/MacOS/Chromium', '/usr/bin/chromium'],
 };
 
@@ -45,7 +55,14 @@ const CANDIDATES: Record<BrowserKind, readonly string[]> = {
  */
 export function browserCandidates(kind?: BrowserKind): readonly string[] {
   if (kind !== undefined) return CANDIDATES[kind];
-  return [...CANDIDATES.chrome, ...CANDIDATES.edge, ...CANDIDATES.brave, ...CANDIDATES.chromium];
+  return [
+    ...CANDIDATES.chrome,
+    ...CANDIDATES.edge,
+    ...CANDIDATES.brave,
+    ...CANDIDATES.opera,
+    ...CANDIDATES.vivaldi,
+    ...CANDIDATES.chromium,
+  ];
 }
 
 /** 後方のために残す。既定の探し順。 */
@@ -80,6 +97,8 @@ export function browserLabel(binaryPath: string, version: string | undefined): s
 function knownName(binaryPath: string): string | undefined {
   if (/Microsoft Edge|msedge/.test(binaryPath)) return 'Microsoft Edge';
   if (/Brave/i.test(binaryPath)) return 'Brave';
+  if (/Opera/i.test(binaryPath)) return 'Opera';
+  if (/Vivaldi/i.test(binaryPath)) return 'Vivaldi';
   if (/Chromium/.test(binaryPath)) return 'Chromium';
   if (/Google Chrome|chrome\.exe|google-chrome/.test(binaryPath)) return 'Google Chrome';
   return undefined;

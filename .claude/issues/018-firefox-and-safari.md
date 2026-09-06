@@ -47,6 +47,24 @@
 WebDriver は BiDi とも CDP とも違うので、**3 本目のプロトコル**になる。
 ただし **iOS Safari の代理**になるので、Issue 001（iOS）が止まっている間の価値は高い。
 
+## 実測（2026-09-06・このマシン）
+
+**このマシンの Firefox は 89.0.2（2021 年）。**起こして何が開くか見た。
+
+```
+/json/version → { "Browser": "Firefox/89.0.2", "Protocol-Version": "1.0" }
+ログ          → DevTools listening on ws://localhost:9333/devtools/browser/…
+/session      → 404 Not Found
+```
+
+**この版は CDP を話す。BiDi は無い。**
+
+**ただしそこに乗ってはいけない。**Firefox は **129 で CDP を捨てている**。
+古い Firefox でだけ動くものを「Firefox 対応」と書くと、
+**新しい Firefox を使っている人の所で動かない。**それは、はったりになる。
+
+→ **BiDi 一本で作る。**そのために**新しい Firefox が要る**（人が入れる）。
+
 ## 決める順番
 
 **配って、試験運用のフィードバックを見てから。**

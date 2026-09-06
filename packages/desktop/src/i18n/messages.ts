@@ -71,6 +71,8 @@ const ja = {
   'setup.browser.chrome': 'Chrome',
   'setup.browser.edge': 'Edge',
   'setup.browser.brave': 'Brave',
+  'setup.browser.opera': 'Opera',
+  'setup.browser.vivaldi': 'Vivaldi',
   'setup.browser.other': 'その他（場所を指定する）',
   // **名前を数え上げに行かない。**セキュリティソフト付属のブラウザは数えきれないし、増える
   'setup.browser.path': '中身が Chromium なら動く（セキュリティソフト付属のものなど）',
@@ -176,6 +178,8 @@ const en: Record<keyof typeof ja, string> = {
   'setup.browser.chrome': 'Chrome',
   'setup.browser.edge': 'Edge',
   'setup.browser.brave': 'Brave',
+  'setup.browser.opera': 'Opera',
+  'setup.browser.vivaldi': 'Vivaldi',
   'setup.browser.other': 'Other (give its path)',
   'setup.browser.path': 'Works if it is Chromium inside (e.g. a security suite browser)',
   'setup.browser.path.placeholder': 'C:\\...\\browser.exe',

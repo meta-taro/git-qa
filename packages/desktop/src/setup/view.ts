@@ -17,6 +17,8 @@ export interface RenderSetupOptions {
     operator: string;
     /** 見るブラウザ（ウェブのときだけ意味がある）。 */
     browser?: string;
+    /** 名前の無いブラウザの場所。 */
+    browserPath?: string;
   }) => void;
   /**
    * 自分で検証シートを選ぶ。
@@ -45,6 +47,9 @@ export interface RenderSetupOptions {
   /** 見るブラウザ。**証跡に版が残る。** */
   readonly browser?: string;
   readonly onBrowserChange?: (browser: string) => void;
+  /** 名前の無いブラウザの場所。**「その他」を選んだときだけ使う。** */
+  readonly browserPath?: string;
+  readonly onBrowserPathChange?: (path: string) => void;
   readonly onOperatorChange?: (handle: string) => void;
 }
 
@@ -196,6 +201,10 @@ export function renderSetup(
   for (const [value, key] of [
     ['chrome', 'setup.browser.chrome'],
     ['edge', 'setup.browser.edge'],
+    ['brave', 'setup.browser.brave'],
+    ['opera', 'setup.browser.opera'],
+    ['vivaldi', 'setup.browser.vivaldi'],
+    ['other', 'setup.browser.other'],
   ] as const) {
     const option = doc.createElement('option');
     option.value = value;
@@ -208,6 +217,31 @@ export function renderSetup(
   const browserLabel = doc.createElement('p');
   browserLabel.className = 'setup-hint';
   browserLabel.textContent = t('setup.browser');
+
+  /**
+   * 名前の無いブラウザ。**数え上げに行かない。**
+   *
+   * セキュリティソフトが出すブラウザは数えきれないし、増える。
+   * **中身が Chromium なら、場所さえ分かれば動く**ので、指定できるようにする。
+   */
+  const browserPath = doc.createElement('input');
+  browserPath.type = 'text';
+  browserPath.className = 'setup-web';
+  browserPath.placeholder = t('setup.browser.path.placeholder');
+  browserPath.value = options.browserPath ?? '';
+  browserPath.hidden = browser.value !== 'other';
+
+  const browserPathHint = doc.createElement('p');
+  browserPathHint.className = 'setup-hint';
+  browserPathHint.textContent = t('setup.browser.path');
+  browserPathHint.hidden = browserPath.hidden;
+
+  browserPath.addEventListener('input', () => options.onBrowserPathChange?.(browserPath.value));
+  browser.addEventListener('change', () => {
+    // 「その他」を選んだときだけ、場所の欄を出す。**出しっぱなしにしない。**
+    browserPath.hidden = browser.value !== 'other';
+    browserPathHint.hidden = browserPath.hidden;
+  });
 
   const lookingAt = (): string | undefined => {
     const url = webUrl.value.trim();
@@ -268,7 +302,15 @@ export function renderSetup(
     const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
     const handle = operator.value.trim();
     if (serial === undefined || sheetPath === undefined || !isValidHandle(handle)) return;
-    options.onStart({ serial, sheetPath, operator: handle, browser: browser.value });
+    options.onStart({
+      serial,
+      sheetPath,
+      operator: handle,
+      browser: browser.value,
+      ...(browser.value === 'other' && browserPath.value.trim() !== ''
+        ? { browserPath: browserPath.value.trim() }
+        : {}),
+    });
   });
 
   section.append(
@@ -281,6 +323,8 @@ export function renderSetup(
     webHint,
     browser,
     browserLabel,
+    browserPath,
+    browserPathHint,
   );
 
   if (state.devices.length === 0) {
