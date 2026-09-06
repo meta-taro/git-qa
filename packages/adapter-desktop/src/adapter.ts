@@ -356,6 +356,14 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
     return;
   }
 
+  if (action.kind === 'drag') {
+    // **持っていない。**できないことを、別の操作へ黙って流さない（C20 と同じ考え方）。
+    throw new AdapterError(
+      KIND,
+      'デスクトップではドラッグをまだ持っていない（人が自分で動かす必要がある）',
+    );
+  }
+
   // swipe。デスクトップではスクロールとして送る（指でなぞる相手ではない）。
   const from = await resolvePoint(action.from, look);
   const to = await resolvePoint(action.to, look);

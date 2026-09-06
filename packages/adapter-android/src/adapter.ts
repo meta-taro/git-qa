@@ -35,6 +35,8 @@ import { createNodeCommandRunner } from './node-runner.js';
 
 const KIND = 'android';
 const DUMP_PATH = '/sdcard/git-qa-window-dump.xml';
+/** ドラッグにかける時間。**なぞりより長くかけて「掴んだ」と分からせる。** */
+const DRAG_MS = 1200;
 const DEFAULT_SWIPE_MS = 300;
 /** 押してから画面が変わるまで。実機・エミュレータで測って決めた（2026-09-04）。 */
 const DEFAULT_SETTLE_MS = 500;
@@ -491,6 +493,15 @@ function createSession(deps: SessionDeps): TargetSession {
           from: await resolve(action.from),
           to: await resolve(action.to),
           durationMs: action.durationMs ?? DEFAULT_SWIPE_MS,
+        };
+      case 'drag':
+        // **端末にはドラッグという命令が無い。**ゆっくりなぞると並べ替えになる
+        // （長押ししてから動かす形）。なぞりより長くかけて、掴んだと分からせる。
+        return {
+          kind: 'swipe',
+          from: await resolve(action.from),
+          to: await resolve(action.to),
+          durationMs: DRAG_MS,
         };
       case 'type':
         return action.target === undefined

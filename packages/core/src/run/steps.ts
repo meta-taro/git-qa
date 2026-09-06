@@ -64,6 +64,9 @@ const TAP = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:タップ|クリッ
 /** `「X」を起動する` / `X を起動する` */
 const LAUNCH = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))\s*を(?:(?:起動|開始)する|開く)$/;
 /** シートの見出しが宣言したアプリを指す言い方。**特定のアプリ名は含めない。** */
+/** `「A」を「B」へドラッグする`。**なぞる（スクロール）とは別物。** */
+const DRAG =
+  /^(?:「(?<from>[^」]+)」|(?<fromBare>.+?))を(?:「(?<to>[^」]+)」|(?<toBare>.+?))[へに](?:ドラッグ(?:＆|&|アンド)?(?:ドロップ)?)する$/;
 const THE_APP = /^(?:対象)?アプリ(?:ケーション)?$/;
 /**
  * ウェブの言い方。**実物のシートは「ページを開く」と書く。**
@@ -183,6 +186,21 @@ function planOneStep(
   if (launch?.groups) {
     const named = launch.groups['target'] ?? launch.groups['bare'] ?? '';
     return planLaunch(named, app, text, appId);
+  }
+
+  const drag = DRAG.exec(text);
+  if (drag?.groups) {
+    const from = drag.groups['from'] ?? drag.groups['fromBare'] ?? '';
+    const to = drag.groups['to'] ?? drag.groups['toBare'] ?? '';
+    return {
+      kind: 'action',
+      text,
+      action: {
+        kind: 'drag',
+        from: { at: 'element', ref: from.trim() },
+        to: { at: 'element', ref: to.trim() },
+      },
+    };
   }
 
   const tap = TAP.exec(text);

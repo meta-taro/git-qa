@@ -40,8 +40,22 @@ export interface WebAdapterOptions {
   readonly browserPath?: string;
   /** 窓の大きさ。**同じ幅で見ないと、崩れの有無を比べられない。** */
   readonly size?: { readonly width: number; readonly height: number };
+  /**
+   * 操作のあと、画面が落ち着くのを待つ時間（ms）。
+   *
+   * **押した直後の画面は、まだ前の画面。**データが多いページほど、描き終わるまで時間がかかる。
+   * 待たずに読むと、**出るはずのものが「出ていない」ことになって落ちる。**
+   */
+  readonly settleMs?: number;
+  /** 読み込みが終わるのを待つ上限（ms）。**待っても終わらなければ、そのまま進む。** */
+  readonly loadTimeoutMs?: number;
   readonly now?: () => Date;
 }
+
+/** 押した直後の画面は、まだ前の画面（Android の `settleMs` と同じ考え方）。 */
+const DEFAULT_SETTLE_MS = 300;
+/** 読み込みを待つ上限。**永久には待たない**（待ち続けると、止まった理由が分からない）。 */
+const DEFAULT_LOAD_TIMEOUT_MS = 15_000;
 
 const capabilities: AdapterCapabilities = {
   // Web の画面の状態は DOM。アクセシビリティツリーとは別物なので潰さない（C24）。
@@ -101,8 +115,16 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
         const start = options.url ?? options.build.source;
         // **行き先はシートが宣言したものだけ**（C40）。ここで別の場所へ行かない。
         await cdp.send('Page.navigate', { url: start });
+        await waitForLoad(cdp, options.loadTimeoutMs ?? DEFAULT_LOAD_TIMEOUT_MS);
 
-        return createSession({ cdp, browser, build: options.build, now });
+        return createSession({
+          cdp,
+          browser,
+          now,
+          build: options.build,
+          ...(options.settleMs === undefined ? {} : { settleMs: options.settleMs }),
+          ...(options.loadTimeoutMs === undefined ? {} : { loadTimeoutMs: options.loadTimeoutMs }),
+        });
       } catch (error) {
         // 掴んだまま投げない。**起こしたブラウザを残さない。**
         await cdp?.close().catch(() => undefined);
@@ -118,6 +140,29 @@ interface SessionDeps {
   readonly browser: RunningBrowser;
   readonly build: TargetBuild;
   readonly now: () => Date;
+  readonly settleMs?: number;
+  readonly loadTimeoutMs?: number;
+}
+
+/**
+ * 読み込みが終わるのを待つ。
+ *
+ * `Page.navigate` は**行き先が決まった時点**で返る。中身が描き終わるのは、そのあと。
+ * **データが多いページほど差が開く。**待たずに読むと、出るはずのものが
+ * 「出ていない」ことになって落ちる。
+ *
+ * **永久には待たない。**上限を過ぎたら、そのまま進む（待ち続けると理由が分からない）。
+ */
+async function waitForLoad(cdp: CdpClient, limitMs: number): Promise<void> {
+  const until = Date.now() + limitMs;
+  while (Date.now() < until) {
+    const result = await cdp
+      .send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true })
+      .catch(() => undefined);
+    const state = (result?.['result'] as { value?: unknown } | undefined)?.value;
+    if (state === 'complete') return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 }
 
 function createSession(deps: SessionDeps): TargetSession {
@@ -172,6 +217,10 @@ function createSession(deps: SessionDeps): TargetSession {
     async act(action: Action): Promise<void> {
       ensureOpen();
       await dispatch(cdp, action);
+      // **押した直後の画面は、まだ前の画面。**落ち着くのを待ってから次へ。
+      await new Promise((resolve) => setTimeout(resolve, deps.settleMs ?? DEFAULT_SETTLE_MS));
+      // 行き先が変わったなら、描き終わるまで待つ。
+      await waitForLoad(cdp, deps.loadTimeoutMs ?? DEFAULT_LOAD_TIMEOUT_MS);
     },
 
     async observe(): Promise<Observation> {
@@ -274,6 +323,46 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   if (action.kind === 'key') {
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: action.key });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: action.key });
+    return;
+  }
+
+  if (action.kind === 'drag') {
+    /**
+     * 掴んで、動かして、離す。
+     *
+     * **1 回で運ばない。**掴んだ先が動きを追うのは「途中の動き」を見てからなので、
+     * 押して即離すと**何も起きない**（並べ替えの UI で実際にそうなる）。
+     */
+    const from = await resolvePoint(cdp, action.from);
+    const to = await resolvePoint(cdp, action.to);
+
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x, y: from.y });
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: from.x,
+      y: from.y,
+      button: 'left',
+      clickCount: 1,
+    });
+
+    const steps = 10;
+    for (let i = 1; i <= steps; i += 1) {
+      await cdp.send('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: Math.round(from.x + ((to.x - from.x) * i) / steps),
+        y: Math.round(from.y + ((to.y - from.y) * i) / steps),
+        button: 'left',
+        buttons: 1,
+      });
+    }
+
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: to.x,
+      y: to.y,
+      button: 'left',
+      clickCount: 1,
+    });
     return;
   }
 

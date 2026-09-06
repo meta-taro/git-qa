@@ -127,6 +127,13 @@ export type Action =
       readonly to: PointerRef;
       readonly durationMs?: number;
     }
+  /**
+   * 物を掴んで移す。**なぞる（swipe）とは別物。**
+   *
+   * なぞりはスクロール、ドラッグは並べ替えや投げ込み。
+   * 同じ命令にまとめると、**どちらのつもりで書いたのかが読めなくなる。**
+   */
+  | { readonly kind: 'drag'; readonly from: PointerRef; readonly to: PointerRef }
   | { readonly kind: 'type'; readonly text: string; readonly target?: PointerRef }
   | { readonly kind: 'key'; readonly key: string }
   /**

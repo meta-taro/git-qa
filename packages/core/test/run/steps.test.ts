@@ -280,3 +280,35 @@ describe('行き先の書き方（Issue 016）', () => {
     });
   });
 });
+
+/**
+ * **並べ替えは、実物の画面でよく出る**（Issue 015 の試験運用で人が挙げた）。
+ *
+ * > DnD はできるのか
+ *
+ * なぞる（swipe）とは別物。**なぞりはスクロール、ドラッグは物を移す。**
+ * 同じ命令にまとめると、どちらのつもりで書いたのかが読めなくなる。
+ */
+describe('ドラッグ（Issue 015）', () => {
+  it('「A」を「B」へドラッグする', () => {
+    const [step] = planSteps('「見出し」を「本文」へドラッグする');
+
+    expect(step).toEqual({
+      kind: 'action',
+      text: '「見出し」を「本文」へドラッグする',
+      action: {
+        kind: 'drag',
+        from: { at: 'element', ref: '見出し' },
+        to: { at: 'element', ref: '本文' },
+      },
+    });
+  });
+
+  it('「A」を「B」にドラッグする（「に」でも同じ）', () => {
+    expect(planSteps('「A」を「B」にドラッグする')[0]?.kind).toBe('action');
+  });
+
+  it('「A」を「B」へドラッグ＆ドロップする', () => {
+    expect(planSteps('「A」を「B」へドラッグ＆ドロップする')[0]?.kind).toBe('action');
+  });
+});

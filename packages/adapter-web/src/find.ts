@@ -42,7 +42,19 @@ export function findElementScript(ref: string): string {
     seen.push({ el, box, labels: labels.map((v) => v.trim()), text, children });
   }
 
-  const point = (hit) => hit && { x: hit.box.left + hit.box.width / 2, y: hit.box.top + hit.box.height / 2 };
+  /**
+   * 触る前に、見える所へ運ぶ。
+   *
+   * **画面の外にあるものは押せない。**データが増えて下へ流れた要素は、
+   * 位置は返るのに、その座標を押しても何も起きない（画面の外なので）。
+   * 運んでから測り直す。
+   */
+  const point = (hit) => {
+    if (!hit) return null;
+    hit.el.scrollIntoView({ block: 'center', inline: 'center' });
+    const box = hit.el.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  };
 
   // 1. 名乗りが完全に一致
   const byLabel = seen.find((h) => h.labels.includes(want));
