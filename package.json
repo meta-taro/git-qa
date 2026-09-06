@@ -17,6 +17,7 @@
     "app": "pnpm --filter @git-qa/host exec vite-node src/app-cli.ts",
     "run:sheet": "pnpm --filter @git-qa/host exec vite-node src/run-cli.ts",
     "run:sheet:web": "pnpm --filter @git-qa/host exec vite-node src/run-web-cli.ts",
+    "run:sheet:desktop": "pnpm --filter @git-qa/host exec vite-node src/run-desktop-cli.ts",
     "mcp": "pnpm --filter @git-qa/mcp exec vite-node src/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

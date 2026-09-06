@@ -99,6 +99,8 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
     recording: true,
     // `input text` は IME を通らない。日本語は送れない（C34）。
     textInput: 'ascii-only',
+    // どのパッケージかは端末と地域で変わる。**表示名からの推測はしない**（C40）。
+    appId: 'package-or-url',
   };
 
   const adbRun = async (args: readonly string[], serial?: string): Promise<Uint8Array> => {

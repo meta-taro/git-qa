@@ -39,6 +39,16 @@ export interface PlanOptions {
    * ブラウザはそのまま入るので `'any'`。**Android の事情を全部の相手に押し付けない。**
    */
   readonly textInput?: 'ascii-only' | 'any';
+  /**
+   * 行き先の書き方。
+   *
+   * Android はパッケージ名、ウェブは URL（既定の `'package-or-url'`）。
+   * **デスクトップはアプリ名そのもの**なので `'name'`。
+   *
+   * 表示名を通さないという決めごと（C40）は Android の話で、
+   * どのパッケージかが端末と地域で変わるのが理由。**その問題が無い相手にまで押し付けない。**
+   */
+  readonly appId?: 'package-or-url' | 'name';
 }
 
 /** 行頭の番号・箇条書き記号。書式は書き手によって揺れるので、まとめて剥がす。 */
@@ -104,12 +114,21 @@ function planType(
  * 実物の検証シートは、ほぼ必ず 1 行目が「アプリを起動する」で始まる。
  * ここを落とせないと、どのシートも 1 件目で止まる（2026-09-02 の実行記録がその形だった）。
  */
-function planLaunch(rawName: string, app: string | undefined, text: string): PlannedStep {
+function planLaunch(
+  rawName: string,
+  app: string | undefined,
+  text: string,
+  appId: 'package-or-url' | 'name',
+): PlannedStep {
   // 書き手は「URL を開く」と空けて書く。**前後の空白で行き先を見失わない。**
   const named = rawName.trim();
 
-  // 行き先がそのまま書いてある（パッケージ名でも URL でも）。
-  if (APP_ID.test(named) || URL_ID.test(named)) {
+  // 名前で指す相手なら、書いてあるものをそのまま使う。
+  const usable = (value: string): boolean =>
+    appId === 'name' ? value.trim() !== '' : APP_ID.test(value) || URL_ID.test(value);
+
+  // 行き先がそのまま書いてある。
+  if (appId !== 'name' && (APP_ID.test(named) || URL_ID.test(named))) {
     return { kind: 'action', text, action: { kind: 'launch', app: named } };
   }
 
@@ -133,7 +152,7 @@ function planLaunch(rawName: string, app: string | undefined, text: string): Pla
         'パッケージ名（例 com.example.app）か URL（例 http://localhost:3000/）を書く',
     };
   }
-  if (APP_ID.test(app) || URL_ID.test(app)) {
+  if (usable(app)) {
     return { kind: 'action', text, action: { kind: 'launch', app } };
   }
   return {
@@ -147,6 +166,7 @@ function planOneStep(
   text: string,
   app: string | undefined,
   textInput: 'ascii-only' | 'any',
+  appId: 'package-or-url' | 'name',
 ): PlannedStep {
   const into = TYPE_INTO.exec(text);
   if (into?.groups) {
@@ -162,15 +182,7 @@ function planOneStep(
   const launch = LAUNCH.exec(text);
   if (launch?.groups) {
     const named = launch.groups['target'] ?? launch.groups['bare'] ?? '';
-    return planLaunch(
-      (THE_APP.test(named) || THE_PAGE.test(named)) &&
-        app !== undefined &&
-        (APP_ID.test(app) || URL_ID.test(app))
-        ? app
-        : named,
-      app,
-      text,
-    );
+    return planLaunch(named, app, text, appId);
   }
 
   const tap = TAP.exec(text);
@@ -203,7 +215,8 @@ export function planSteps(stepsText: string, options: PlanOptions = {}): Planned
     return [{ kind: 'hold', text: stepsText.trim(), reason: '手順が空' }];
   }
   const textInput = options.textInput ?? 'ascii-only';
-  return lines.map((line) => planOneStep(line, options.app, textInput));
+  const appId = options.appId ?? 'package-or-url';
+  return lines.map((line) => planOneStep(line, options.app, textInput, appId));
 }
 
 /** 画面に在るかどうかで決まる期待結果。 */

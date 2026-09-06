@@ -31,6 +31,16 @@ export interface AdapterCapabilities {
    * **省略できる形にしない。**既定を置くと、送れないのに送ったことになる相手が混ざる。
    */
   readonly textInput: 'ascii-only' | 'any';
+  /**
+   * 行き先（`# 対象:`）の書き方。**相手によって違うので、アダプタが名乗る。**
+   *
+   * Android はパッケージ名、ウェブは URL（`'package-or-url'`）。
+   * **デスクトップはアプリ名そのもの**（`'name'`）。
+   *
+   * 表示名を通さないという決めごと（C40）は Android の話で、
+   * どのパッケージかが端末と地域で変わるのが理由。**その問題が無い相手にまで押し付けない。**
+   */
+  readonly appId: 'package-or-url' | 'name';
 }
 
 export type ObservationKind = 'accessibility-tree' | 'dom' | 'ui-automation' | 'none';

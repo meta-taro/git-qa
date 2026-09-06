@@ -210,6 +210,7 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeAdapter
     observation: options.capabilities?.observation ?? 'accessibility-tree',
     recording: options.capabilities?.recording ?? true,
     textInput: options.capabilities?.textInput ?? 'ascii-only',
+    appId: options.capabilities?.appId ?? 'package-or-url',
   };
   const now = options.now ?? ((): Date => new Date());
   const actions: Action[] = [];

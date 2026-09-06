@@ -251,3 +251,32 @@ describe('文字を送れる範囲（Issue 015）', () => {
     });
   });
 });
+
+/**
+ * **行き先の書き方も、相手によって違う**（Issue 016 / C55）。
+ *
+ * Android はパッケージ名、ウェブは URL、**デスクトップはアプリ名そのもの**。
+ * 2026-09-06、`# 対象: warifu` のシートが
+ * `シートの見出し「# 対象:」が、パッケージ名でも URL でもない: warifu` で止まった。
+ *
+ * **表示名を通さない**という決めごと（C40）は Android の話。
+ * どのパッケージかが端末と地域で変わるのが理由で、**デスクトップにその問題は無い。**
+ */
+describe('行き先の書き方（Issue 016）', () => {
+  it('既定は今までどおり、パッケージ名か URL（Android / ウェブを壊さない）', () => {
+    const [step] = planSteps('アプリを起動する', { app: 'warifu' });
+
+    expect(step?.kind).toBe('hold');
+    expect((step as { reason: string }).reason).toMatch(/パッケージ名/);
+  });
+
+  it('名前で指す相手なら、そのまま通す', () => {
+    const [step] = planSteps('アプリを起動する', { app: 'warifu', appId: 'name' });
+
+    expect(step).toEqual({
+      kind: 'action',
+      text: 'アプリを起動する',
+      action: { kind: 'launch', app: 'warifu' },
+    });
+  });
+});

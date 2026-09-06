@@ -304,6 +304,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     ...(app === undefined ? {} : { app }),
     // **相手が名乗った能力をそのまま渡す。**Android の事情を全部の相手に押し付けない。
     textInput: options.adapter.capabilities.textInput,
+    appId: options.adapter.capabilities.appId,
   });
 
   const runCase = async (ctx: CaseContext): Promise<CaseVerdict> => {

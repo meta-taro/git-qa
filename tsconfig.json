@@ -11,6 +11,9 @@
       "path": "./packages/adapter-web"
     },
     {
+      "path": "./packages/adapter-desktop"
+    },
+    {
       "path": "./packages/live-bridge"
     },
     {

@@ -39,6 +39,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/adapter-desktop:
+    dependencies:
+      '@git-qa/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/adapter-web:
     dependencies:
       '@git-qa/core':
@@ -90,6 +96,9 @@ importers:
       '@git-qa/adapter-android':
         specifier: workspace:*
         version: link:../adapter-android
+      '@git-qa/adapter-desktop':
+        specifier: workspace:*
+        version: link:../adapter-desktop
       '@git-qa/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web
