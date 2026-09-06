@@ -68,7 +68,7 @@ const setup = await startSetupServer({
       SHEET_LIMIT,
     ),
 
-  start: async ({ serial, sheetPath, operator, browser }) => {
+  start: async ({ serial, sheetPath, operator, browser, browserPath }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -89,7 +89,9 @@ const setup = await startSetupServer({
               // 同じ幅で見ないと、崩れの有無を比べられない。
               size: { width: 1280, height: 900 },
               // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
-              ...(browser === undefined ? {} : { browser }),
+              // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
+              ...(browserPath === undefined ? {} : { browserPath }),
+              ...(browser === undefined || browserPath !== undefined ? {} : { browser }),
             })
           : createAndroidAdapter({
               build: {

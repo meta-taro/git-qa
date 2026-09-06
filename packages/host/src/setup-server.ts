@@ -61,7 +61,9 @@ export interface StartSetupServerOptions {
     /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */
     operator?: string;
     /** どのブラウザで見るか（ウェブのときだけ）。**証跡に版が残る。** */
-    browser?: 'chrome' | 'edge' | 'chromium';
+    browser?: 'chrome' | 'edge' | 'brave' | 'chromium';
+    /** 名前の無いブラウザの場所。**中身が Chromium なら動く。** */
+    browserPath?: string;
   }) => Promise<StartedRun>;
   readonly port?: number;
 }
@@ -134,7 +136,8 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     serial: string,
     sheetPath: string,
     operator: string | undefined,
-    browser: 'chrome' | 'edge' | 'chromium' | undefined,
+    browser: 'chrome' | 'edge' | 'brave' | 'chromium' | undefined,
+    browserPath: string | undefined,
   ): void => {
     phase = 'starting';
     failure = undefined;
@@ -144,6 +147,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
         sheetPath,
         ...(operator === undefined ? {} : { operator }),
         ...(browser === undefined ? {} : { browser }),
+        ...(browserPath === undefined ? {} : { browserPath }),
       })
       .then((run) => {
         started = run;
@@ -218,8 +222,16 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
         const wanted = (body as { browser?: unknown }).browser;
         // **知らない値は捨てる。**勝手に別のブラウザで見ない。
         const browser =
-          wanted === 'chrome' || wanted === 'edge' || wanted === 'chromium' ? wanted : undefined;
-        begin(serial, sheetPath, operator, browser);
+          wanted === 'chrome' || wanted === 'edge' || wanted === 'brave' || wanted === 'chromium'
+            ? wanted
+            : undefined;
+        const wantedPath = (body as { browserPath?: unknown }).browserPath;
+        // **知らない形は捨てる。**長すぎるものも通さない（§21）。
+        const browserPath =
+          typeof wantedPath === 'string' && wantedPath !== '' && wantedPath.length <= 500
+            ? wantedPath
+            : undefined;
+        begin(serial, sheetPath, operator, browser, browserPath);
         res.writeHead(202, cors).end();
       });
       return;

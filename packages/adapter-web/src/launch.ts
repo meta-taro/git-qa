@@ -6,7 +6,14 @@
  */
 
 /** 選べるブラウザ。**人が普段使っているものを使う**（C54）。 */
-export type BrowserKind = 'chrome' | 'edge' | 'chromium';
+/**
+ * 選べるブラウザ。**人が普段使っているものを使う**（C54）。
+ *
+ * ここに名前が無いブラウザ（セキュリティソフトが出すもの等）は、
+ * **実行ファイルの場所を直に指定する。**中身が Chromium なら、それで動く。
+ * **名前を数え上げに行かない** —— 数えきれないし、増える。
+ */
+export type BrowserKind = 'chrome' | 'edge' | 'brave' | 'chromium';
 
 /** どこを探すか。**先に見つかったものを使う。**無ければ、無いと言って止まる。 */
 const CANDIDATES: Record<BrowserKind, readonly string[]> = {
@@ -22,6 +29,11 @@ const CANDIDATES: Record<BrowserKind, readonly string[]> = {
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     '/usr/bin/microsoft-edge',
   ],
+  brave: [
+    '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+    'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+    '/usr/bin/brave-browser',
+  ],
   chromium: ['/Applications/Chromium.app/Contents/MacOS/Chromium', '/usr/bin/chromium'],
 };
 
@@ -33,7 +45,7 @@ const CANDIDATES: Record<BrowserKind, readonly string[]> = {
  */
 export function browserCandidates(kind?: BrowserKind): readonly string[] {
   if (kind !== undefined) return CANDIDATES[kind];
-  return [...CANDIDATES.chrome, ...CANDIDATES.edge, ...CANDIDATES.chromium];
+  return [...CANDIDATES.chrome, ...CANDIDATES.edge, ...CANDIDATES.brave, ...CANDIDATES.chromium];
 }
 
 /** 後方のために残す。既定の探し順。 */
@@ -60,15 +72,24 @@ export function parseBrowserVersion(version: {
 
 /** 証跡に残す形。**何で見たか**と**どの版か**を並べる。 */
 export function browserLabel(binaryPath: string, version: string | undefined): string {
-  const name = /Microsoft Edge/.test(binaryPath)
-    ? 'Microsoft Edge'
-    : /Chromium/.test(binaryPath)
-      ? 'Chromium'
-      : /msedge/.test(binaryPath)
-        ? 'Microsoft Edge'
-        : 'Google Chrome';
+  const name = knownName(binaryPath) ?? fileName(binaryPath);
   return version === undefined ? name : `${name}（${version}）`;
 }
+
+/** 場所から名前を読む。**知らないブラウザは、実行ファイルの名前をそのまま残す。** */
+function knownName(binaryPath: string): string | undefined {
+  if (/Microsoft Edge|msedge/.test(binaryPath)) return 'Microsoft Edge';
+  if (/Brave/i.test(binaryPath)) return 'Brave';
+  if (/Chromium/.test(binaryPath)) return 'Chromium';
+  if (/Google Chrome|chrome\.exe|google-chrome/.test(binaryPath)) return 'Google Chrome';
+  return undefined;
+}
+
+const fileName = (binaryPath: string): string =>
+  binaryPath
+    .split(/[/\\]/)
+    .filter((part) => part !== '')
+    .pop() ?? binaryPath;
 
 export interface BrowserArgsOptions {
   /** 繋ぎ口。**0 を渡すと空いている番号を OS が選ぶ**（人の他の作業とぶつからない）。 */
