@@ -57,6 +57,8 @@ describe('renderSetup', () => {
       serial: 'R5CT1234',
       sheetPath: '/repo/docs/b.tsv',
       operator: 'octocat',
+      // **何で見たかも一緒に渡す。**証跡に版が残る（2026-09-06）。
+      browser: 'chrome',
     });
   });
 
@@ -147,6 +149,8 @@ describe('検証シートを自分で選ぶ（Issue 011 段階 3 の続き）', 
       serial: 'emulator-5554',
       sheetPath: '/どこか/別の.tsv',
       operator: 'octocat',
+      // **何で見たかも一緒に渡す。**証跡に版が残る（2026-09-06）。
+      browser: 'chrome',
     });
   });
 });
@@ -184,6 +188,8 @@ describe('置いた人（ハンドル）を入れる', () => {
       serial: 'emulator-5554',
       sheetPath: '/repo/docs/a.tsv',
       operator: 'octocat',
+      // **何で見たかも一緒に渡す。**証跡に版が残る（2026-09-06）。
+      browser: 'chrome',
     });
   });
 });

@@ -11,7 +11,13 @@ import type { SetupState } from './client.js';
  */
 
 export interface RenderSetupOptions {
-  readonly onStart: (params: { serial: string; sheetPath: string; operator: string }) => void;
+  readonly onStart: (params: {
+    serial: string;
+    sheetPath: string;
+    operator: string;
+    /** 見るブラウザ（ウェブのときだけ意味がある）。 */
+    browser?: string;
+  }) => void;
   /**
    * 自分で検証シートを選ぶ。
    *
@@ -36,6 +42,9 @@ export interface RenderSetupOptions {
   /** ウェブページの URL。**覚えておく**（毎回打たせない）。 */
   readonly webUrl?: string;
   readonly onWebUrlChange?: (url: string) => void;
+  /** 見るブラウザ。**証跡に版が残る。** */
+  readonly browser?: string;
+  readonly onBrowserChange?: (browser: string) => void;
   readonly onOperatorChange?: (handle: string) => void;
 }
 
@@ -174,6 +183,32 @@ export function renderSetup(
   webHint.className = 'setup-hint';
   webHint.textContent = t('setup.web');
 
+  /**
+   * どのブラウザで見るか（人の求め・2026-09-06）。
+   *
+   * > chrome, エッヂを選択できて、検証時につかったブラウザのバージョンなども
+   * > 記録できるとなおよいです。
+   *
+   * **同じ画面でも版が違えば結果が変わる。**選べて、証跡に残るようにする。
+   */
+  const browser = doc.createElement('select');
+  browser.className = 'setup-browser';
+  for (const [value, key] of [
+    ['chrome', 'setup.browser.chrome'],
+    ['edge', 'setup.browser.edge'],
+  ] as const) {
+    const option = doc.createElement('option');
+    option.value = value;
+    option.textContent = t(key);
+    browser.append(option);
+  }
+  browser.value = options.browser ?? 'chrome';
+  browser.addEventListener('change', () => options.onBrowserChange?.(browser.value));
+
+  const browserLabel = doc.createElement('p');
+  browserLabel.className = 'setup-hint';
+  browserLabel.textContent = t('setup.browser');
+
   const lookingAt = (): string | undefined => {
     const url = webUrl.value.trim();
     // **URL が優先。**打ち込んだ人は、そちらを見たいと言っている。
@@ -233,10 +268,20 @@ export function renderSetup(
     const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
     const handle = operator.value.trim();
     if (serial === undefined || sheetPath === undefined || !isValidHandle(handle)) return;
-    options.onStart({ serial, sheetPath, operator: handle });
+    options.onStart({ serial, sheetPath, operator: handle, browser: browser.value });
   });
 
-  section.append(title, operatorHeading, operator, operatorRule, deviceHeading, webUrl, webHint);
+  section.append(
+    title,
+    operatorHeading,
+    operator,
+    operatorRule,
+    deviceHeading,
+    webUrl,
+    webHint,
+    browser,
+    browserLabel,
+  );
 
   if (state.devices.length === 0) {
     const empty = doc.createElement('p');

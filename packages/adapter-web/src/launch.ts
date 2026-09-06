@@ -5,16 +5,70 @@
  * **人が実際に使っているブラウザ**であるべきで、そこに差を作る理由が無い。
  */
 
-/** 探しに行く場所。**先に見つかったものを使う。**無ければ、無いと言って止まる。 */
-export const BROWSER_CANDIDATES = [
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-] as const;
+/** 選べるブラウザ。**人が普段使っているものを使う**（C54）。 */
+export type BrowserKind = 'chrome' | 'edge' | 'chromium';
+
+/** どこを探すか。**先に見つかったものを使う。**無ければ、無いと言って止まる。 */
+const CANDIDATES: Record<BrowserKind, readonly string[]> = {
+  chrome: [
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    '/usr/bin/google-chrome',
+  ],
+  edge: [
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/usr/bin/microsoft-edge',
+  ],
+  chromium: ['/Applications/Chromium.app/Contents/MacOS/Chromium', '/usr/bin/chromium'],
+};
+
+/**
+ * 探す場所を並べる。
+ *
+ * **選ばれていれば、そのブラウザだけ。**「Chrome で見る」と言われたのに Edge が起きたら、
+ * 証跡に書いてあるものと、実際に見たものが食い違う。
+ */
+export function browserCandidates(kind?: BrowserKind): readonly string[] {
+  if (kind !== undefined) return CANDIDATES[kind];
+  return [...CANDIDATES.chrome, ...CANDIDATES.edge, ...CANDIDATES.chromium];
+}
+
+/** 後方のために残す。既定の探し順。 */
+export const BROWSER_CANDIDATES = browserCandidates();
+
+/**
+ * ブラウザが名乗った版を読む（CDP の `Browser.getVersion`）。
+ *
+ * **Edge は `product` に `Chrome/…` と名乗る。**そのまま書くと、
+ * どちらで見たのかが証跡から消える。`userAgent` の `Edg/…` を優先する。
+ */
+export function parseBrowserVersion(version: {
+  readonly product?: unknown;
+  readonly userAgent?: unknown;
+}): string | undefined {
+  const agent = typeof version.userAgent === 'string' ? version.userAgent : '';
+  const edge = /Edg\/[\d.]+/.exec(agent);
+  if (edge !== null) return edge[0];
+
+  return typeof version.product === 'string' && version.product !== ''
+    ? version.product
+    : undefined;
+}
+
+/** 証跡に残す形。**何で見たか**と**どの版か**を並べる。 */
+export function browserLabel(binaryPath: string, version: string | undefined): string {
+  const name = /Microsoft Edge/.test(binaryPath)
+    ? 'Microsoft Edge'
+    : /Chromium/.test(binaryPath)
+      ? 'Chromium'
+      : /msedge/.test(binaryPath)
+        ? 'Microsoft Edge'
+        : 'Google Chrome';
+  return version === undefined ? name : `${name}（${version}）`;
+}
 
 export interface BrowserArgsOptions {
   /** 繋ぎ口。**0 を渡すと空いている番号を OS が選ぶ**（人の他の作業とぶつからない）。 */

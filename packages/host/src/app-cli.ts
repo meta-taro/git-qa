@@ -68,7 +68,7 @@ const setup = await startSetupServer({
       SHEET_LIMIT,
     ),
 
-  start: async ({ serial, sheetPath, operator }) => {
+  start: async ({ serial, sheetPath, operator, browser }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -88,6 +88,8 @@ const setup = await startSetupServer({
               build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
               // 同じ幅で見ないと、崩れの有無を比べられない。
               size: { width: 1280, height: 900 },
+              // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
+              ...(browser === undefined ? {} : { browser }),
             })
           : createAndroidAdapter({
               build: {

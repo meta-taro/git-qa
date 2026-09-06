@@ -525,6 +525,14 @@ body {
 }
 
 /* 置いた人のハンドル。**空のままでは始められない**（誰が保証したかが残らないため）。 */
+/* 見るブラウザ。打ち込む欄と並ぶので、高さを合わせる。 */
+.setup-browser {
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: inherit;
+}
+
 /* ウェブページの URL。**ハンドルの欄と同じ形にする**（同じ「打ち込む所」なので）。 */
 .setup-web,
 .setup-operator {

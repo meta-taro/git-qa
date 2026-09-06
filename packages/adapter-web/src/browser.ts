@@ -6,7 +6,8 @@ import { join } from 'node:path';
 
 import { AdapterError } from '@git-qa/core';
 
-import { BROWSER_CANDIDATES, browserArgs, parseActivePort, parseDevToolsUrl } from './launch.js';
+import { browserArgs, browserCandidates, parseActivePort, parseDevToolsUrl } from './launch.js';
+import type { BrowserKind } from './launch.js';
 
 /**
  * ブラウザを起こして、繋ぎ先を返す。
@@ -20,12 +21,16 @@ const KIND = 'web';
 export interface RunningBrowser {
   readonly devToolsUrl: string;
   readonly userDataDir: string;
+  /** 実際に起こしたブラウザの場所。**証跡に「何で見たか」を残すのに要る。** */
+  readonly binaryPath: string;
   close(): Promise<void>;
 }
 
 export interface LaunchBrowserOptions {
   /** 使うブラウザ。省略すると、入っているものを順に探す。 */
   readonly browserPath?: string;
+  /** どのブラウザで見るか。**選ばれていれば、それ以外は探さない。** */
+  readonly browser?: BrowserKind;
   readonly size?: { readonly width: number; readonly height: number };
   /** 繋ぎ先が出てくるまで待つ上限（ms）。 */
   readonly startTimeoutMs?: number;
@@ -34,8 +39,8 @@ export interface LaunchBrowserOptions {
 const DEFAULT_START_TIMEOUT_MS = 20_000;
 
 /** 入っているブラウザを探す。**無ければ、どこを探したかまで言う。** */
-export async function findBrowser(explicit?: string): Promise<string> {
-  const candidates = explicit === undefined ? BROWSER_CANDIDATES : [explicit];
+export async function findBrowser(explicit?: string, kind?: BrowserKind): Promise<string> {
+  const candidates = explicit === undefined ? browserCandidates(kind) : [explicit];
   for (const path of candidates) {
     try {
       await access(path);
@@ -52,7 +57,7 @@ export async function findBrowser(explicit?: string): Promise<string> {
 }
 
 export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise<RunningBrowser> {
-  const binary = await findBrowser(options.browserPath);
+  const binary = await findBrowser(options.browserPath, options.browser);
   // **人のプロファイルを触らない。**開いているタブ・履歴・ログイン状態に手を出さない。
   const userDataDir = await mkdtemp(join(tmpdir(), 'git-qa-web-'));
 
@@ -139,7 +144,7 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
       });
     });
 
-    return { devToolsUrl, userDataDir, close };
+    return { devToolsUrl, userDataDir, binaryPath: binary, close };
   } catch (error) {
     // 掴んだまま投げない。**起こしたブラウザと作業場所を残さない。**
     await close();

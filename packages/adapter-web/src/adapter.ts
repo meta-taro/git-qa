@@ -17,8 +17,8 @@ import type { CdpClient } from './cdp.js';
 import { launchBrowser } from './browser.js';
 import type { RunningBrowser } from './browser.js';
 import { findElementScript, parseFoundPoint } from './find.js';
-import { httpOriginFromWs, pickPageTarget } from './launch.js';
-import type { BrowserTarget } from './launch.js';
+import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
+import type { BrowserKind, BrowserTarget } from './launch.js';
 import { createScreencast } from './screencast.js';
 import { connectCdpSocket } from './socket.js';
 
@@ -38,6 +38,13 @@ export interface WebAdapterOptions {
   /** 最初に開く場所。省略すると `build.source` を URL として使う。 */
   readonly url?: string;
   readonly browserPath?: string;
+  /**
+   * どのブラウザで見るか。**選ばれていれば、それ以外は探さない。**
+   *
+   * 「Chrome で見る」と言われたのに Edge が起きたら、
+   * **証跡に書いてあるものと、実際に見たものが食い違う。**
+   */
+  readonly browser?: BrowserKind;
   /** 窓の大きさ。**同じ幅で見ないと、崩れの有無を比べられない。** */
   readonly size?: { readonly width: number; readonly height: number };
   /**
@@ -105,12 +112,20 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
       try {
         browser = await launchBrowser({
           ...(options.browserPath === undefined ? {} : { browserPath: options.browserPath }),
+          ...(options.browser === undefined ? {} : { browser: options.browser }),
           ...(options.size === undefined ? {} : { size: options.size }),
         });
         cdp = createCdpClient(await connectCdpSocket(await findPage(browser.devToolsUrl)));
 
         await cdp.send('Page.enable');
         await cdp.send('Runtime.enable');
+
+        /**
+         * **何で見たかを証跡に残す。**同じ画面でも版が違えば結果が変わる。
+         * 後から「どのブラウザのどの版で見たか」が読めないと、証跡として弱い。
+         */
+        const version = await cdp.send('Browser.getVersion').catch(() => ({}));
+        const label = browserLabel(browser.binaryPath, parseBrowserVersion(version));
 
         const start = options.url ?? options.build.source;
         // **行き先はシートが宣言したものだけ**（C40）。ここで別の場所へ行かない。
@@ -122,6 +137,7 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
           browser,
           now,
           build: options.build,
+          browserLabel: label,
           ...(options.settleMs === undefined ? {} : { settleMs: options.settleMs }),
           ...(options.loadTimeoutMs === undefined ? {} : { loadTimeoutMs: options.loadTimeoutMs }),
         });
@@ -140,6 +156,8 @@ interface SessionDeps {
   readonly browser: RunningBrowser;
   readonly build: TargetBuild;
   readonly now: () => Date;
+  /** 証跡に残す「何で見たか」。例: `Google Chrome（Chrome/141.0.7390.55）`。 */
+  readonly browserLabel: string;
   readonly settleMs?: number;
   readonly loadTimeoutMs?: number;
 }
@@ -207,7 +225,8 @@ function createSession(deps: SessionDeps): TargetSession {
   };
 
   return {
-    target: { kind: KIND, browser: 'chrome', build },
+    // **何で見たかは、run.json の `target.browser` に残る。**決め打ちにしない。
+    target: { kind: KIND, browser: deps.browserLabel, build },
     liveView,
     recording,
     get isClosed() {

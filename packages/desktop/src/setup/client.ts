@@ -87,7 +87,7 @@ export async function fetchSetupState(
  */
 export async function requestStart(
   url: string,
-  params: { serial: string; sheetPath: string; operator?: string },
+  params: { serial: string; sheetPath: string; operator?: string; browser?: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   const res = await fetchImpl(`${url}/start`, {

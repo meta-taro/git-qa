@@ -60,6 +60,8 @@ export interface StartSetupServerOptions {
     sheetPath: string;
     /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */
     operator?: string;
+    /** どのブラウザで見るか（ウェブのときだけ）。**証跡に版が残る。** */
+    browser?: 'chrome' | 'edge' | 'chromium';
   }) => Promise<StartedRun>;
   readonly port?: number;
 }
@@ -128,11 +130,21 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     ...(failure === undefined ? {} : { error: failure }),
   });
 
-  const begin = (serial: string, sheetPath: string, operator: string | undefined): void => {
+  const begin = (
+    serial: string,
+    sheetPath: string,
+    operator: string | undefined,
+    browser: 'chrome' | 'edge' | 'chromium' | undefined,
+  ): void => {
     phase = 'starting';
     failure = undefined;
     void options
-      .start({ serial, sheetPath, ...(operator === undefined ? {} : { operator }) })
+      .start({
+        serial,
+        sheetPath,
+        ...(operator === undefined ? {} : { operator }),
+        ...(browser === undefined ? {} : { browser }),
+      })
       .then((run) => {
         started = run;
         phase = 'running';
@@ -203,7 +215,11 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
             .end('ハンドルに空白か区切り（/ \\）が入っているか、39 文字を超えている（0 の欄）');
           return;
         }
-        begin(serial, sheetPath, operator);
+        const wanted = (body as { browser?: unknown }).browser;
+        // **知らない値は捨てる。**勝手に別のブラウザで見ない。
+        const browser =
+          wanted === 'chrome' || wanted === 'edge' || wanted === 'chromium' ? wanted : undefined;
+        begin(serial, sheetPath, operator, browser);
         res.writeHead(202, cors).end();
       });
       return;

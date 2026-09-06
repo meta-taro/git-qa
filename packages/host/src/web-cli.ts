@@ -28,6 +28,14 @@ await runWithLiveView({
     ...(process.env['GIT_QA_BROWSER'] === undefined
       ? {}
       : { browserPath: process.env['GIT_QA_BROWSER'] }),
+    // どのブラウザで見るか。**証跡には、実際に起きたものの版が残る。**
+    ...(process.env['GIT_QA_BROWSER_KIND'] === 'edge'
+      ? { browser: 'edge' as const }
+      : process.env['GIT_QA_BROWSER_KIND'] === 'chromium'
+        ? { browser: 'chromium' as const }
+        : process.env['GIT_QA_BROWSER_KIND'] === 'chrome'
+          ? { browser: 'chrome' as const }
+          : {}),
   }),
   launch: (liveUrl) =>
     new Promise<void>((resolve, reject) => {
