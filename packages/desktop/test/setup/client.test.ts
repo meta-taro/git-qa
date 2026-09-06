@@ -86,6 +86,23 @@ describe('requestStart', () => {
       requestStart('http://127.0.0.1:5/setup/abc', { serial: 'a', sheetPath: 'b' }, fetchImpl),
     ).rejects.toThrow(/409/);
   });
+
+  /**
+   * **断った側は理由を書いている。それを捨てていた。**
+   *
+   * 2026-09-06、人が「押しても開始されません」と言った。画面に出ていたのは
+   * `実行を始められなかった: 400`。**400 は人に何も言っていない。**
+   * 実行器は本文で理由を返していたのに、こちらが読まずに数字だけ出していた。
+   */
+  it('断られた理由が本文にあるなら、それを出す（数字だけにしない）', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response('ハンドルに空白は使えない', { status: 400 }));
+
+    await expect(
+      requestStart('http://127.0.0.1:5/setup/abc', { serial: 'a', sheetPath: 'b' }, fetchImpl),
+    ).rejects.toThrow(/ハンドルに空白は使えない/);
+  });
 });
 
 describe('resolveSetupUrl — 配布物では URL をアプリに聞く', () => {

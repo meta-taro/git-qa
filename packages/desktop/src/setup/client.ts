@@ -94,7 +94,13 @@ export async function requestStart(
     body: JSON.stringify(params),
   });
   if (res.status !== 202) {
-    throw new Error(`実行を始められなかった: ${String(res.status)}`);
+    // **断った側が書いた理由を捨てない。**`400` だけでは人は何をすればいいか分からない。
+    const reason = await res.text().catch(() => '');
+    throw new Error(
+      reason.trim() === ''
+        ? `実行を始められなかった（${String(res.status)}）`
+        : `実行を始められなかった: ${reason.trim()}`,
+    );
   }
 }
 

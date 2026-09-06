@@ -258,6 +258,14 @@ if (liveUrl !== undefined) {
      * 判断は `setup/redraw.ts` にある（ここは配線なので検査していない）。
      */
     let lastDrawn = '';
+    /**
+     * 始めようとして断られた理由。**押した所へ返す。**
+     *
+     * 2026-09-06、人が「押しても開始されません」と言った。理由は出ていたが、
+     * **押したボタンから遠い「判定」の欄**に `実行を始められなかった: 400` と出ていた。
+     * 押した本人が見ている所は、押したボタンの周りしかない。
+     */
+    let startError: string | undefined;
 
     const tick = async (): Promise<void> => {
       const state = await fetchSetupState(setupUrl);
@@ -277,7 +285,10 @@ if (liveUrl !== undefined) {
       if (shape === undefined) return;
       lastDrawn = shape;
 
-      renderSetup(app, state, {
+      // 断られた理由は、実行器の状態ではなくこちらが持っている。**同じ画面に載せる。**
+      const shown = startError === undefined ? state : { ...state, error: startError };
+
+      renderSetup(app, shown, {
         ...(pickedSheet === undefined ? {} : { pickedSheet }),
         recentSheets,
         operator,
@@ -289,8 +300,13 @@ if (liveUrl !== undefined) {
           // **開いたものを覚える。**次からは探索に頼らずここへ出す。
           recentSheets = rememberSheet(recentSheets, params.sheetPath);
           writeRecentSheets(defaultStore(), recentSheets);
+          // もう一度押したなら、前の理由は消す。**古い理由が残ると、直ったのか分からない。**
+          startError = undefined;
           requestStart(setupUrl, params).catch((error: unknown) => {
-            showSessionError(app, error instanceof Error ? error.message : String(error));
+            // **押した所へ返す。**「判定」の欄に出しても、押した人は見ていない。
+            startError = error instanceof Error ? error.message : String(error);
+            lastDrawn = '';
+            void tick();
           });
         },
         onPickSheet: () => {
