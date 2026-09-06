@@ -34,3 +34,7 @@ export {
   pointerActions,
   typeActions,
 } from './firefox.js';
+export { createSafariAdapter } from './safari-adapter.js';
+export type { SafariAdapterOptions } from './safari-adapter.js';
+export { createWebDriverClient, w3cDrag, w3cPointer, w3cType } from './webdriver.js';
+export type { WebDriverClient } from './webdriver.js';

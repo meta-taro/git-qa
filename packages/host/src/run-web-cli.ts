@@ -2,7 +2,12 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import { createFirefoxAdapter, createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
+import {
+  createFirefoxAdapter,
+  createSafariAdapter,
+  createWebAdapter,
+  readWebScreenText,
+} from '@git-qa/adapter-web';
 import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
 
 import { startRunSession } from './run-session.js';
@@ -59,34 +64,42 @@ if (target === undefined || !/^https?:\/\//.test(target)) {
   process.exit(1);
 }
 
-/** Firefox は別の口（BiDi）で動く。**同じコードには乗らない**（Issue 018）。 */
-const useFirefox = process.env['GIT_QA_BROWSER_KIND'] === 'firefox';
+/**
+ * **相手によって口が違う**（Issue 018）。
+ * Chrome 系は CDP、Firefox は BiDi、Safari は WebDriver。**同じコードには乗らない。**
+ */
+const kind = process.env['GIT_QA_BROWSER_KIND'];
 
 const session = await startRunSession({
-  adapter: useFirefox
-    ? createFirefoxAdapter({
-        build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-        size: { width: 1280, height: 900 },
-        ...(process.env['GIT_QA_BROWSER'] === undefined
-          ? {}
-          : { firefoxPath: process.env['GIT_QA_BROWSER'] }),
-      })
-    : createWebAdapter({
-        build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-        // 同じ幅で見ないと、崩れの有無を比べられない。
-        size: { width: 1280, height: 900 },
-        ...(process.env['GIT_QA_BROWSER'] === undefined
-          ? {}
-          : { browserPath: process.env['GIT_QA_BROWSER'] }),
-        // どのブラウザで見るか。**証跡には、実際に起きたものの版が残る。**
-        ...(process.env['GIT_QA_BROWSER_KIND'] === 'edge'
-          ? { browser: 'edge' as const }
-          : process.env['GIT_QA_BROWSER_KIND'] === 'chromium'
-            ? { browser: 'chromium' as const }
-            : process.env['GIT_QA_BROWSER_KIND'] === 'chrome'
-              ? { browser: 'chrome' as const }
-              : {}),
-      }),
+  adapter:
+    kind === 'safari'
+      ? createSafariAdapter({
+          build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+        })
+      : kind === 'firefox'
+        ? createFirefoxAdapter({
+            build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+            size: { width: 1280, height: 900 },
+            ...(process.env['GIT_QA_BROWSER'] === undefined
+              ? {}
+              : { firefoxPath: process.env['GIT_QA_BROWSER'] }),
+          })
+        : createWebAdapter({
+            build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+            // 同じ幅で見ないと、崩れの有無を比べられない。
+            size: { width: 1280, height: 900 },
+            ...(process.env['GIT_QA_BROWSER'] === undefined
+              ? {}
+              : { browserPath: process.env['GIT_QA_BROWSER'] }),
+            // どのブラウザで見るか。**証跡には、実際に起きたものの版が残る。**
+            ...(process.env['GIT_QA_BROWSER_KIND'] === 'edge'
+              ? { browser: 'edge' as const }
+              : process.env['GIT_QA_BROWSER_KIND'] === 'chromium'
+                ? { browser: 'chromium' as const }
+                : process.env['GIT_QA_BROWSER_KIND'] === 'chrome'
+                  ? { browser: 'chrome' as const }
+                  : {}),
+          }),
   sheet,
   sheetRef: {
     path: sheetPath,

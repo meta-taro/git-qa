@@ -127,8 +127,26 @@ document.title → {"type":"string","value":"Example Domain"}
 `fromRemoteValue` を足して戻すようにした。**知らない型は undefined**にする
 （中途半端に読むと、読めたことになってしまう）。
 
+### 2026-09-06（続き）— **Safari の道も書けた。許可 1 つで止まっている**
+
+`safaridriver` は OS 付属（`/System/Cryptexes/App/usr/bin/safaridriver`）。
+**WebDriver は HTTP**（CDP も BiDi も WebSocket だったので、3 本目は形が違う）。
+**依存はまた足していない。**
+
+実物に当てた結果:
+
+```
+止まった理由: Safari を外から動かす許可が入っていない。
+Safari の設定 →「詳細」→「Web デベロッパ用の機能を表示」を入れ、
+「開発」メニュー →「リモートオートメーションを許可」にチェックを入れる
+（元の理由: Could not create a session: You must enable 'Allow remote automation' …）
+```
+
+**Safari が英語で返した文を、人が動ける日本語に直して返している。**元の文も残してある。
+
 ### 残っていること
 
-- **Safari**（3 本目のプロトコル。iOS の代理になる）
-- 対応表の Firefox は **✅ 実測**へ動かした
+- **Safari の「リモートオートメーションを許可」にチェックを入れる**（**人の作業**）。
+  入れば、その場で通して実測に変える
+- 対応表の Safari を動かすのは、**通ってから**（C56）
 
