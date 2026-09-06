@@ -38,6 +38,9 @@ export function createScreencast(cdp: CdpClient, options: ScreencastOptions = {}
   const start = async (): Promise<void> => {
     if (started) return;
     started = true;
+    // **背面のタブは画面を配れない。**実測（2026-09-06）: 前面に出さずに頼むと
+    // `Page.startScreencast を断られた: Not attached to an active page` で落ちる。
+    await cdp.send('Page.bringToFront');
     await cdp.send('Page.startScreencast', {
       format: 'jpeg',
       quality: options.quality ?? DEFAULT_QUALITY,

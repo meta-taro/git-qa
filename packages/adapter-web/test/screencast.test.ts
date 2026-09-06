@@ -68,6 +68,23 @@ describe('createScreencast', () => {
     expect(cdp.calls.map((c) => c.method)).toContain('Page.startScreencast');
   });
 
+  /**
+   * **背面のタブは画面を配れない。**実測（2026-09-06）: 前面に出さずに頼むと
+   * `Page.startScreencast を断られた: Not attached to an active page` で落ちた。
+   */
+  it('頼む前に、その画面を前面に出す', async () => {
+    const cdp = fakeCdp();
+    const cast = createScreencast(cdp);
+
+    const pending = drain(cast.frames(), 1);
+    cdp.emit('Page.screencastFrame', { data: image(1), sessionId: 1 });
+    await pending;
+
+    const order = cdp.calls.map((c) => c.method);
+    expect(order.indexOf('Page.bringToFront')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('Page.bringToFront')).toBeLessThan(order.indexOf('Page.startScreencast'));
+  });
+
   it('届いた絵を、長さを付けて流す', async () => {
     const cdp = fakeCdp();
     const cast = createScreencast(cdp);

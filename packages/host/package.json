@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@git-qa/adapter-android": "workspace:*",
+    "@git-qa/adapter-web": "workspace:*",
     "@git-qa/core": "workspace:*",
     "@git-qa/live-bridge": "workspace:*"
   },

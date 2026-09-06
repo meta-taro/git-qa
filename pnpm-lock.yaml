@@ -90,6 +90,9 @@ importers:
       '@git-qa/adapter-android':
         specifier: workspace:*
         version: link:../adapter-android
+      '@git-qa/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
       '@git-qa/core':
         specifier: workspace:*
         version: link:../core

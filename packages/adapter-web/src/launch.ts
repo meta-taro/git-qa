@@ -56,3 +56,52 @@ export function parseDevToolsUrl(stderr: string): string | undefined {
   const found = /ws:\/\/\S+/.exec(stderr);
   return found?.[0];
 }
+
+/**
+ * 繋ぎ先（ws）から、対象の一覧を聞く先（http）を作る。
+ *
+ * **当て推量で聞きに行かない。**読めない形なら undefined を返し、呼ぶ側に判断させる。
+ */
+export function httpOriginFromWs(devToolsUrl: string): string | undefined {
+  const found = /^ws:\/\/([^/]+)/.exec(devToolsUrl);
+  return found === null ? undefined : `http://${found[1] as string}`;
+}
+
+/** ブラウザが並べてくる「対象」の 1 つ。中身は増えるので、要る所だけ読む。 */
+export interface BrowserTarget {
+  readonly type?: string;
+  readonly url?: string;
+  readonly webSocketDebuggerUrl?: string;
+}
+
+/**
+ * 人が見る 1 枚を選ぶ。
+ *
+ * ブラウザは画面のほかに、拡張・裏方（service worker）・開発者ツールも並べてくる。
+ * **そこを掴むと真っ白な絵が返る**ので、`page` かつ開発者ツールでないものだけを見る。
+ */
+export function pickPageTarget(targets: readonly BrowserTarget[]): string | undefined {
+  for (const target of targets) {
+    if (target.type !== 'page') continue;
+    if (target.url?.startsWith('devtools://') === true) continue;
+    if (typeof target.webSocketDebuggerUrl !== 'string') continue;
+    return target.webSocketDebuggerUrl;
+  }
+  return undefined;
+}
+
+/**
+ * ブラウザが作業場所に書く `DevToolsActivePort` を読む。
+ *
+ * **標準エラーの 1 行より、こちらが確か。**実測（2026-09-06）: macOS の Chrome を
+ * 直に起こすと、標準エラーには**何も書かないまま**繋ぎ先だけがこのファイルに出た。
+ * 20 秒待って「ブラウザは起きたが、繋ぎ先を言ってこない」で落ちた。
+ *
+ * 中身は 2 行。1 行目が番号、2 行目が道。
+ */
+export function parseActivePort(contents: string): string | undefined {
+  const [port, path] = contents.split('\n');
+  if (port === undefined || !/^\d+$/.test(port.trim())) return undefined;
+  const suffix = path?.trim() ?? '';
+  return `ws://127.0.0.1:${port.trim()}${suffix}`;
+}
