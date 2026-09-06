@@ -268,8 +268,56 @@ describe('始められない理由を画面に出す', () => {
     expect(css).toContain("[data-bad='true']");
   });
 
+  /**
+   * **押せない理由が、自分の枠の外へ押し出されて見えなくなっていた**（2026-09-06）。
+   *
+   * カラムは縦の flex で、`.setup` の下に「はじめかた」が並ぶ。既定のままだと両方が縮み、
+   * `.setup` のいちばん下にある理由の行が、`overflow-y: auto` の外に出る。
+   * **文は DOM にあるのに、人の目には何も出ていない。**画面の部品を読んで気づいた
+   * （理由の行 y=523〜557 の上に「はじめかた」が y=537 から重なっていた）。
+   */
+  it('準備の欄は縮まない規則が CSS にある（理由の行が枠の外へ出ない）', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const url = await import('node:url');
+    const path = await import('node:path');
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const css = await readFile(path.resolve(here, '../../src/styles.css'), 'utf8');
+    const setup = css.slice(css.indexOf('.setup {'), css.indexOf('.setup-title'));
+
+    expect(setup).toContain('flex: 0 0 auto');
+    // 自分で縦に切らない。切ると、いちばん下の理由がまた隠れる。
+    expect(setup).not.toContain('overflow-y: auto');
+  });
+
   it('ハンドルが規則に合わないときは、そう名指しで出す', () => {
     expect(render('めたたろ').querySelector('.setup-blocked')?.textContent).toContain('ハンドル');
+  });
+
+  /**
+   * **理由を出したのに、同じ人が同じ所で 2 度止まった**（2026-09-06）。
+   *
+   * 出していたのは `ハンドルが規則に合っていないので始められない（0 の欄。英数字とハイフンだけ）`。
+   * 規則は書いてあるが、**いま入っている値の何が悪いのか**は書いていない。
+   * 入っていたのは `めたたろ` —— IME を切り忘れて打っただけ。
+   *
+   * **規則を読ませるのではなく、目の前の値の何が駄目かを言う。**
+   */
+  it('日本語が入っているときは、日本語だと名指しで出す', () => {
+    const blocked = render('めたたろ').querySelector('.setup-blocked')?.textContent ?? '';
+
+    expect(blocked).toContain('日本語');
+    // **次に何をすればいいか。**IME を切る所まで言わないと、また同じ所で止まる。
+    expect(blocked).toContain('IME');
+    // 打てる例が要る。規則の文だけでは、何を打てばいいかが分からない。
+    expect(blocked).toContain('octocat');
+  });
+
+  it('日本語ではない規則違反は、そちらの言い方をする', () => {
+    // 記号や先頭のハイフン。**日本語の話をされても直せない。**
+    const blocked = render('-bad_handle').querySelector('.setup-blocked')?.textContent ?? '';
+
+    expect(blocked).not.toContain('日本語');
+    expect(blocked).toContain('英数字');
   });
 
   it('ハンドルが空のときも、何をすれば始まるかを出す', () => {

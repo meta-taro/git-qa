@@ -74,6 +74,11 @@ const ja = {
   'setup.blocked.operator.empty': 'ハンドルを入れると始められる（0 の欄）',
   'setup.blocked.operator.bad':
     'ハンドルが規則に合っていないので始められない（0 の欄。英数字とハイフンだけ）',
+  // **規則を読ませるのではなく、目の前の値の何が駄目かを言う。**
+  // 同じ人が同じ所で 2 度止まった。どちらも IME を切り忘れて打っただけだった
+  'setup.blocked.operator.notAscii':
+    'ハンドルに日本語が入っているので始められない（0 の欄）。' +
+    'IME を切って、英数字とハイフンだけで入れ直す（例: octocat）',
   'setup.blocked.device': '端末が見えていないので始められない（1 の欄）',
   'setup.blocked.sheet': '検証シートが選べていないので始められない（2 の欄）',
   'setup.failed': '始められなかった: {message}',
@@ -166,6 +171,9 @@ const en: Record<keyof typeof ja, string> = {
   'setup.blocked.operator.empty': 'Enter your handle to start (field 0)',
   'setup.blocked.operator.bad':
     'That handle does not match the rule, so this cannot start (field 0: letters, digits and hyphens only)',
+  'setup.blocked.operator.notAscii':
+    'That handle contains characters outside ASCII, so this cannot start (field 0). ' +
+    'Turn off your IME and use letters, digits and hyphens only (e.g. octocat)',
   'setup.blocked.device': 'No device is visible, so this cannot start (field 1)',
   'setup.blocked.sheet': 'No test sheet is selected, so this cannot start (field 2)',
   'setup.failed': 'Could not start: {message}',
