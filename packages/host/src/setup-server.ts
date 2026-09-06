@@ -32,6 +32,8 @@ export interface SetupState {
   readonly sheets: readonly string[];
   readonly liveUrl?: string;
   readonly controlUrl?: string;
+  /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
+  readonly liveKind?: 'h264' | 'images';
   /** 始められなかった理由。**黙って idle へ戻さない。** */
   readonly error?: string;
 }
@@ -39,12 +41,21 @@ export interface SetupState {
 export interface StartedRun {
   readonly liveUrl: string;
   readonly controlUrl: string;
+  /**
+   * 流れてくる映像の種類。**画面側では決められない。**
+   * Android は H.264、ウェブはブラウザの画像 1 枚ずつ（C54）。
+   */
+  readonly liveKind?: 'h264' | 'images';
 }
 
 export interface StartSetupServerOptions {
   readonly listDevices: () => Promise<readonly SetupDevice[]>;
   readonly findSheets: () => Promise<readonly string[]>;
   readonly start: (params: {
+    /**
+     * 見る相手。**端末の serial か、ウェブページの URL。**
+     * どちらかは呼ばれた側（`app-cli`）が形で見分ける。
+     */
     serial: string;
     sheetPath: string;
     /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */

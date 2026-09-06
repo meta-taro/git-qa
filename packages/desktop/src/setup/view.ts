@@ -33,6 +33,9 @@ export interface RenderSetupOptions {
    * 空のままでは始められないようにする。
    */
   readonly operator?: string;
+  /** ウェブページの URL。**覚えておく**（毎回打たせない）。 */
+  readonly webUrl?: string;
+  readonly onWebUrlChange?: (url: string) => void;
   readonly onOperatorChange?: (handle: string) => void;
 }
 
@@ -156,10 +159,33 @@ export function renderSetup(
    * **押せるかどうか（ボタン）・規則を破っているか（印）・なぜ始まらないか（文）**を
    * 別々に更新すると、どれかが取り残される。
    */
+  /**
+   * ウェブページを見る口（Issue 015 / C54）。
+   *
+   * **配布物から使えないと意味がない。**`pnpm live:web` はターミナルの話で、
+   * 実際に検証する人はアプリしか開かない。ここに URL を入れたら、そちらを見る。
+   */
+  const webUrl = doc.createElement('input');
+  webUrl.type = 'text';
+  webUrl.className = 'setup-web';
+  webUrl.placeholder = t('setup.web.placeholder');
+  webUrl.value = options.webUrl ?? '';
+  const webHint = doc.createElement('p');
+  webHint.className = 'setup-hint';
+  webHint.textContent = t('setup.web');
+
+  const lookingAt = (): string | undefined => {
+    const url = webUrl.value.trim();
+    // **URL が優先。**打ち込んだ人は、そちらを見たいと言っている。
+    if (url !== '') return /^https?:\/\//.test(url) ? url : undefined;
+    // 人が選んだ端末。選んでいなければ、一覧の先頭。
+    return picked(column, 'setup-device', 'serial') ?? defaultSerial;
+  };
+
   const reflect = (handle: string): void => {
     // 準備中は、ボタンの文字（「準備しています…」）が理由を兼ねる。
     const reason =
-      state.phase === 'starting' ? undefined : blockedReason(handle, defaultSerial, defaultSheet);
+      state.phase === 'starting' ? undefined : blockedReason(handle, lookingAt(), defaultSheet);
     start.disabled = state.phase === 'starting' || reason !== undefined;
     operatorRule.dataset['bad'] = handle !== '' && !isValidHandle(handle) ? 'true' : 'false';
     blocked.textContent = reason ?? '';
@@ -172,6 +198,12 @@ export function renderSetup(
     const handle = operator.value.trim();
     reflect(handle);
     options.onOperatorChange?.(handle);
+  });
+
+  // URL を打っている最中も、押せるかどうかを合わせる。**打ち終わるまで黙らない。**
+  webUrl.addEventListener('input', () => {
+    reflect(operator.value.trim());
+    options.onWebUrlChange?.(webUrl.value.trim());
   });
 
   const deviceHeading = doc.createElement('p');
@@ -196,7 +228,7 @@ export function renderSetup(
   blocked.className = 'setup-blocked';
 
   start.addEventListener('click', () => {
-    const serial = picked(column, 'setup-device', 'serial');
+    const serial = lookingAt();
     // 一覧から選ばれていなければ、人が自分で選んだものを使う。
     const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
     const handle = operator.value.trim();
@@ -204,7 +236,7 @@ export function renderSetup(
     options.onStart({ serial, sheetPath, operator: handle });
   });
 
-  section.append(title, operatorHeading, operator, operatorRule, deviceHeading);
+  section.append(title, operatorHeading, operator, operatorRule, deviceHeading, webUrl, webHint);
 
   if (state.devices.length === 0) {
     const empty = doc.createElement('p');

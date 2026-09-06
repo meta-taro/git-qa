@@ -120,7 +120,7 @@ export function stubAdapter(options: {
 
   return {
     kind: 'android',
-    capabilities: { observation: 'accessibility-tree', recording: true },
+    capabilities: { observation: 'accessibility-tree', recording: true, textInput: 'ascii-only' },
     connect: () => {
       opened.push('session');
       return Promise.resolve(session);

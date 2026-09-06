@@ -28,6 +28,11 @@ export interface SheetCaseRunnerOptions {
    * 「アプリを起動する」の行き先になる。**無ければその手順は保留になる。**
    */
   readonly app?: string;
+  /**
+   * 文字をそのまま送れるか。**アダプタが名乗ったものをそのまま渡す**
+   * （`AdapterCapabilities.textInput`）。ここで推し量らない。
+   */
+  readonly textInput?: 'ascii-only' | 'any';
   readonly stepsColumn?: string;
   readonly expectationColumn?: string;
 }
@@ -89,10 +94,11 @@ export function createSheetCaseRunner(
   const expectationColumn = options.expectationColumn ?? EXPECTATION_COLUMN;
 
   return async (ctx: CaseContext): Promise<CaseVerdict> => {
-    const planned = planSteps(
-      ctx.subject.row.cells[stepsColumn] ?? '',
-      options.app === undefined ? {} : { app: options.app },
-    );
+    const planned = planSteps(ctx.subject.row.cells[stepsColumn] ?? '', {
+      ...(options.app === undefined ? {} : { app: options.app }),
+      // **相手が名乗った能力をそのまま使う。**ここで推し量らない。
+      ...(options.textInput === undefined ? {} : { textInput: options.textInput }),
+    });
     const held = holdBeforeTouching(planned);
     if (held !== undefined) return held;
 

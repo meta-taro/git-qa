@@ -97,6 +97,8 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
     // Android の画面の状態は uiautomator のツリー。DOM とは別物なので潰さない（C24）。
     observation: 'accessibility-tree',
     recording: true,
+    // `input text` は IME を通らない。日本語は送れない（C34）。
+    textInput: 'ascii-only',
   };
 
   const adbRun = async (args: readonly string[], serial?: string): Promise<Uint8Array> => {

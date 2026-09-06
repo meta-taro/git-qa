@@ -139,6 +139,8 @@ void startLocaleSync({
 async function startLiveView(
   container: HTMLElement,
   url: string,
+  /** 映像の種類。**実行器が知らせたものを優先する**（起動時のクエリは入口が 1 つのときだけ）。 */
+  told: 'h264' | 'images' | undefined,
   onCanvas: (canvas: HTMLCanvasElement) => void,
 ): Promise<void> {
   // 映像を出す前に案内を片付ける。**残すと映像の上に説明が重なる。**
@@ -146,7 +148,7 @@ async function startLiveView(
   renderOnboarding(container, onboarding);
 
   // **相手によって映像の形が違う。**Android は H.264、ウェブはブラウザの画像 1 枚ずつ（C54）。
-  const kind = liveKindFromLocation(window.location.search);
+  const kind = told ?? liveKindFromLocation(window.location.search);
 
   if (kind === 'h264') {
     diagnostics.canDecode = await isLiveViewSupported();
@@ -202,11 +204,15 @@ const controlUrl = controlUrlFromLocation(window.location.search);
  * **入口が 2 つある。**起動時に URL で渡される場合（`pnpm run:sheet`）と、
  * 画面で選んで始めた場合（`pnpm app`・Issue 011 段階 3）。**どちらも同じ道を通す。**
  */
-const startSession = (live: string, control: string | undefined): void => {
+const startSession = (
+  live: string,
+  control: string | undefined,
+  kind?: 'h264' | 'images',
+): void => {
   onboarding = 'running';
   renderOnboarding(root, onboarding);
 
-  startLiveView(root, live, (canvas) => {
+  startLiveView(root, live, kind, (canvas) => {
     // **人が端末を触れるようにする**（Issue 013）。実行に繋がっているときだけ。
     if (control === undefined) return;
     const send = (input: HumanInput): void => {
@@ -268,6 +274,8 @@ if (liveUrl !== undefined) {
     let recentSheets = readRecentSheets(defaultStore());
     /** 置いた人のハンドル。**覚えておく**（毎回打たせない）。 */
     let operator = readSetting('git-qa.operator', defaultStore()) ?? '';
+    /** 見るウェブページ。**覚えておく**（毎回打たせない）。 */
+    let webUrl = readSetting('git-qa.webUrl', defaultStore()) ?? '';
     /**
      * 実行へ移ったか。**取りに行く処理が同時に 2 本走ると、映像が二重に立ち上がる**
      * （実機で画面が 2 つ縦に並んだ）。
@@ -296,7 +304,7 @@ if (liveUrl !== undefined) {
         if (started) return;
         started = true;
         renderSetup(app, state, { onStart: () => undefined });
-        startSession(state.liveUrl, state.controlUrl);
+        startSession(state.liveUrl, state.controlUrl, state.liveKind);
         return;
       }
 
@@ -312,9 +320,14 @@ if (liveUrl !== undefined) {
         ...(pickedSheet === undefined ? {} : { pickedSheet }),
         recentSheets,
         operator,
+        webUrl,
         onOperatorChange: (handle) => {
           operator = handle;
           writeSetting('git-qa.operator', handle, defaultStore());
+        },
+        onWebUrlChange: (url) => {
+          webUrl = url;
+          writeSetting('git-qa.webUrl', url, defaultStore());
         },
         onStart: (params) => {
           // **開いたものを覚える。**次からは探索に頼らずここへ出す。

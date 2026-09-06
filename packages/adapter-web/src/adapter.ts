@@ -48,6 +48,8 @@ const capabilities: AdapterCapabilities = {
   observation: 'dom',
   // 録画はまだ持たない。**「できない」を黙って `failed` にしない**（C20）。
   recording: false,
+  // ブラウザは IME を通さずそのまま入る。**日本語も送れる。**
+  textInput: 'any',
 };
 
 /** 対象の一覧を聞いて、人が見る 1 枚の繋ぎ先を返す。 */

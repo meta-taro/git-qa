@@ -23,6 +23,14 @@ export interface AdapterCapabilities {
   readonly observation: ObservationKind;
   /** 録画できるか。できないなら {@link CaseRecording} に `unsupported` を返す（C20）。 */
   readonly recording: boolean;
+  /**
+   * 文字をそのまま送れるか。**相手によって違うので、アダプタが名乗る。**
+   *
+   * Android の `input text` は IME を通らないので ASCII しか送れない（`'ascii-only'`）。
+   * ブラウザはそのまま入る（`'any'`）。
+   * **省略できる形にしない。**既定を置くと、送れないのに送ったことになる相手が混ざる。
+   */
+  readonly textInput: 'ascii-only' | 'any';
 }
 
 export type ObservationKind = 'accessibility-tree' | 'dom' | 'ui-automation' | 'none';

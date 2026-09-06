@@ -219,3 +219,35 @@ describe('ウェブの起動（Issue 015）', () => {
     });
   });
 });
+
+/**
+ * **文字を送れる範囲は、相手によって違う**（Issue 015）。
+ *
+ * Android の `input text` は IME を通らないので ASCII しか送れない。
+ * ブラウザはそのまま入る。**Android の事情を、すべての相手に押し付けない。**
+ *
+ * 2026-09-06、ウェブの見本シートに「「お名前」に「テスト太郎」と入力する」と書いたら、
+ * `端末の入力は IME を通らないので送れない` で止まった。**ブラウザなら送れる。**
+ */
+describe('文字を送れる範囲（Issue 015）', () => {
+  it('既定は今までどおり、ASCII だけ（Android を壊さない）', () => {
+    const [step] = planSteps('「お名前」に「テスト太郎」と入力する');
+
+    expect(step?.kind).toBe('hold');
+    expect((step as { reason: string }).reason).toMatch(/IME/);
+  });
+
+  it('そのまま入る相手なら、日本語も送る', () => {
+    const [step] = planSteps('「お名前」に「テスト太郎」と入力する', { textInput: 'any' });
+
+    expect(step).toEqual({
+      kind: 'action',
+      text: '「お名前」に「テスト太郎」と入力する',
+      action: {
+        kind: 'type',
+        text: 'テスト太郎',
+        target: { at: 'element', ref: 'お名前' },
+      },
+    });
+  });
+});

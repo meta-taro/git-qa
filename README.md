@@ -269,6 +269,19 @@ pnpm run:sheet sheets/android-settings.tsv
 シートを読み、AI が端末を操作し、**人が横で見て 1 打鍵で判定を置く**までを 1 本で走らせます。
 終わると `runs/<runId>/run.json` が出ます（`runs/` は Git に入れません）。
 
+### ウェブページを検証する
+
+```bash
+pnpm live:web http://localhost:3000/        # 映像だけ見る
+pnpm run:sheet:web sheets/web-sample-ja.tsv # シートを 1 本走らせる
+```
+
+人が持っているブラウザ（Chrome 等）を CDP で動かします。**依存は足していません**（C54）。
+シートの見出し `# 対象:` に URL を書きます。**配布物（.app）からは、
+「1. 見る相手を選ぶ」の URL 欄に入れて始められます。**
+
+> 使ってみる人への案内は **`docs/alpha-guide.md`**。
+
 | キー | 置くもの |
 |---|---|
 | `v` | `VERIFIED`（見た。合格） |

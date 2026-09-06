@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
+import { createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
+
 import {
   createAndroidAdapter,
   listAndroidDevices,
@@ -70,15 +72,31 @@ const setup = await startSetupServer({
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
+    /**
+     * 見る相手は、端末か、ウェブページか。**形で見分ける。**
+     *
+     * 画面から来るのは「選んだ端末の serial」か「打ち込まれた URL」のどちらか。
+     * ここで別の場所へ行かない —— ウェブの行き先はシートの `# 対象:`（C40）。
+     */
+    const web = /^https?:\/\//.test(serial);
+    const url = web ? (sheet.meta['対象'] ?? serial) : undefined;
+
     session = await startRunSession({
-      adapter: createAndroidAdapter({
-        build: {
-          source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-          label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
-        },
-        liveView: { mode: 'h264-stream' },
-        serial,
-      }),
+      adapter:
+        web && url !== undefined
+          ? createWebAdapter({
+              build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+              // 同じ幅で見ないと、崩れの有無を比べられない。
+              size: { width: 1280, height: 900 },
+            })
+          : createAndroidAdapter({
+              build: {
+                source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+                label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+              },
+              liveView: { mode: 'h264-stream' },
+              serial,
+            }),
       sheet,
       sheetRef: {
         path: sheetPath,
@@ -91,7 +109,7 @@ const setup = await startSetupServer({
       // **置いた人。**画面から受け取る。無ければ環境変数、それも無ければ unknown
       // （unknown のまま残ると「誰が保証したか」が読めないので、画面側で入力を促す）。
       operator: { handle: operator ?? process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
-      readScreenText: readAndroidScreenText,
+      readScreenText: web ? readWebScreenText : readAndroidScreenText,
       // **保存は実行の一部。**配布物（--serve）には書く処理が無く、人が置いた判定が
       // どこにも残らないまま終わっていた（2026-09-04・実機で踏んだ）。
       // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
@@ -107,7 +125,12 @@ const setup = await startSetupServer({
     });
 
     finished = session.done;
-    return { liveUrl: session.liveUrl, controlUrl: session.controlUrl };
+    // **画面側では映像の種類を決められない。**実行器が知らせる（C54）。
+    return {
+      liveUrl: session.liveUrl,
+      controlUrl: session.controlUrl,
+      liveKind: web ? ('images' as const) : ('h264' as const),
+    };
   },
 });
 

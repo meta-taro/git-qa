@@ -32,6 +32,13 @@ export interface PlanOptions {
    * **無ければ「アプリを起動する」「ページを開く」は保留になる。**
    */
   readonly app?: string;
+  /**
+   * 文字をそのまま送れるか。
+   *
+   * Android の `input text` は IME を通らないので ASCII しか送れない（既定）。
+   * ブラウザはそのまま入るので `'any'`。**Android の事情を全部の相手に押し付けない。**
+   */
+  readonly textInput?: 'ascii-only' | 'any';
 }
 
 /** 行頭の番号・箇条書き記号。書式は書き手によって揺れるので、まとめて剥がす。 */
@@ -67,8 +74,12 @@ const APP_ID = /^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
 /** 端末の `input text` は IME を経由しないので、ASCII の範囲しか送れない。 */
 const ASCII_ONLY = /^[\x20-\x7e]*$/;
 
-function planType(text: string, target: string | undefined): PlannedStep {
-  if (!ASCII_ONLY.test(text)) {
+function planType(
+  text: string,
+  target: string | undefined,
+  textInput: 'ascii-only' | 'any',
+): PlannedStep {
+  if (textInput === 'ascii-only' && !ASCII_ONLY.test(text)) {
     // 黙って化けた文字を打つより、送れないと言うほうがよい（adapter-android と同じ判断）。
     return {
       kind: 'hold',
@@ -132,16 +143,20 @@ function planLaunch(rawName: string, app: string | undefined, text: string): Pla
   };
 }
 
-function planOneStep(text: string, app: string | undefined): PlannedStep {
+function planOneStep(
+  text: string,
+  app: string | undefined,
+  textInput: 'ascii-only' | 'any',
+): PlannedStep {
   const into = TYPE_INTO.exec(text);
   if (into?.groups) {
     const target = into.groups['target'] ?? into.groups['bare'];
-    return { ...planType(into.groups['text'] ?? '', target), text };
+    return { ...planType(into.groups['text'] ?? '', target, textInput), text };
   }
 
   const only = TYPE_ONLY.exec(text);
   if (only?.groups) {
-    return { ...planType(only.groups['text'] ?? '', undefined), text };
+    return { ...planType(only.groups['text'] ?? '', undefined, textInput), text };
   }
 
   const launch = LAUNCH.exec(text);
@@ -187,7 +202,8 @@ export function planSteps(stepsText: string, options: PlanOptions = {}): Planned
   if (lines.length === 0) {
     return [{ kind: 'hold', text: stepsText.trim(), reason: '手順が空' }];
   }
-  return lines.map((line) => planOneStep(line, options.app));
+  const textInput = options.textInput ?? 'ascii-only';
+  return lines.map((line) => planOneStep(line, options.app, textInput));
 }
 
 /** 画面に在るかどうかで決まる期待結果。 */

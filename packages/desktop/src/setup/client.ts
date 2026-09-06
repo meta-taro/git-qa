@@ -20,6 +20,8 @@ export interface SetupState {
   readonly sheets: readonly string[];
   readonly liveUrl?: string;
   readonly controlUrl?: string;
+  /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
+  readonly liveKind?: 'h264' | 'images';
   readonly error?: string;
 }
 

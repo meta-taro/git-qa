@@ -302,6 +302,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
     ...(app === undefined ? {} : { app }),
+    // **相手が名乗った能力をそのまま渡す。**Android の事情を全部の相手に押し付けない。
+    textInput: options.adapter.capabilities.textInput,
   });
 
   const runCase = async (ctx: CaseContext): Promise<CaseVerdict> => {
