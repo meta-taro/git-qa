@@ -4,5 +4,7 @@
 // `node:fs` に依存する。webview 側から使うとバンドルできない（実際にビルドが落ちた）。
 // 映像の切り出しはどちらの実行環境でも要るので、ここから出す。
 export { createAnnexBSplitter } from './annexb.js';
+export { createFrameSplitter, encodeFrame } from './frames.js';
+export type { FrameSplitter, FrameSplitterOptions } from './frames.js';
 export type { AccessUnit, AnnexBSplitter } from './annexb.js';
 export { codecFromAnnexB } from './codec.js';

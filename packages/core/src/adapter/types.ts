@@ -53,7 +53,8 @@ export interface LiveView {
   open(): Promise<void>;
   close(): Promise<void>;
   /**
-   * 映像そのものを読む口。**`transport.kind` が `'h264-stream'` のときだけ持つ。**
+   * 映像そのものを読む口。**枠の中に描く方式のときだけ持つ**
+   * （`'h264-stream'` と `'image-frames'`）。
    *
    * 別窓で出す方式では映像はここを通らないので、無いのが正しい。
    * 「必ずある」ことにすると、別窓の実装が空の口を返すことになり、
@@ -70,7 +71,14 @@ export type LiveViewTransport =
    * 生 H.264（Annex-B）を流す。**アプリの枠の中に描ける**方式（C27 の方式 A）。
    * 受け手は `createAnnexBSplitter` で切って復号する。
    */
-  | { readonly kind: 'h264-stream'; readonly label: string };
+  | { readonly kind: 'h264-stream'; readonly label: string }
+  /**
+   * 画像を 1 枚ずつ流す（ウェブ検証・C54）。**こちらもアプリの枠の中に描ける**（C27 の方式 A）。
+   *
+   * ブラウザから来るのは `Page.screencastFrame` の画像で、H.264 のような区切りが無い。
+   * 受け手は `createFrameSplitter` で切り、`createImageBitmap` で描く。
+   */
+  | { readonly kind: 'image-frames'; readonly label: string; readonly mimeType: 'image/jpeg' };
 
 export interface Observation {
   readonly kind: Target['kind'];

@@ -56,6 +56,8 @@ export type { ValidationResult } from './run/validate.js';
 // 生 H.264 の切り出しは UI 固有ではない。映像を出す側（アダプタ）も、
 // 描く側（デスクトップ）も同じ切り方を使う。
 export { createAnnexBSplitter } from './live/annexb.js';
+export { createFrameSplitter, encodeFrame } from './live/frames.js';
+export type { FrameSplitter, FrameSplitterOptions } from './live/frames.js';
 export type { AccessUnit, AnnexBSplitter } from './live/annexb.js';
 
 export { AdapterError, humanMessage } from './adapter/errors.js';
