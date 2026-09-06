@@ -107,9 +107,12 @@ export function createSafariAdapter(options: SafariAdapterOptions): TargetAdapte
           KIND,
           detail.includes('Allow remote automation')
             ? 'Safari を外から動かす許可が入っていない。' +
-                'Safari の設定 →「詳細」→「Web デベロッパ用の機能を表示」を入れ、' +
-                '「開発」メニュー →「リモートオートメーションを許可」にチェックを入れる' +
-                `（元の理由: ${detail}）`
+                'Safari の設定 →「デベロッパ」タブ →「リモートオートメーションを許可」に' +
+                'チェックを入れる。' +
+                '（「デベロッパ」タブが無ければ、先に「詳細」タブの' +
+                '「Web デベロッパ用の機能を表示」を入れる。' +
+                '古い版では「開発」メニューの中にある）' +
+                `元の理由: ${detail}`
             : detail,
         );
       }
