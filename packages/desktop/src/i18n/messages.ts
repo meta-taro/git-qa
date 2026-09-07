@@ -36,7 +36,7 @@ const ja = {
   'verdict.revise': '置き直し（このケースは済んでいる。置いても次へは進まない）',
   'key.prev': '前のケースを見る',
   'key.next': '次のケースを見る',
-  'key.move.note': '見る場所が動くだけ。戻って置き直せる',
+  'key.move.note': '走り終わったケースだけを行き来する。戻って置き直せる',
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   'verdict.finished': '検証は終了しました',
   'setup.operator.rule':
@@ -147,7 +147,7 @@ const en: Record<keyof typeof ja, string> = {
   'verdict.revise': 'Re-placing a verdict (this case is done; it will not move on)',
   'key.prev': 'Look at the previous case',
   'key.next': 'Look at the next case',
-  'key.move.note': 'Only moves what you are looking at; you can go back and re-place',
+  'key.move.note': 'Moves among cases that have run; you can go back and re-place',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'verdict.finished': 'This run has finished.',
   'setup.operator.rule':
