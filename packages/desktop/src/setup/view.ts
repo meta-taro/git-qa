@@ -50,6 +50,9 @@ export interface RenderSetupOptions {
   /** 名前の無いブラウザの場所。**「その他」を選んだときだけ使う。** */
   readonly browserPath?: string;
   readonly onBrowserPathChange?: (path: string) => void;
+  /** 見るデスクトップアプリの名前。**覚えておく。** */
+  readonly appName?: string;
+  readonly onAppNameChange?: (name: string) => void;
   readonly onOperatorChange?: (handle: string) => void;
 }
 
@@ -189,6 +192,26 @@ export function renderSetup(
   webHint.textContent = t('setup.web');
 
   /**
+   * デスクトップアプリ（Issue 016）。
+   *
+   * **配布物から選べないと意味がない。**`pnpm run:sheet:desktop` はターミナルの話で、
+   * 実際に検証する人はアプリしか開かない。
+   */
+  const appName = doc.createElement('input');
+  appName.type = 'text';
+  appName.className = 'setup-web';
+  appName.placeholder = t('setup.app.placeholder');
+  appName.value = options.appName ?? '';
+  appName.addEventListener('input', () => {
+    reflect(operator.value.trim());
+    options.onAppNameChange?.(appName.value.trim());
+  });
+
+  const appHint = doc.createElement('p');
+  appHint.className = 'setup-hint';
+  appHint.textContent = t('setup.app');
+
+  /**
    * どのブラウザで見るか（人の求め・2026-09-06）。
    *
    * > chrome, エッヂを選択できて、検証時につかったブラウザのバージョンなども
@@ -250,6 +273,9 @@ export function renderSetup(
     const url = webUrl.value.trim();
     // **URL が優先。**打ち込んだ人は、そちらを見たいと言っている。
     if (url !== '') return /^https?:\/\//.test(url) ? url : undefined;
+    // 次にアプリ名。**`app:` を付けて、端末の serial と混ざらないようにする。**
+    const app = appName.value.trim();
+    if (app !== '') return `app:${app}`;
     // 人が選んだ端末。選んでいなければ、一覧の先頭。
     return picked(column, 'setup-device', 'serial') ?? defaultSerial;
   };
@@ -324,6 +350,8 @@ export function renderSetup(
     deviceHeading,
     webUrl,
     webHint,
+    appName,
+    appHint,
     browser,
     browserLabel,
     browserPath,

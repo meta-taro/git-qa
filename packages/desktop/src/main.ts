@@ -280,6 +280,8 @@ if (liveUrl !== undefined) {
     let browser = readSetting('git-qa.browser', defaultStore()) ?? 'chrome';
     /** 名前の無いブラウザの場所。**覚えておく**（毎回打たせない）。 */
     let browserPath = readSetting('git-qa.browserPath', defaultStore()) ?? '';
+    /** 見るデスクトップアプリの名前。**覚えておく。** */
+    let appName = readSetting('git-qa.appName', defaultStore()) ?? '';
     /**
      * 実行へ移ったか。**取りに行く処理が同時に 2 本走ると、映像が二重に立ち上がる**
      * （実機で画面が 2 つ縦に並んだ）。
@@ -342,6 +344,11 @@ if (liveUrl !== undefined) {
         onBrowserPathChange: (path) => {
           browserPath = path;
           writeSetting('git-qa.browserPath', path, defaultStore());
+        },
+        appName,
+        onAppNameChange: (name) => {
+          appName = name;
+          writeSetting('git-qa.appName', name, defaultStore());
         },
         onStart: (params) => {
           // **開いたものを覚える。**次からは探索に頼らずここへ出す。

@@ -1,7 +1,11 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+
+import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
 
 import {
   createFirefoxAdapter,
@@ -44,6 +48,26 @@ import { watchParent } from './watch-parent.js';
 /** 画面を起こさない（配布物の中から呼ばれるとき）。 */
 const serveOnly = process.argv.includes('--serve');
 
+/**
+ * 絵から文字を読む道具（段 2・C55）。
+ *
+ * **配布物には同梱されている**（`resources/git-qa-ocr`）。この実行器は同じ所から
+ * 呼ばれるので、隣を見に行けば見つかる。**無ければ段 1 だけで動く。**
+ */
+const ocrPath = await (async (): Promise<string | undefined> => {
+  const fromEnv = process.env['GIT_QA_OCR'];
+  if (fromEnv !== undefined) return fromEnv;
+
+  const beside = join(dirname(fileURLToPath(import.meta.url)), 'git-qa-ocr');
+  try {
+    await access(beside);
+    return beside;
+  } catch {
+    // 同梱されていない（開発中に直接動かした等）。**段 1 だけで動く。**
+    return undefined;
+  }
+})();
+
 /** `20260902-150000`。人が ls で並べ替えられる形にする。 */
 const runIdFrom = (at: Date): string => {
   const pad = (n: number): string => String(n).padStart(2, '0');
@@ -85,6 +109,8 @@ const setup = await startSetupServer({
      */
     const web = /^https?:\/\//.test(serial);
     const url = web ? (sheet.meta['対象'] ?? serial) : undefined;
+    /** `app:連絡くん` の形で来たら、デスクトップアプリ（Issue 016）。 */
+    const app = serial.startsWith('app:') ? serial.slice(4) : undefined;
 
     /** Firefox と Safari はエンジンが違う。**同じコードには乗らない**（Issue 018）。 */
     const chromium =
@@ -92,35 +118,42 @@ const setup = await startSetupServer({
 
     session = await startRunSession({
       adapter:
-        web && url !== undefined && browser === 'firefox'
-          ? createFirefoxAdapter({
-              build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-              size: { width: 1280, height: 900 },
+        app !== undefined
+          ? createDesktopAdapter({
+              app,
+              build: { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+              // **同梱の OCR を既定で使う**（段 2・C55）。無ければ段 1 だけで動く。
+              ...(ocrPath === undefined ? {} : { ocrPath }),
             })
-          : web && url !== undefined && browser === 'safari'
-            ? createSafariAdapter({
+          : web && url !== undefined && browser === 'firefox'
+            ? createFirefoxAdapter({
                 build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+                size: { width: 1280, height: 900 },
               })
-            : web && url !== undefined
-              ? createWebAdapter({
+            : web && url !== undefined && browser === 'safari'
+              ? createSafariAdapter({
                   build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-                  // 同じ幅で見ないと、崩れの有無を比べられない。
-                  size: { width: 1280, height: 900 },
-                  // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
-                  // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
-                  ...(browserPath === undefined ? {} : { browserPath }),
-                  ...(chromium === undefined || browserPath !== undefined
-                    ? {}
-                    : { browser: chromium }),
                 })
-              : createAndroidAdapter({
-                  build: {
-                    source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-                    label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
-                  },
-                  liveView: { mode: 'h264-stream' },
-                  serial,
-                }),
+              : web && url !== undefined
+                ? createWebAdapter({
+                    build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+                    // 同じ幅で見ないと、崩れの有無を比べられない。
+                    size: { width: 1280, height: 900 },
+                    // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
+                    // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
+                    ...(browserPath === undefined ? {} : { browserPath }),
+                    ...(chromium === undefined || browserPath !== undefined
+                      ? {}
+                      : { browser: chromium }),
+                  })
+                : createAndroidAdapter({
+                    build: {
+                      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+                      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                    },
+                    liveView: { mode: 'h264-stream' },
+                    serial,
+                  }),
       sheet,
       sheetRef: {
         path: sheetPath,
@@ -133,7 +166,8 @@ const setup = await startSetupServer({
       // **置いた人。**画面から受け取る。無ければ環境変数、それも無ければ unknown
       // （unknown のまま残ると「誰が保証したか」が読めないので、画面側で入力を促す）。
       operator: { handle: operator ?? process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
-      readScreenText: web ? readWebScreenText : readAndroidScreenText,
+      readScreenText:
+        app !== undefined ? readDesktopScreenText : web ? readWebScreenText : readAndroidScreenText,
       // **保存は実行の一部。**配布物（--serve）には書く処理が無く、人が置いた判定が
       // どこにも残らないまま終わっていた（2026-09-04・実機で踏んだ）。
       // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
@@ -153,7 +187,7 @@ const setup = await startSetupServer({
     return {
       liveUrl: session.liveUrl,
       controlUrl: session.controlUrl,
-      liveKind: web ? ('images' as const) : ('h264' as const),
+      liveKind: web || app !== undefined ? ('images' as const) : ('h264' as const),
     };
   },
 });
