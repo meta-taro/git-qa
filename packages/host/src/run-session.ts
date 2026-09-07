@@ -192,6 +192,9 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   /** ケース番号ごとの「打鍵待ち」。**宛先の違う打鍵は捨てる。** */
   const waiting = new Map<number, (input: HumanInput | undefined) => void>();
 
+  /** 人が触った分を、**1 つずつ順に**端末へ送るための列。 */
+  let humanWork: Promise<void> = Promise.resolve();
+
   live.bridge.onInput((raw) => {
     const input = parseHumanInput(raw);
     if (input === undefined) return;
@@ -230,46 +233,55 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
         };
       };
 
-      // **人の番のときだけ端末へ送る**（待っている＝AI の操作は終わっている）。
-      // AI の操作中に人の操作が割り込むと、どちらがやったのか証跡から読めなくなる。
-      void (async () => {
-        const at = (options.now ?? (() => new Date()))().toISOString();
-        let action: Action;
-        let record: HumanAction;
+      /**
+       * **人の番のときだけ端末へ送る**（待っている＝AI の操作は終わっている）。
+       * AI の操作中に人の操作が割り込むと、どちらがやったのか証跡から読めなくなる。
+       *
+       * **1 つずつ順に送る。**同時に走らせると、なぞる操作どうしが指の位置を奪い合う
+       * （2026-09-07「ポインタが斜めにとばされるんですよね」）。
+       * 送る側は「元の位置を覚えて、返す」をやっているので、
+       * **前の操作が返す前に次が覚えると、覚える位置がもう動いている。**
+       */
+      humanWork = humanWork
+        .then(async () => {
+          const at = (options.now ?? (() => new Date()))().toISOString();
+          let action: Action;
+          let record: HumanAction;
 
-        if (input.kind === 'tap') {
-          const to = await scale(input.x, input.y);
-          action = { kind: 'tap', target: { at: 'point', ...to } };
-          record = { at, kind: 'tap', to };
-        } else if (input.kind === 'longPress') {
-          // **端末に「長押し」という命令は無い。**同じ場所へ時間をかけてなぞると長押しになる。
-          const to = await scale(input.x, input.y);
-          action = {
-            kind: 'swipe',
-            from: { at: 'point', ...to },
-            to: { at: 'point', ...to },
-            durationMs: input.durationMs,
-          };
-          record = { at, kind: 'longPress', to };
-        } else {
-          const from = await scale(input.from.x, input.from.y);
-          const to = await scale(input.to.x, input.to.y);
-          action = {
-            kind: 'swipe',
-            from: { at: 'point', ...from },
-            to: { at: 'point', ...to },
-            durationMs: input.durationMs,
-          };
-          record = { at, kind: 'swipe', from, to };
-        }
+          if (input.kind === 'tap') {
+            const to = await scale(input.x, input.y);
+            action = { kind: 'tap', target: { at: 'point', ...to } };
+            record = { at, kind: 'tap', to };
+          } else if (input.kind === 'longPress') {
+            // **端末に「長押し」という命令は無い。**同じ場所へ時間をかけてなぞると長押しになる。
+            const to = await scale(input.x, input.y);
+            action = {
+              kind: 'swipe',
+              from: { at: 'point', ...to },
+              to: { at: 'point', ...to },
+              durationMs: input.durationMs,
+            };
+            record = { at, kind: 'longPress', to };
+          } else {
+            const from = await scale(input.from.x, input.from.y);
+            const to = await scale(input.to.x, input.to.y);
+            action = {
+              kind: 'swipe',
+              from: { at: 'point', ...from },
+              to: { at: 'point', ...to },
+              durationMs: input.durationMs,
+            };
+            record = { at, kind: 'swipe', from, to };
+          }
 
-        // **端末の実寸で残す。**画面に映していた大きさではなく、実際に触った位置。
-        touched.set(input.caseNo, [...(touched.get(input.caseNo) ?? []), record]);
-        await live.session.act(action);
-      })().catch((error: unknown) => {
-        // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
-        console.error('[git-qa] 人の操作を端末へ送れない', error);
-      });
+          // **端末の実寸で残す。**画面に映していた大きさではなく、実際に触った位置。
+          touched.set(input.caseNo, [...(touched.get(input.caseNo) ?? []), record]);
+          await live.session.act(action);
+        })
+        .catch((error: unknown) => {
+          // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
+          console.error('[git-qa] 人の操作を端末へ送れない', error);
+        });
       return;
     }
 

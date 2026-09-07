@@ -49,6 +49,7 @@ extern "C" {
     fn CGEventCreateMouseEvent(source: Ref, kind: u32, at: CGPoint, button: u32) -> Ref;
     fn CGEventPost(tap: u32, event: Ref);
     fn CGWarpMouseCursorPosition(at: CGPoint) -> i32;
+    fn CGAssociateMouseAndMouseCursorPosition(connected: i32) -> i32;
     fn AXUIElementCopyElementAtPosition(app: Ref, x: f32, y: f32, out: *mut Ref) -> i32;
     fn AXUIElementCopyAttributeValue(el: Ref, attr: *const c_void, out: *mut Ref) -> i32;
     fn AXUIElementPerformAction(el: Ref, action: *const c_void) -> i32;
@@ -118,6 +119,19 @@ fn fail(message: &str) -> ! {
     std::process::exit(1);
 }
 
+/**
+指を元へ返す。
+
+**返すだけでは足りない。**`CGWarpMouseCursorPosition` の後、macOS は
+**0.25 秒ほど、実際のマウスの動きを画面の指に伝えない。**
+人からはこう見える: 「ポインタが斜めにとばされるんですよね」。
+`CGAssociateMouseAndMouseCursorPosition(1)` で、その場で繋ぎ直す。
+*/
+unsafe fn warp_back(to: CGPoint) {
+    let _ = CGWarpMouseCursorPosition(to);
+    let _ = CGAssociateMouseAndMouseCursorPosition(1);
+}
+
 /// いま指が居る場所。**返しに行くために覚える。**
 unsafe fn cursor_now() -> CGPoint {
     let probe = CGEventCreate(std::ptr::null_mut());
@@ -160,7 +174,7 @@ unsafe fn scroll(x: f64, y: f64, lines: i32) {
     // **人のポインタを飛ばしたままにしない。**
     // 早く返しすぎると、滑車が届く前に指が戻ってしまう（実測）。
     std::thread::sleep(std::time::Duration::from_millis(120));
-    let _ = CGWarpMouseCursorPosition(was);
+    warp_back(was);
 }
 
 /**
@@ -219,7 +233,7 @@ unsafe fn drag(pid: i32, from: CGPoint, to: CGPoint) {
     post(2, to);
 
     // **人のポインタを飛ばしたままにしない。**
-    let _ = CGWarpMouseCursorPosition(was_cursor);
+    warp_back(was_cursor);
     if was_pid != 0 && was_pid != pid {
         let back = AXUIElementCreateApplication(was_pid);
         let _ = AXUIElementSetAttributeValue(back, cfstr("AXFrontmost"), kCFBooleanTrue);
