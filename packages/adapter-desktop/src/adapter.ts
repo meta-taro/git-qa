@@ -372,8 +372,19 @@ async function dispatch(
   lookWindow: () => Promise<WindowRef>,
 ): Promise<void> {
   if (action.kind === 'launch') {
-    // **書いてあるものだけを開く。**表示名からの推測はしない（C40）。
-    // ここだけは前面に出す —— シートが「起動する」と書いているので、人も承知している。
+    /**
+     * **書いてあるものだけを開く。**表示名からの推測はしない（C40）。
+     *
+     * **もう窓が出ているなら、何もしない。**
+     * 実物の検証シートは、ほぼ全部のケースが「アプリを起動する」で始まる。
+     * ここで毎回 `activate()` していたので、**人が判定を 1 件置くたびに相手が前面へ出ていた**
+     * （2026-09-07「キーボード押すたびに連動くんが前にくるのじゃまですw」）。
+     *
+     * 見るのに前面は要らない（窓の番号で撮っている）。**出ていないときだけ起こす。**
+     */
+    const already = parseWindow(await osa(windowScript(action.app)).catch(() => ''));
+    if (already !== undefined) return;
+
     await osa(`Application(${JSON.stringify(action.app)}).activate()`);
     return;
   }

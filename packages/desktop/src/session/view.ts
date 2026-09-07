@@ -1,7 +1,7 @@
 import type { SessionCase, SessionState } from '@git-qa/core/session';
 
 import { t } from '../i18n/current.js';
-import { KEY_BINDINGS } from './keys.js';
+import { KEY_BINDINGS, keyCap } from './keys.js';
 import { markFor } from './marks.js';
 
 /**
@@ -103,7 +103,7 @@ function renderKeyHelp(doc: Document, enabled: boolean): HTMLElement {
 
     const cap = doc.createElement('span');
     cap.className = 'key-binding';
-    cap.textContent = binding.key === ' ' ? 'Space' : binding.key;
+    cap.textContent = keyCap(binding.key);
 
     const text = doc.createElement('span');
     text.className = 'key-text';

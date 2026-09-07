@@ -92,3 +92,22 @@ export function shouldIgnoreKeyPress(target: EventTarget | null): boolean {
   if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button') return true;
   return target.getAttribute('contenteditable') === 'true';
 }
+
+/**
+ * 画面に出すキーの名前。
+ *
+ * **`ArrowUp` はブラウザの内部の名前**で、人に見せる名前ではない
+ * （2026-09-07「あとあろうアプとかなぜえいごですか？記号ではだめなの？」）。
+ * **キーボードに刻まれているものを出す。**
+ */
+const CAPS: Readonly<Record<string, string>> = {
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  ' ': 'スペース',
+};
+
+export function keyCap(key: string): string {
+  return CAPS[key] ?? (key.length === 1 ? key.toUpperCase() : key);
+}
