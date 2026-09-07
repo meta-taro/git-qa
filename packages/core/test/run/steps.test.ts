@@ -39,6 +39,41 @@ describe('planSteps — 手順を操作へ落とす', () => {
     });
   });
 
+  /**
+   * **実物の検証シートは「押す」と書く**（2026-09-07）。
+   *
+   * 連動くん（browser-sync-agent）の検証シート 55 行を通したら、
+   * 「「⚙ 管理」を押す」のような行が全部落ちた。**日本語の button は「押す」。**
+   */
+  it('鉤括弧付きの「押す」も tap に落とす', () => {
+    const [step] = planSteps('「⚙ 管理」を押す');
+
+    expect(step).toMatchObject({
+      action: { kind: 'tap', target: { at: 'element', ref: '⚙ 管理' } },
+    });
+  });
+
+  it('「押下する」も同じ', () => {
+    const [step] = planSteps('「保存」を押下する');
+
+    expect(step).toMatchObject({
+      action: { kind: 'tap', target: { at: 'element', ref: '保存' } },
+    });
+  });
+
+  /**
+   * **鉤括弧の無い「押す」は受けない。**
+   *
+   * 「Win+← を押す」「Enter を押す」は**キーの話**で、画面の文字ではない。
+   * 「クリック」なら鉤括弧が無くても要素だと決まるが、「押す」は決まらない。
+   * **決まらないものを当てにいくと、無い要素を探して別の理由で落ちる。**
+   */
+  it('鉤括弧の無い「押す」は保留にする（キー操作と区別できない）', () => {
+    const [step] = planSteps('3. Win+← を押す');
+
+    expect(step).toMatchObject({ kind: 'hold' });
+  });
+
   it('「X に「Y」と入力する」を type に落とす', () => {
     const [step] = planSteps('1. 本文に「abc」と入力する');
 

@@ -60,6 +60,17 @@ const TYPE_INTO = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))に「(?<text>[^」
 const TYPE_ONLY = /^「(?<text>[^」]*)」と入力する$/;
 /** `「X」をタップする` / `X をタップする`（クリックも同じ扱い） */
 const TAP = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:タップ|クリック)する?$/;
+/**
+ * `「X」を押す` / `「X」を押下する`。**日本語の button は「押す」と書かれる。**
+ *
+ * 2026-09-07、連動くん（browser-sync-agent）の実物の検証シート 55 行を通したら、
+ * 「「⚙ 管理」を押す」のような行がすべて落ちた。
+ *
+ * **鉤括弧を必須にしている。**「Win+← を押す」「Enter を押す」は**キーの話**で、
+ * 画面に見えている文字ではない。「クリック」なら括弧が無くても要素だと決まるが、
+ * 「押す」は決まらない。**決まらないものを当てにいかない。**
+ */
+const PRESS = /^「(?<target>[^」]+)」を押(?:す|下する)$/;
 
 /** `「X」を起動する` / `X を起動する` */
 const LAUNCH = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))\s*を(?:(?:起動|開始)する|開く)$/;
@@ -206,6 +217,12 @@ function planOneStep(
   const tap = TAP.exec(text);
   if (tap?.groups) {
     const ref = tap.groups['target'] ?? tap.groups['bare'] ?? '';
+    return { kind: 'action', text, action: { kind: 'tap', target: { at: 'element', ref } } };
+  }
+
+  const press = PRESS.exec(text);
+  if (press?.groups) {
+    const ref = press.groups['target'] ?? '';
     return { kind: 'action', text, action: { kind: 'tap', target: { at: 'element', ref } } };
   }
 
