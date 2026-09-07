@@ -17,12 +17,20 @@ import type {
   TargetSession,
 } from '@git-qa/core';
 
-import { axScript, findInElements, parseElements } from './ax.js';
+import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
 import type { AxElement } from './ax.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
-import { captureArgs, parseWindow, windowScript } from './window.js';
+import {
+  captureArgs,
+  notFrontmost,
+  occludedBy,
+  parseTopWindow,
+  parseWindow,
+  topWindowScript,
+  windowScript,
+} from './window.js';
 import type { WindowRef } from './window.js';
 
 /**
@@ -103,6 +111,19 @@ export function createDesktopAdapter(options: DesktopAdapterOptions): TargetAdap
             '（名前は窓の持ち主のもの。「情報を見る」の名前とは違うことがある）',
         );
       }
+      /**
+       * **中身を出してもらってから始める。**
+       *
+       * Electron / Chromium は聞かれるまで木を作らない。作っていない相手には、
+       * 段 1 が空になるうえ、押すと `-25211`（補助アクセスは許可されません）が返る。
+       * **許可はあるのに、その文言で返るので、原因の見当がまるで違う方へ向く。**
+       *
+       * **失敗は握り潰す。**この属性を持たないアプリ（普通の Mac アプリ）では
+       * 必ず失敗し、そちらは何もしなくても最初から中身が見えている。
+       * ここで止めると、Electron でない相手が全部通らなくなる。
+       */
+      await run('osascript', ['-e', manualAccessibilityScript(options.app)]).catch(() => undefined);
+
       return createSession({ ...options, now, window });
     },
   };
@@ -322,19 +343,23 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
   }
 
   /**
-   * **毎回は前面に出さない。**
+   * **見るだけなら前面に出さない。**
    *
    * 2026-09-06、人から報告があった:
    * 「チャット欄に書き込もうとしてフォーカス当てると、実際のアプリに移動しちゃうね」。
    * 操作のたびに `activate()` していたので、**人が別の窓に打っている最中でも奪っていた。**
-   *
    * **検証は人の作業の上で走る。**人の手を止める道具は、それだけで使われなくなる。
-   * 前面に出すのは、シートが「起動する」と書いたときだけにする。
+   *
+   * **ただし押すときは別**（2026-09-07 に実測して戻した・`clickAt`）。
+   * 押すのは画面全体の座標なので、隠れていれば手前の別アプリが受け取る。
+   * 実際に Google Chrome のツールバーと warifu の窓を押していた。
+   * **奪わないことより、別のアプリを押さないことが先。**
    */
   if (action.kind === 'type') {
     if (action.target !== undefined) {
+      const seen = await look();
       const point = await resolvePoint(action.target, look);
-      await clickAt(point);
+      await clickAt(point, seen.window, app);
     }
     // `keystroke` は IME を通すので、日本語もそのまま入る。
     await run('osascript', [
@@ -353,7 +378,8 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
   }
 
   if (action.kind === 'tap') {
-    await clickAt(await resolvePoint(action.target, look));
+    const seen = await look();
+    await clickAt(await resolvePoint(action.target, look), seen.window, app);
     return;
   }
 
@@ -375,8 +401,33 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
   ]);
 }
 
-const clickAt = (point: { x: number; y: number }): Promise<string> =>
-  run('osascript', [
+/**
+ * 押す。**押す前に、その点の最前面が目的の窓かを確かめる。**
+ *
+ * 撮るほうは `screencapture -l <窓番号>` なので、重なっていても目的の窓だけが写る。
+ * **押すほうは画面全体の座標で送るので、隠れていれば手前の別アプリが受け取る。**
+ * 映像には目的の窓が写ったまま、押した先だけが別、という形になる。
+ */
+const clickAt = async (
+  point: { x: number; y: number },
+  window: WindowRef,
+  app: string,
+): Promise<void> => {
+  // **押す前に前面へ出す。**隠れたまま押すと、手前の別アプリが受け取る。
+  await osa(`Application(${JSON.stringify(app)}).activate()`);
+  const front = await run('osascript', [
+    '-e',
+    'tell application "System Events" to return name of first process whose frontmost is true',
+  ]);
+  const notFront = notFrontmost(app, front);
+  if (notFront !== undefined) throw new AdapterError(KIND, notFront);
+
+  const top = parseTopWindow(await osa(topWindowScript(point.x, point.y)));
+  const blocked = occludedBy(window.id, top, app);
+  if (blocked !== undefined) throw new AdapterError(KIND, blocked);
+
+  await run('osascript', [
     '-e',
     `tell application "System Events" to click at {${String(point.x)}, ${String(point.y)}}`,
   ]);
+};

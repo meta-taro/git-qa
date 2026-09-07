@@ -8,6 +8,23 @@
  * その先は絵から文字を読む（`ocr.ts`）。**アプリの作りで線を引かない。**
  */
 
+/**
+ * **中身を出してもらう。**
+ *
+ * Electron / Chromium は、支援技術に聞かれるまで木を作らない。
+ * 作っていない間は段 1 が `group` だけになり、押すと `-25211`
+ * （補助アクセスは許可されません）が返る。**許可はあるのに、その文言で返る。**
+ * 2026-09-07、連動くんでここに嵌まった。
+ *
+ * この属性を持たないアプリでは失敗する。**呼び側で握り潰す**（下記の理由つき）。
+ */
+export function manualAccessibilityScript(app: string): string {
+  return (
+    `tell application "System Events" to tell process ${JSON.stringify(app)} ` +
+    'to set value of attribute "AXManualAccessibility" to true'
+  );
+}
+
 /** 画面に出ている部品 1 つ。位置と大きさは、触る場所を決めるのに要る。 */
 export interface AxElement {
   readonly role: string;
