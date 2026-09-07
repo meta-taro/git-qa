@@ -28,6 +28,20 @@ describe('explainToolFailure', () => {
     expect(message).toContain('画面を見ることはできている');
   });
 
+  /**
+   * **2026-09-07、この文言自体が人を間違った方へ送った。**
+   *
+   * 「ターミナルははなから ON ですよ」と言われて、実際その通りだった。
+   * `-25211` は許可が無いときにも出るが、**相手のアプリがまだ中身を出していないときにも出る**
+   * （Electron / Chromium）。**許可の話だけを書くと、合っている設定を疑わせる。**
+   */
+  it('許可が原因とは限らないことを、同じ文の中で言う', () => {
+    const message = explainToolFailure('osascript', '… (-25211)');
+
+    expect(message).toContain('Electron');
+    expect(message).toContain('許可が入っているのに出ることがある');
+  });
+
   it('英語で出たときも同じに扱う', () => {
     const message = explainToolFailure(
       'osascript',
