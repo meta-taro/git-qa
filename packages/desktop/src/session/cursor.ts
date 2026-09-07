@@ -1,4 +1,4 @@
-import type { HumanInput, SessionCase } from '@git-qa/core/session';
+import type { HumanInput, SessionCase, SessionPhase } from '@git-qa/core/session';
 
 import type { KeyCommand } from './keys.js';
 
@@ -39,6 +39,30 @@ export function humanInputFor(
   if (command.kind === 'advance') return { kind: 'advance', caseNo };
   if (command.kind === 'verdict') {
     return { kind: 'verdict', caseNo, humanResult: command.humanResult };
+  }
+  return undefined;
+}
+
+/**
+ * 置けない理由。**置けるなら `undefined`。**
+ *
+ * 打鍵を送った瞬間に記号を光らせていたが、**受け取られたかは見ていなかった**
+ * （2026-09-07）。実行器はまだ走っていないケースへの判定を捨てるので、
+ * **置いていないのに置いた合図だけが出ていた。**黙って捨てるより悪い。
+ */
+export function whyCannotPlace(
+  cases: readonly SessionCase[],
+  caseNo: number | undefined,
+  phase: SessionPhase,
+): string | undefined {
+  if (phase === 'finished') return 'この検証は終わっている。証跡はもう書かれた';
+  if (caseNo === undefined) return 'どのケースへ置くかが決まっていない';
+
+  const subject = cases.find((c) => c.no === caseNo);
+  if (subject === undefined) return `そのケースがこのシートに無い（${String(caseNo)}）`;
+  // 走っていなければ置けない。`aiResult` がその印。
+  if (subject.aiResult === undefined) {
+    return 'このケースはまだ走っていない。AI が操作していないので、見て判断する材料が無い';
   }
   return undefined;
 }

@@ -205,13 +205,15 @@ describe('見ているケース（カーソル）を出す（Issue 013）', () =
 
     const text = column('verdict').textContent ?? '';
     expect(text).toContain('アプリが起動する');
-    expect(text).toContain('置き直');
+    // **帯そのものを見る。**↑ ↓ の説明にも「置き直せる」と書いてあるので、
+    // 本文の文字列だけで見分けると、説明を直したときに落ちる（2026-09-07 に落ちた）。
+    expect(column('verdict').querySelector('.verdict-revise')).not.toBeNull();
   });
 
-  it('打鍵待ちのケースを見ているときは、置き直しとは言わない', () => {
+  it('打鍵待ちのケースを見ているときは、置き直しの帯を出さない', () => {
     renderSession(root, ran, { cursor: 3 });
 
-    expect(column('verdict').textContent).not.toContain('置き直');
+    expect(column('verdict').querySelector('.verdict-revise')).toBeNull();
   });
 
   it('カーソルを渡さなければ、打鍵待ちのケースを見ている', () => {

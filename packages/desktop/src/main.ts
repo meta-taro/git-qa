@@ -14,7 +14,7 @@ import type { ConnectionStatus } from './onboarding/index.js';
 import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
-import { humanInputFor, nextCursor } from './session/cursor.js';
+import { humanInputFor, nextCursor, whyCannotPlace } from './session/cursor.js';
 import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
@@ -467,8 +467,21 @@ function startControl(controlUrl: string): void {
     }
 
     // **見ているケースへ置く。**戻って直しているなら、そのケースが相手になる。
-    const input = humanInputFor(command, cursor ?? latest?.awaiting);
+    const caseNo = cursor ?? latest?.awaiting;
+    const input = humanInputFor(command, caseNo);
     if (input === undefined) return;
+
+    /**
+     * **置けないなら、置いた合図を出さない。**
+     *
+     * 実行器はまだ走っていないケースへの判定を捨てる。ところが画面は光っていたので、
+     * **置いていないのに置いたと見えていた**（2026-09-07）。黙って捨てるより悪い。
+     */
+    const cannot = whyCannotPlace(latest?.cases ?? [], caseNo, latest?.phase ?? 'running');
+    if (cannot !== undefined) {
+      showSessionError(app, cannot);
+      return;
+    }
 
     // **押した直後に、置いたものを前面へ出す。**押し間違いに気づけるのはここだけ。
     flashVerdict(app, command.kind === 'advance' ? 'AUTO_PASS' : command.humanResult);
