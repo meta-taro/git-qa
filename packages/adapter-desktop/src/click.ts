@@ -39,3 +39,40 @@ export function clickScript(app: string, x: number, y: number): string {
     '"ok"',
   ].join('\n');
 }
+
+/**
+ * なぞる（スクロール）。
+ *
+ * **2026-09-07 まで一度も効いていなかった。**
+ * `tell application "System Events" to scroll {0, N} at {x, y}` と書いてあったが、
+ * **`System Events` に `scroll` という命令は無い。**実行時に構文エラーになるだけで、
+ * 検査では捕まらない形だった。人が 22 回なぞって、22 回とも落ちていた。
+ *
+ * 滑車の出来事は、**いま指が乗っている窓**へ届く。だから先に指の位置を運ぶ。
+ * そのためには相手が手前に居る必要があるので、押すときと同じく前面へ出して、戻す。
+ */
+export function scrollScript(app: string, x: number, y: number, lines: number): string {
+  const name = JSON.stringify(app);
+  // 人が上へなぞった（`lines` が正）＝ 先を見たい ＝ 滑車は負へ回す。
+  const wheel = String(-Math.round(lines));
+  return [
+    "ObjC.import('CoreGraphics');",
+    "ObjC.bindFunction('CGEventCreateMouseEvent', ['void*', ['void*', 'int', '{CGPoint=dd}', 'int']]);",
+    "ObjC.bindFunction('CGEventCreateScrollWheelEvent2', ['void*', ['void*', 'int', 'int', 'int', 'int', 'int']]);",
+    "ObjC.bindFunction('CGEventPost', ['void', ['int', 'void*']]);",
+    'var se = Application("System Events");',
+    // 押すときと同じく、人が見ていた窓を覚えておいて戻す。
+    'var wasFront = se.processes.whose({ frontmost: true })[0].name();',
+    `Application(${name}).activate();`,
+    'for (var i = 0; i < 25; i++) {',
+    `  if (se.processes.whose({ frontmost: true })[0].name() === ${name}) break;`,
+    '  delay(0.02);',
+    '}',
+    // 5 = kCGEventMouseMoved、1 = kCGScrollEventUnitLine。
+    `$.CGEventPost(0, $.CGEventCreateMouseEvent($(), 5, {x: ${String(Math.round(x))}, y: ${String(Math.round(y))}}, 0));`,
+    'delay(0.03);',
+    `$.CGEventPost(0, $.CGEventCreateScrollWheelEvent2($(), 1, 1, ${wheel}, 0, 0));`,
+    `if (wasFront !== ${name}) { se.processes.byName(wasFront).frontmost = true; }`,
+    '"ok";',
+  ].join('\n');
+}

@@ -18,7 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
-import { clickScript, NOT_FRONT_MARK } from './click.js';
+import { clickScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 import type { AxElement } from './ax.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
@@ -440,10 +440,8 @@ async function dispatch(
   const from = await resolvePoint(action.from, look, lookWindow);
   const to = await resolvePoint(action.to, look, lookWindow);
   const amount = Math.round((from.y - to.y) / 10);
-  await run('osascript', [
-    '-e',
-    `tell application "System Events" to scroll {0, ${String(amount)}} at {${String(from.x)}, ${String(from.y)}}`,
-  ]);
+  if (amount === 0) return;
+  await osa(scrollScript(app, from.x, from.y, amount));
 }
 
 /**
