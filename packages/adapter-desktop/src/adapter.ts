@@ -257,7 +257,7 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action: Action): Promise<void> {
       ensureOpen();
-      await dispatch(app, action, look);
+      await dispatch(app, action, look, refreshWindow);
     },
 
     async observe(): Promise<Observation> {
@@ -320,12 +320,23 @@ async function readOcr(ocrPath: string | undefined, bytes: Uint8Array): Promise<
 async function resolvePoint(
   ref: PointerRef,
   look: () => Promise<Seen>,
+  lookWindow: () => Promise<WindowRef>,
 ): Promise<{ x: number; y: number }> {
-  const seen = await look();
   if (ref.at === 'point') {
+    /**
+     * **点で指されているなら、撮らないし読まない。**
+     *
+     * 人がライブビューを押したときがこれ。要るのは窓の左上だけで、
+     * 画面の文字は 1 つも要らない。
+     * 2026-09-07、ここで毎回 `look()` していたので **1 押しに OCR が 1 秒**かかり、
+     * 「反応したのか、遅れているのか分からない」と言われた（実測 988 ms / 回）。
+     */
+    const window = await lookWindow();
     // 窓の中の座標として受け取る。**画面の座標へ戻す。**
-    return { x: seen.window.x + ref.x, y: seen.window.y + ref.y };
+    return { x: window.x + ref.x, y: window.y + ref.y };
   }
+
+  const seen = await look();
 
   const byAx = findInElements(seen.elements, ref.ref);
   if (byAx !== undefined) return byAx;
@@ -342,7 +353,13 @@ async function resolvePoint(
   throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
 }
 
-async function dispatch(app: string, action: Action, look: () => Promise<Seen>): Promise<void> {
+async function dispatch(
+  app: string,
+  action: Action,
+  look: () => Promise<Seen>,
+  /** 窓の位置だけを取る安い道。**点で指されたときは、これで足りる。** */
+  lookWindow: () => Promise<WindowRef>,
+): Promise<void> {
   if (action.kind === 'launch') {
     // **書いてあるものだけを開く。**表示名からの推測はしない（C40）。
     // ここだけは前面に出す —— シートが「起動する」と書いているので、人も承知している。
@@ -365,9 +382,8 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
    */
   if (action.kind === 'type') {
     if (action.target !== undefined) {
-      const seen = await look();
-      const point = await resolvePoint(action.target, look);
-      await clickAt(point, seen.window, app);
+      const point = await resolvePoint(action.target, look, lookWindow);
+      await clickAt(point, await lookWindow(), app);
     }
     // `keystroke` は IME を通すので、日本語もそのまま入る。
     await run('osascript', [
@@ -386,8 +402,7 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
   }
 
   if (action.kind === 'tap') {
-    const seen = await look();
-    await clickAt(await resolvePoint(action.target, look), seen.window, app);
+    await clickAt(await resolvePoint(action.target, look, lookWindow), await lookWindow(), app);
     return;
   }
 
@@ -400,8 +415,8 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
   }
 
   // swipe。デスクトップではスクロールとして送る（指でなぞる相手ではない）。
-  const from = await resolvePoint(action.from, look);
-  const to = await resolvePoint(action.to, look);
+  const from = await resolvePoint(action.from, look, lookWindow);
+  const to = await resolvePoint(action.to, look, lookWindow);
   const amount = Math.round((from.y - to.y) / 10);
   await run('osascript', [
     '-e',
@@ -416,6 +431,21 @@ async function dispatch(app: string, action: Action, look: () => Promise<Seen>):
  * **押すほうは画面全体の座標で送るので、隠れていれば手前の別アプリが受け取る。**
  * 映像には目的の窓が写ったまま、押した先だけが別、という形になる。
  */
+/**
+ * **中身を出してくれと頼む。**ただし毎回は頼まない。
+ *
+ * 1 回 260 ms かかる（実測 2026-09-07）。Chromium が木を畳むのは分単位なので、
+ * **数秒に 1 回で足りる。**押すたびに頼むと、そのぶん人が待つ。
+ */
+const CONTENT_ASK_INTERVAL_MS = 5_000;
+let lastAsked = 0;
+const askForContent = async (app: string): Promise<void> => {
+  const at = Date.now();
+  if (at - lastAsked < CONTENT_ASK_INTERVAL_MS) return;
+  lastAsked = at;
+  await run('osascript', ['-e', manualAccessibilityScript(app)]).catch(() => undefined);
+};
+
 const clickAt = async (
   point: { x: number; y: number },
   window: WindowRef,
@@ -431,7 +461,7 @@ const clickAt = async (
    *
    * 頼むのは osascript 1 回。**押せないより安い。**
    */
-  await run('osascript', ['-e', manualAccessibilityScript(app)]).catch(() => undefined);
+  await askForContent(app);
 
   // **押す前に前面へ出す。**隠れたまま押すと、手前の別アプリが受け取る。
   await osa(`Application(${JSON.stringify(app)}).activate()`);
@@ -442,13 +472,14 @@ const clickAt = async (
    * （そのとき前面に居たのは、頼んだ側のターミナルだった）。
    */
   let front = '';
-  for (let tries = 0; tries < 15; tries += 1) {
+  for (let tries = 0; tries < 20; tries += 1) {
     front = await run('osascript', [
       '-e',
       'tell application "System Events" to return name of first process whose frontmost is true',
     ]);
     if (notFrontmost(app, front) === undefined) break;
-    await new Promise((wake) => setTimeout(wake, 100));
+    // **1 回が 250 ms 前後かかる。**待ちを重ねると「押したのに動かない」に見える。
+    await new Promise((wake) => setTimeout(wake, 30));
   }
   const notFront = notFrontmost(app, front);
   if (notFront !== undefined) throw new AdapterError(KIND, notFront);
