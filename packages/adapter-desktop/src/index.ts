@@ -3,10 +3,7 @@ export {
   captureArgs,
   missingWindowMessage,
   notFrontmost,
-  occludedBy,
-  parseTopWindow,
   parseWindow,
-  topWindowScript,
   windowScript,
 } from './window.js';
 export type { WindowRef } from './window.js';
@@ -17,4 +14,5 @@ export type { OcrLine } from './ocr.js';
 export { createDesktopAdapter, screenTextOf } from './adapter.js';
 export type { DesktopAdapterOptions } from './adapter.js';
 export { readDesktopScreenText } from './screen-text.js';
+export { clickScript, NOT_FRONT_MARK } from './click.js';
 export { explainToolFailure } from './permission.js';

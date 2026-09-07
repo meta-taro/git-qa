@@ -18,6 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
+import { clickScript, NOT_FRONT_MARK } from './click.js';
 import type { AxElement } from './ax.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
@@ -27,10 +28,7 @@ import {
   captureArgs,
   missingWindowMessage,
   notFrontmost,
-  occludedBy,
-  parseTopWindow,
   parseWindow,
-  topWindowScript,
   windowScript,
 } from './window.js';
 import type { WindowRef } from './window.js';
@@ -155,6 +153,18 @@ function createSession(deps: SessionDeps): TargetSession {
     if (closed) throw new AdapterError(KIND, 'アプリとの接続はもう閉じている');
   };
 
+  /**
+   * 押すときに使う窓の位置。**映像が流れている間は、それが取り直している。**
+   *
+   * osascript は 1 回 250 ms かかる（実測 2026-09-07）。映像は 8 枚/秒で
+   * 窓を取り直しているので、**その値を使えば 1 押しぶんの待ちが丸ごと消える。**
+   * 古すぎるときだけ取り直す。
+   */
+  const WINDOW_FRESH_MS = 400;
+  let windowAt = 0;
+  const recentWindow = async (): Promise<WindowRef> =>
+    Date.now() - windowAt < WINDOW_FRESH_MS ? window : refreshWindow();
+
   /** 窓の位置は動く。**撮る前に取り直す**（動かしたまま古い場所を撮らない）。 */
   const refreshWindow = async (): Promise<WindowRef> => {
     const found = parseWindow(await osa(windowScript(app)));
@@ -168,6 +178,7 @@ function createSession(deps: SessionDeps): TargetSession {
       );
     }
     window = found;
+    windowAt = Date.now();
     return found;
   };
 
@@ -257,7 +268,7 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action: Action): Promise<void> {
       ensureOpen();
-      await dispatch(app, action, look, refreshWindow);
+      await dispatch(app, action, look, recentWindow);
     },
 
     async observe(): Promise<Observation> {
@@ -448,48 +459,16 @@ const askForContent = async (app: string): Promise<void> => {
 
 const clickAt = async (
   point: { x: number; y: number },
-  window: WindowRef,
+  _window: WindowRef,
   app: string,
 ): Promise<void> => {
-  /**
-   * **押すたびに、中身を出してくれと頼み直す。**
-   *
-   * 繋いだときに 1 回だけでは足りなかった（2026-09-07、人が
-   * 「git-qa 上の連動くんをクリックしても反応しない」と 2 度言った）。
-   * Chromium は**聞きに来る相手が居ない間、木を畳んでしまう。**
-   * 映像は窓を撮っているだけで木を読まないので、流している間ずっと畳まれたままになる。
-   *
-   * 頼むのは osascript 1 回。**押せないより安い。**
-   */
+  // **中身を出してくれと頼む**（Electron は聞かれるまで木を作らない・C57）。5 秒に 1 回で足りる。
   await askForContent(app);
 
-  // **押す前に前面へ出す。**隠れたまま押すと、手前の別アプリが受け取る。
-  await osa(`Application(${JSON.stringify(app)}).activate()`);
-
-  /**
-   * **出るまで待つ。**`activate()` は前面に出る前に返る。
-   * 2026-09-07、待たずに確かめて「前面に出せなかった」と断ってしまった
-   * （そのとき前面に居たのは、頼んだ側のターミナルだった）。
-   */
-  let front = '';
-  for (let tries = 0; tries < 20; tries += 1) {
-    front = await run('osascript', [
-      '-e',
-      'tell application "System Events" to return name of first process whose frontmost is true',
-    ]);
-    if (notFrontmost(app, front) === undefined) break;
-    // **1 回が 250 ms 前後かかる。**待ちを重ねると「押したのに動かない」に見える。
-    await new Promise((wake) => setTimeout(wake, 30));
+  // **前面へ出す・出るのを待つ・押す。1 本で済ませる**（分けると 1 押しが 1 秒を超える）。
+  const said = (await run('osascript', ['-e', clickScript(app, point.x, point.y)])).trim();
+  if (said.startsWith(NOT_FRONT_MARK)) {
+    const front = said.slice(NOT_FRONT_MARK.length).trim();
+    throw new AdapterError(KIND, notFrontmost(app, front) ?? `${app} を前面に出せなかった`);
   }
-  const notFront = notFrontmost(app, front);
-  if (notFront !== undefined) throw new AdapterError(KIND, notFront);
-
-  const top = parseTopWindow(await osa(topWindowScript(point.x, point.y)));
-  const blocked = occludedBy(window.id, top, app);
-  if (blocked !== undefined) throw new AdapterError(KIND, blocked);
-
-  await run('osascript', [
-    '-e',
-    `tell application "System Events" to click at {${String(point.x)}, ${String(point.y)}}`,
-  ]);
 };
