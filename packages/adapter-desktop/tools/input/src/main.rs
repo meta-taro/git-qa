@@ -22,9 +22,33 @@ use std::ffi::{c_void, CStr, CString};
 
 type Ref = *mut c_void;
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct CGPoint {
+    x: f64,
+    y: f64,
+}
+
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXUIElementCreateApplication(pid: i32) -> Ref;
+    fn AXUIElementCreateSystemWide() -> Ref;
+    fn AXUIElementGetPid(el: Ref, out: *mut i32) -> i32;
+
+    fn CGEventCreate(source: Ref) -> Ref;
+    fn CGEventGetLocation(event: Ref) -> CGPoint;
+    fn CGEventSetLocation(event: Ref, at: CGPoint);
+    fn CGEventCreateScrollWheelEvent2(
+        source: Ref,
+        units: u32,
+        wheels: u32,
+        w1: i32,
+        w2: i32,
+        w3: i32,
+    ) -> Ref;
+    fn CGEventCreateMouseEvent(source: Ref, kind: u32, at: CGPoint, button: u32) -> Ref;
+    fn CGEventPost(tap: u32, event: Ref);
+    fn CGWarpMouseCursorPosition(at: CGPoint) -> i32;
     fn AXUIElementCopyElementAtPosition(app: Ref, x: f32, y: f32, out: *mut Ref) -> i32;
     fn AXUIElementCopyAttributeValue(el: Ref, attr: *const c_void, out: *mut Ref) -> i32;
     fn AXUIElementPerformAction(el: Ref, action: *const c_void) -> i32;
@@ -94,11 +118,162 @@ fn fail(message: &str) -> ! {
     std::process::exit(1);
 }
 
+/// いま指が居る場所。**返しに行くために覚える。**
+unsafe fn cursor_now() -> CGPoint {
+    let probe = CGEventCreate(std::ptr::null_mut());
+    if probe.is_null() {
+        return CGPoint { x: 0.0, y: 0.0 };
+    }
+    let at = CGEventGetLocation(probe);
+    CFRelease(probe as *const c_void);
+    at
+}
+
+/**
+なぞる。**前面に出さない。指も動かさない。**
+
+滑車の出来事は「いま指が乗っている窓」へ行くと思っていたが、
+**出来事そのものに場所を書ける**（`CGEventSetLocation`）。
+これで、隠れている窓でも、人のポインタを飛ばさずになぞれる（2026-09-07 実測）。
+*/
+unsafe fn scroll(x: f64, y: f64, lines: i32) {
+    let was = cursor_now();
+
+    // **指を運ばないと届かない。**出来事に場所を書くだけでは、窓が受け取らなかった（実測）。
+    let at = CGPoint { x, y };
+    let move_ev = CGEventCreateMouseEvent(std::ptr::null_mut(), 5, at, 0);
+    if !move_ev.is_null() {
+        CGEventPost(0, move_ev);
+        CFRelease(move_ev as *const c_void);
+    }
+    std::thread::sleep(std::time::Duration::from_millis(60));
+
+    // 1 = kCGScrollEventUnitLine
+    let ev = CGEventCreateScrollWheelEvent2(std::ptr::null_mut(), 1, 1, lines, 0, 0);
+    if ev.is_null() {
+        fail("滑車の出来事を作れなかった");
+    }
+    CGEventSetLocation(ev, at);
+    CGEventPost(0, ev);
+    CFRelease(ev as *const c_void);
+
+    // **人のポインタを飛ばしたままにしない。**
+    // 早く返しすぎると、滑車が届く前に指が戻ってしまう（実測）。
+    std::thread::sleep(std::time::Duration::from_millis(120));
+    let _ = CGWarpMouseCursorPosition(was);
+}
+
+/**
+掴んで運ぶ。**ここだけは前面に出す。**
+
+押して離すまでが 1 つながりで、途中で焦点が動くと掴んだものが落ちる。
+**指も実際に動く**（そういう操作なので避けられない）。**終わったら指を元へ返す。**
+*/
+unsafe fn drag(pid: i32, from: CGPoint, to: CGPoint) {
+    let was_cursor = cursor_now();
+
+    // 前に居たアプリを覚えて、終わったら返す。
+    let system = AXUIElementCreateSystemWide();
+    let mut focused: Ref = std::ptr::null_mut();
+    let mut was_pid: i32 = 0;
+    if AXUIElementCopyAttributeValue(system, cfstr("AXFocusedApplication"), &mut focused) == 0
+        && !focused.is_null()
+    {
+        let _ = AXUIElementGetPid(focused, &mut was_pid);
+    }
+
+    extern "C" {
+        static kCFBooleanTrue: *const c_void;
+    }
+    let app = AXUIElementCreateApplication(pid);
+    let _ = AXUIElementSetAttributeValue(app, cfstr("AXFrontmost"), kCFBooleanTrue);
+    std::thread::sleep(std::time::Duration::from_millis(120));
+
+    let post = |kind: u32, at: CGPoint| {
+        let ev = CGEventCreateMouseEvent(std::ptr::null_mut(), kind, at, 0);
+        if !ev.is_null() {
+            CGEventPost(0, ev);
+            CFRelease(ev as *const c_void);
+        }
+    };
+
+    // 5 = 動かす / 1 = 押す / 6 = 押したまま動かす / 2 = 離す
+    post(5, from);
+    std::thread::sleep(std::time::Duration::from_millis(40));
+    post(1, from);
+    std::thread::sleep(std::time::Duration::from_millis(80));
+    // **一足飛びに運ばない。**途中の動きを見ている相手が、掴んだと気づかない。
+    let steps = 12;
+    for step in 1..=steps {
+        let ratio = f64::from(step) / f64::from(steps);
+        post(
+            6,
+            CGPoint {
+                x: from.x + (to.x - from.x) * ratio,
+                y: from.y + (to.y - from.y) * ratio,
+            },
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(80));
+    post(2, to);
+
+    // **人のポインタを飛ばしたままにしない。**
+    let _ = CGWarpMouseCursorPosition(was_cursor);
+    if was_pid != 0 && was_pid != pid {
+        let back = AXUIElementCreateApplication(was_pid);
+        let _ = AXUIElementSetAttributeValue(back, cfstr("AXFrontmost"), kCFBooleanTrue);
+    }
+}
+
+fn usage() -> ! {
+    eprintln!("使い方:");
+    eprintln!("  git-qa-input press  <プロセス番号> <x> <y>");
+    eprintln!("  git-qa-input scroll <x> <y> <行数>");
+    eprintln!("  git-qa-input drag   <プロセス番号> <x1> <y1> <x2> <y2>");
+    std::process::exit(2);
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        usage();
+    }
+
+    if args[1] == "scroll" {
+        if args.len() < 5 {
+            usage();
+        }
+        let x: f64 = args[2].parse().unwrap_or_else(|_| fail("x が数ではない"));
+        let y: f64 = args[3].parse().unwrap_or_else(|_| fail("y が数ではない"));
+        let lines: i32 = args[4].parse().unwrap_or_else(|_| fail("行数が数ではない"));
+        unsafe { scroll(x, y, lines) };
+        println!("ok");
+        return;
+    }
+
+    if args[1] == "drag" {
+        if args.len() < 7 {
+            usage();
+        }
+        let pid: i32 = args[2].parse().unwrap_or_else(|_| fail("プロセス番号が数ではない"));
+        let coords: Vec<f64> = args[3..7]
+            .iter()
+            .map(|v| v.parse().unwrap_or_else(|_| fail("座標が数ではない")))
+            .collect();
+        unsafe {
+            drag(
+                pid,
+                CGPoint { x: coords[0], y: coords[1] },
+                CGPoint { x: coords[2], y: coords[3] },
+            );
+        }
+        println!("ok");
+        return;
+    }
+
     if args.len() < 5 || args[1] != "press" {
-        eprintln!("使い方: git-qa-input press <プロセス番号> <x> <y>");
-        std::process::exit(2);
+        usage();
     }
     let pid: i32 = args[2].parse().unwrap_or_else(|_| fail("プロセス番号が数ではない"));
     let x: f32 = args[3].parse().unwrap_or_else(|_| fail("x が数ではない"));

@@ -443,10 +443,26 @@ async function dispatch(
   if (action.kind === 'drag') {
     /**
      * **掴んで運ぶ。**押すのと違い、AX には口が無いので実際のマウス操作を送る。
-     * そのため**1 回だけ前面に出る**（途中で焦点が動くと、掴んだものが落ちる）。
+     * そのため**1 回だけ前面に出て、指も実際に動く**（途中で焦点が動くと、掴んだものが落ちる）。
+     * 道具がある場合は、**終わったら指と前面を元へ返す。**
      */
     const from = await resolvePoint(action.from, look, lookWindow);
     const to = await resolvePoint(action.to, look, lookWindow);
+    const window = await lookWindow();
+    if (inputPath !== undefined) {
+      const done = await run(inputPath, [
+        'drag',
+        String(window.pid),
+        String(Math.round(from.x)),
+        String(Math.round(from.y)),
+        String(Math.round(to.x)),
+        String(Math.round(to.y)),
+      ]).then(
+        () => true,
+        () => false,
+      );
+      if (done) return;
+    }
     await osa(dragScript(app, from.x, from.y, to.x, to.y));
     return;
   }
@@ -456,6 +472,24 @@ async function dispatch(
   const to = await resolvePoint(action.to, look, lookWindow);
   const amount = Math.round((from.y - to.y) / 10);
   if (amount === 0) return;
+
+  /**
+   * **なぞるのは、前面に出さずにできる**（2026-09-07 実測）。
+   * 指は一度その場所へ運ぶ必要があるが、**終わったら元へ返す。**
+   * 人にこう言われた: 「スクロールと、DnDのときだけ一瞬前面にでるのかまうすぽいんたがとびます」。
+   */
+  if (inputPath !== undefined) {
+    const done = await run(inputPath, [
+      'scroll',
+      String(Math.round(from.x)),
+      String(Math.round(from.y)),
+      String(-amount),
+    ]).then(
+      () => true,
+      () => false,
+    );
+    if (done) return;
+  }
   await osa(scrollScript(app, from.x, from.y, amount));
 }
 
