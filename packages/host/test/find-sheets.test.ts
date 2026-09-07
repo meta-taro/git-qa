@@ -176,8 +176,24 @@ describe('探す場所', () => {
  * しかも無関係なものが混ざる。人の言い分:「最近開いた／最近作られたものを少し出すのがよい」。
  */
 describe('newestFirst', () => {
-  it('更新が新しい順に並べ、決めた数で切る', async () => {
+  /**
+   * **検査が人の機械を汚さない。**
+   *
+   * 2026-09-06、1 日走らせたあとに数えたら、**一時フォルダが 171 個**残っていた。
+   * `mkdtemp` で作って片付けていなかった。**落ちたテストより静かで、後から効く。**
+   */
+  const made: string[] = [];
+  const tempDir = async (): Promise<string> => {
     const dir = await mkdtemp(join(tmpdir(), 'git-qa-recent-'));
+    made.push(dir);
+    return dir;
+  };
+  afterEach(async () => {
+    for (const dir of made.splice(0)) await rm(dir, { recursive: true, force: true });
+  });
+
+  it('更新が新しい順に並べ、決めた数で切る', async () => {
+    const dir = await tempDir();
     const paths: string[] = [];
     for (const [index, name] of ['old.tsv', 'mid.tsv', 'new.tsv'].entries()) {
       const path = join(dir, name);
@@ -191,7 +207,7 @@ describe('newestFirst', () => {
   });
 
   it('数が足りなければ、あるだけ返す', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'git-qa-recent-'));
+    const dir = await tempDir();
     const path = join(dir, 'only.tsv');
     await writeFile(path, 'x', 'utf8');
 
@@ -199,7 +215,7 @@ describe('newestFirst', () => {
   });
 
   it('読めなくなっていたものは、落とさずに後ろへ回す', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'git-qa-recent-'));
+    const dir = await tempDir();
     const path = join(dir, 'here.tsv');
     await writeFile(path, 'x', 'utf8');
 
