@@ -204,6 +204,9 @@ export function renderSetup(
     ['brave', 'setup.browser.brave'],
     ['opera', 'setup.browser.opera'],
     ['vivaldi', 'setup.browser.vivaldi'],
+    // **エンジンが違う。**Firefox は BiDi、Safari は WebDriver（Issue 018）。
+    ['firefox', 'setup.browser.firefox'],
+    ['safari', 'setup.browser.safari'],
     ['other', 'setup.browser.other'],
   ] as const) {
     const option = doc.createElement('option');

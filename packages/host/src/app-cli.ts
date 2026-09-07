@@ -3,7 +3,12 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
-import { createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
+import {
+  createFirefoxAdapter,
+  createSafariAdapter,
+  createWebAdapter,
+  readWebScreenText,
+} from '@git-qa/adapter-web';
 
 import {
   createAndroidAdapter,
@@ -81,26 +86,41 @@ const setup = await startSetupServer({
     const web = /^https?:\/\//.test(serial);
     const url = web ? (sheet.meta['対象'] ?? serial) : undefined;
 
+    /** Firefox と Safari はエンジンが違う。**同じコードには乗らない**（Issue 018）。 */
+    const chromium =
+      browser === 'firefox' || browser === 'safari' || browser === undefined ? undefined : browser;
+
     session = await startRunSession({
       adapter:
-        web && url !== undefined
-          ? createWebAdapter({
+        web && url !== undefined && browser === 'firefox'
+          ? createFirefoxAdapter({
               build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-              // 同じ幅で見ないと、崩れの有無を比べられない。
               size: { width: 1280, height: 900 },
-              // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
-              // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
-              ...(browserPath === undefined ? {} : { browserPath }),
-              ...(browser === undefined || browserPath !== undefined ? {} : { browser }),
             })
-          : createAndroidAdapter({
-              build: {
-                source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-                label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
-              },
-              liveView: { mode: 'h264-stream' },
-              serial,
-            }),
+          : web && url !== undefined && browser === 'safari'
+            ? createSafariAdapter({
+                build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+              })
+            : web && url !== undefined
+              ? createWebAdapter({
+                  build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+                  // 同じ幅で見ないと、崩れの有無を比べられない。
+                  size: { width: 1280, height: 900 },
+                  // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
+                  // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
+                  ...(browserPath === undefined ? {} : { browserPath }),
+                  ...(chromium === undefined || browserPath !== undefined
+                    ? {}
+                    : { browser: chromium }),
+                })
+              : createAndroidAdapter({
+                  build: {
+                    source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+                    label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                  },
+                  liveView: { mode: 'h264-stream' },
+                  serial,
+                }),
       sheet,
       sheetRef: {
         path: sheetPath,

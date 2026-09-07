@@ -61,7 +61,7 @@ export interface StartSetupServerOptions {
     /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */
     operator?: string;
     /** どのブラウザで見るか（ウェブのときだけ）。**証跡に版が残る。** */
-    browser?: 'chrome' | 'edge' | 'brave' | 'chromium';
+    browser?: 'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'chromium' | 'firefox' | 'safari';
     /** 名前の無いブラウザの場所。**中身が Chromium なら動く。** */
     browserPath?: string;
   }) => Promise<StartedRun>;
@@ -136,7 +136,16 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     serial: string,
     sheetPath: string,
     operator: string | undefined,
-    browser: 'chrome' | 'edge' | 'brave' | 'chromium' | undefined,
+    browser:
+      | 'chrome'
+      | 'edge'
+      | 'brave'
+      | 'opera'
+      | 'vivaldi'
+      | 'chromium'
+      | 'firefox'
+      | 'safari'
+      | undefined,
     browserPath: string | undefined,
   ): void => {
     phase = 'starting';
@@ -221,10 +230,9 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
         }
         const wanted = (body as { browser?: unknown }).browser;
         // **知らない値は捨てる。**勝手に別のブラウザで見ない。
-        const browser =
-          wanted === 'chrome' || wanted === 'edge' || wanted === 'brave' || wanted === 'chromium'
-            ? wanted
-            : undefined;
+        const browser = (
+          ['chrome', 'edge', 'brave', 'opera', 'vivaldi', 'chromium', 'firefox', 'safari'] as const
+        ).find((name) => name === wanted);
         const wantedPath = (body as { browserPath?: unknown }).browserPath;
         // **知らない形は捨てる。**長すぎるものも通さない（§21）。
         const browserPath =
