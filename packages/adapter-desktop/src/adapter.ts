@@ -421,12 +421,35 @@ const clickAt = async (
   window: WindowRef,
   app: string,
 ): Promise<void> => {
+  /**
+   * **押すたびに、中身を出してくれと頼み直す。**
+   *
+   * 繋いだときに 1 回だけでは足りなかった（2026-09-07、人が
+   * 「git-qa 上の連動くんをクリックしても反応しない」と 2 度言った）。
+   * Chromium は**聞きに来る相手が居ない間、木を畳んでしまう。**
+   * 映像は窓を撮っているだけで木を読まないので、流している間ずっと畳まれたままになる。
+   *
+   * 頼むのは osascript 1 回。**押せないより安い。**
+   */
+  await run('osascript', ['-e', manualAccessibilityScript(app)]).catch(() => undefined);
+
   // **押す前に前面へ出す。**隠れたまま押すと、手前の別アプリが受け取る。
   await osa(`Application(${JSON.stringify(app)}).activate()`);
-  const front = await run('osascript', [
-    '-e',
-    'tell application "System Events" to return name of first process whose frontmost is true',
-  ]);
+
+  /**
+   * **出るまで待つ。**`activate()` は前面に出る前に返る。
+   * 2026-09-07、待たずに確かめて「前面に出せなかった」と断ってしまった
+   * （そのとき前面に居たのは、頼んだ側のターミナルだった）。
+   */
+  let front = '';
+  for (let tries = 0; tries < 15; tries += 1) {
+    front = await run('osascript', [
+      '-e',
+      'tell application "System Events" to return name of first process whose frontmost is true',
+    ]);
+    if (notFrontmost(app, front) === undefined) break;
+    await new Promise((wake) => setTimeout(wake, 100));
+  }
   const notFront = notFrontmost(app, front);
   if (notFront !== undefined) throw new AdapterError(KIND, notFront);
 

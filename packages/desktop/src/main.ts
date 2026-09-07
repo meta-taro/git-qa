@@ -220,7 +220,13 @@ const startSession = (
         showSessionError(root, error instanceof Error ? error.message : String(error));
       });
     };
-    installDeviceTouch({ canvas, state: () => latest, send });
+    installDeviceTouch({
+      canvas,
+      state: () => latest,
+      send,
+      // **捨てた理由を残す。**「押しても反応しない」を、次は 1 行で切り分けられるように。
+      onIgnored: (reason) => console.warn('[git-qa] 押した操作を送らなかった:', reason),
+    });
     // **長い画面の下を見られるようにする。**タップとなぞるだけでは届かない。
     installDeviceWheel({ canvas, state: () => latest, send });
   }).catch((error: unknown) => {

@@ -90,8 +90,9 @@ describe('installDeviceTouch', () => {
       toJSON: () => ({}),
     });
     const send = vi.fn();
-    installDeviceTouch({ canvas: canvasEl, state, send, now: () => clock });
-    return { canvasEl, send };
+    const ignored = vi.fn();
+    installDeviceTouch({ canvas: canvasEl, state, send, now: () => clock, onIgnored: ignored });
+    return { canvasEl, send, ignored };
   };
 
   let clock = 0;
@@ -214,5 +215,82 @@ describe('installDeviceTouch', () => {
     release(canvasEl);
 
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **2026-09-07、人が 2 度「クリックしても反応しない」と言った。**
+ *
+ * 押した操作が捨てられていたのに、**捨てた側が何も言わなかった。**
+ * ログにも画面にも出ないので、届いていないのか・届いて弾かれたのかが分からない。
+ * **黙って捨てない**（product-baseline §8）。
+ */
+describe('installDeviceTouch — 捨てたときに理由を言う', () => {
+  const waiting: SessionState = {
+    runId: 'r',
+    phase: 'waiting',
+    awaiting: 2,
+    cases: [{ no: 2, title: 'メモを保存できる', aiResult: 'BLOCKED' }],
+  };
+
+  const setup = (state: () => SessionState | undefined) => {
+    const canvasEl = document.createElement('canvas');
+    canvasEl.width = 1080;
+    canvasEl.height = 2220;
+    canvasEl.getBoundingClientRect = () => ({
+      ...rect,
+      right: 0,
+      bottom: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    const send = vi.fn();
+    const ignored = vi.fn();
+    installDeviceTouch({ canvas: canvasEl, state, send, now: () => 0, onIgnored: ignored });
+    return { canvasEl, send, ignored };
+  };
+
+  const press = (canvasEl: HTMLCanvasElement): void => {
+    canvasEl.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+        bubbles: true,
+      }),
+    );
+  };
+
+  it('AI が操作している最中なら、そう言って捨てる', () => {
+    const { canvasEl, send, ignored } = setup(() => ({ ...waiting, phase: 'running' }));
+
+    press(canvasEl);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(String(ignored.mock.calls[0]?.[0])).toContain('running');
+  });
+
+  it('まだ状態を受け取っていないなら、そう言って捨てる', () => {
+    const { canvasEl, ignored } = setup(() => undefined);
+
+    press(canvasEl);
+
+    expect(String(ignored.mock.calls[0]?.[0])).toContain('状態');
+  });
+
+  it('余白を押したなら、そう言って捨てる', () => {
+    const { canvasEl, ignored } = setup(() => waiting);
+
+    canvasEl.dispatchEvent(new MouseEvent('mousedown', { clientX: 0, clientY: 0, bubbles: true }));
+
+    expect(String(ignored.mock.calls[0]?.[0])).toContain('余白');
+  });
+
+  it('送れたときは何も言わない', () => {
+    const { canvasEl, ignored } = setup(() => waiting);
+
+    press(canvasEl);
+
+    expect(ignored).not.toHaveBeenCalled();
   });
 });

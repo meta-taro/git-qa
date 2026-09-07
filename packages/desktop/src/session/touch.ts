@@ -53,6 +53,11 @@ export interface InstallDeviceTouchOptions {
   readonly send: (input: HumanInput) => void;
   /** 時刻の出どころ。**なぞった速さがそのまま端末へ伝わる**ので、検査では固定する。 */
   readonly now?: () => number;
+  /**
+   * 押した操作を捨てたときに、その理由を渡す。
+   * **黙って捨てない**ためのもので、呼び側がログか画面へ出す。
+   */
+  readonly onIgnored?: (reason: string) => void;
 }
 
 /** これ以下しか動いていなければタップ扱い（端末の画素）。手が少し震えても拾わない。 */
@@ -87,17 +92,36 @@ export function installDeviceTouch(options: InstallDeviceTouchOptions): () => vo
       canvas: { width: options.canvas.width, height: options.canvas.height },
     });
 
+  /**
+   * **捨てるときは、なぜ捨てたかを言う。**
+   *
+   * 2026-09-07、人が 2 度「クリックしても反応しない」と言った。
+   * 3 箇所で黙って `return` していたので、**届いていないのか・届いて弾かれたのか**が
+   * 誰にも分からなかった（`product-baseline.md` §8）。
+   */
+  const ignored = (reason: string): void => options.onIgnored?.(reason);
+
   const onDown = (event: MouseEvent): void => {
     start = undefined;
     const state = options.state();
     const caseNo = state?.awaiting;
     // **人の番のときだけ送る。**AI が操作している最中に割り込むと、
     // どちらが触ったのか証跡から読めなくなる。
-    if (state === undefined || state.phase !== 'waiting' || caseNo === undefined) return;
+    if (state === undefined) {
+      ignored('まだ実行の状態を受け取っていない（橋が繋がっていない）');
+      return;
+    }
+    if (state.phase !== 'waiting' || caseNo === undefined) {
+      ignored(`人の番ではないので送らない（phase=${state.phase}）`);
+      return;
+    }
 
     const point = pointFrom(event);
     // 余白（黒い所）から始まった操作は、端末のどこでもない。
-    if (point === undefined) return;
+    if (point === undefined) {
+      ignored('映像の外（余白）を押したので送らない');
+      return;
+    }
     start = { ...point, at: now(), caseNo };
   };
 
@@ -108,7 +132,10 @@ export function installDeviceTouch(options: InstallDeviceTouchOptions): () => vo
     if (from === undefined) return;
 
     const to = pointFrom(event);
-    if (to === undefined) return;
+    if (to === undefined) {
+      ignored('映像の外（余白）で離したので送らない');
+      return;
+    }
 
     const screen = { x: options.canvas.width, y: options.canvas.height };
     const moved = Math.hypot(to.x - from.x, to.y - from.y);
