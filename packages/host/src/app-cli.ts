@@ -23,7 +23,7 @@ import type { Run } from '@git-qa/core';
 import { tauriDevArgs } from './app.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
-import { findOcr } from './ocr-path.js';
+import { findInput, findOcr } from './ocr-path.js';
 import { startRunSession } from './run-session.js';
 import type { RunSession } from './run-session.js';
 import { startSetupServer } from './setup-server.js';
@@ -54,6 +54,7 @@ const serveOnly = process.argv.includes('--serve');
  * 呼ばれるので、隣を見に行けば見つかる。**無ければ段 1 だけで動く。**
  */
 const ocrPath = await findOcr();
+const inputPath = await findInput();
 
 /** `20260902-150000`。人が ls で並べ替えられる形にする。 */
 const runIdFrom = (at: Date): string => {
@@ -111,6 +112,8 @@ const setup = await startSetupServer({
               build: { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
               // **同梱の OCR を既定で使う**（段 2・C55）。無ければ段 1 だけで動く。
               ...(ocrPath === undefined ? {} : { ocrPath }),
+              // **前面に出さずに押す道具**（C57 追記）。無ければ前面へ出す道へ落ちる。
+              ...(inputPath === undefined ? {} : { inputPath }),
             })
           : web && url !== undefined && browser === 'firefox'
             ? createFirefoxAdapter({

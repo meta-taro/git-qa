@@ -1,0 +1,12 @@
+[package]
+name = "git-qa-input"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# **依存は足さない。**OS のフレームワークへ直接繋ぐ（`git-qa-ocr` と同じ考え方）。
+[dependencies]
+
+[profile.release]
+opt-level = "s"
+strip = true

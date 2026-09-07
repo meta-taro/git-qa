@@ -69,6 +69,11 @@ export interface DesktopAdapterOptions {
   readonly build: TargetBuild;
   /** OCR を呼ぶ実行ファイル。無ければ段 2 は使えない（段 1 だけで動く）。 */
   readonly ocrPath?: string;
+  /**
+   * 画面を触る実行ファイル（`git-qa-input`）。
+   * **無ければ、前面へ出して画面の座標を押す道**へ落ちる（人には相手が前面に出て見える）。
+   */
+  readonly inputPath?: string;
   readonly now?: () => Date;
 }
 
@@ -268,7 +273,7 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action: Action): Promise<void> {
       ensureOpen();
-      await dispatch(app, action, look, recentWindow);
+      await dispatch(app, action, look, recentWindow, deps.inputPath);
     },
 
     async observe(): Promise<Observation> {
@@ -370,6 +375,8 @@ async function dispatch(
   look: () => Promise<Seen>,
   /** 窓の位置だけを取る安い道。**点で指されたときは、これで足りる。** */
   lookWindow: () => Promise<WindowRef>,
+  /** 前面に出さずに押す道具。**無ければ前から在る道へ落ちる。** */
+  inputPath: string | undefined,
 ): Promise<void> {
   if (action.kind === 'launch') {
     /**
@@ -405,7 +412,7 @@ async function dispatch(
   if (action.kind === 'type') {
     if (action.target !== undefined) {
       const point = await resolvePoint(action.target, look, lookWindow);
-      await clickAt(point, await lookWindow(), app);
+      await clickAt(point, await lookWindow(), app, inputPath);
     }
     // `keystroke` は IME を通すので、日本語もそのまま入る。
     await run('osascript', [
@@ -424,7 +431,12 @@ async function dispatch(
   }
 
   if (action.kind === 'tap') {
-    await clickAt(await resolvePoint(action.target, look, lookWindow), await lookWindow(), app);
+    await clickAt(
+      await resolvePoint(action.target, look, lookWindow),
+      await lookWindow(),
+      app,
+      inputPath,
+    );
     return;
   }
 
@@ -468,9 +480,32 @@ const askForContent = async (app: string): Promise<void> => {
 
 const clickAt = async (
   point: { x: number; y: number },
-  _window: WindowRef,
+  window: WindowRef,
   app: string,
+  inputPath: string | undefined,
 ): Promise<void> => {
+  /**
+   * **前面に出さずに押す**（C57 追記・2026-09-07）。
+   *
+   * `git-qa-input` はアクセシビリティの要素を直接押す。相手を前面へ出す必要が無く、
+   * 隠れたままでも押せる。**99 ms**（前面へ出す道は 520 ms、その前は 3 秒超だった）。
+   *
+   * **押せない場所もある**（絵で描かれているだけの所には、押せる部品が無い）。
+   * そのときだけ、前から在る道（前面へ出して画面の座標を押す）へ落とす。
+   */
+  if (inputPath !== undefined) {
+    const pressed = await run(inputPath, [
+      'press',
+      String(window.pid),
+      String(Math.round(point.x)),
+      String(Math.round(point.y)),
+    ]).then(
+      () => true,
+      () => false,
+    );
+    if (pressed) return;
+  }
+
   // **中身を出してくれと頼む**（Electron は聞かれるまで木を作らない・C57）。5 秒に 1 回で足りる。
   await askForContent(app);
 
