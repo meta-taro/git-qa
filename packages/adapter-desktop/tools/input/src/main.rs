@@ -160,7 +160,7 @@ unsafe fn scroll(x: f64, y: f64, lines: i32) {
         CGEventPost(0, move_ev);
         CFRelease(move_ev as *const c_void);
     }
-    std::thread::sleep(std::time::Duration::from_millis(60));
+    std::thread::sleep(std::time::Duration::from_millis(15));
 
     // 1 = kCGScrollEventUnitLine
     let ev = CGEventCreateScrollWheelEvent2(std::ptr::null_mut(), 1, 1, lines, 0, 0);
@@ -173,7 +173,8 @@ unsafe fn scroll(x: f64, y: f64, lines: i32) {
 
     // **人のポインタを飛ばしたままにしない。**
     // 早く返しすぎると、滑車が届く前に指が戻ってしまう（実測）。
-    std::thread::sleep(std::time::Duration::from_millis(120));
+    // **遅く返すほど、指が飛んで見える時間が延びる。**届く最短を探した結果がこれ。
+    std::thread::sleep(std::time::Duration::from_millis(25));
     warp_back(was);
 }
 
