@@ -21,3 +21,10 @@ runs/
 
 # 配布物に入れる Node 側の束ね（ビルドで作る）
 packages/desktop/src-tauri/resources/host-bundle.mjs
+
+# **実案件の検証シートは public に出さない**（C10 / §25）。
+# 案件の URL・画面の文字・手順は、そのまま出すと中身が読める。
+# 見本（sheets/*-sample-*.tsv）だけを追跡し、それ以外の sheets/ は入れない。
+sheets/*
+!sheets/*-sample-*.tsv
+!sheets/android-settings*.tsv
