@@ -76,3 +76,59 @@ export function scrollScript(app: string, x: number, y: number, lines: number): 
     '"ok";',
   ].join('\n');
 }
+
+/**
+ * 掴んで運ぶ（DnD）。
+ *
+ * **2026-09-07 まで、実装が無かった。**「持っていない」と言って止まっていた。
+ *
+ * 押すのは AX の要素を直接押せるので、前面に出さずに済む（`git-qa-input`）。
+ * **なぞる・掴んで運ぶには、その口が無い** —— 実測で `AXScrollArea` に
+ * スクロールバーも `AXValue` も出ていなかった。実際のマウス操作を送るしかない。
+ *
+ * ただし**1 回の操作で、前面に出すのは 1 回だけ。**押して・運んで・離すまでを
+ * 1 本の script でやる。**途中で焦点が動くと、掴んだものが落ちる。**
+ */
+export function dragScript(
+  app: string,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+): string {
+  const name = JSON.stringify(app);
+  const x1 = Math.round(fromX);
+  const y1 = Math.round(fromY);
+  const x2 = Math.round(toX);
+  const y2 = Math.round(toY);
+  return [
+    "ObjC.import('CoreGraphics');",
+    "ObjC.bindFunction('CGEventCreateMouseEvent', ['void*', ['void*', 'int', '{CGPoint=dd}', 'int']]);",
+    "ObjC.bindFunction('CGEventPost', ['void', ['int', 'void*']]);",
+    'var LEFT_DOWN = 1, LEFT_UP = 2, LEFT_DRAGGED = 6, MOVED = 5;',
+    // 一足飛びに運ぶと、途中の動きを見ている相手が掴んだと気づかない。
+    'var STEPS = 12;',
+    'var se = Application("System Events");',
+    'var wasFront = se.processes.whose({ frontmost: true })[0].name();',
+    `Application(${name}).activate();`,
+    'for (var i = 0; i < 25; i++) {',
+    `  if (se.processes.whose({ frontmost: true })[0].name() === ${name}) break;`,
+    '  delay(0.02);',
+    '}',
+    'function at(kind, x, y) {',
+    '  $.CGEventPost(0, $.CGEventCreateMouseEvent($(), kind, { x: x, y: y }, 0));',
+    '}',
+    `at(MOVED, ${String(x1)}, ${String(y1)});`,
+    'delay(0.05);',
+    `at(LEFT_DOWN, ${String(x1)}, ${String(y1)});`,
+    'delay(0.08);',
+    'for (var s = 1; s <= STEPS; s++) {',
+    `  at(LEFT_DRAGGED, ${String(x1)} + (${String(x2 - x1)} * s) / STEPS, ${String(y1)} + (${String(y2 - y1)} * s) / STEPS);`,
+    '  delay(0.02);',
+    '}',
+    'delay(0.08);',
+    `at(LEFT_UP, ${String(x2)}, ${String(y2)});`,
+    `if (wasFront !== ${name}) { se.processes.byName(wasFront).frontmost = true; }`,
+    '"ok";',
+  ].join('\n');
+}

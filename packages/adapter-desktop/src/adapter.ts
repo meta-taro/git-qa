@@ -18,7 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
-import { clickScript, NOT_FRONT_MARK, scrollScript } from './click.js';
+import { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 import type { AxElement } from './ax.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
@@ -441,11 +441,14 @@ async function dispatch(
   }
 
   if (action.kind === 'drag') {
-    // **持っていない。**できないことを、別の操作へ黙って流さない（C20 と同じ考え方）。
-    throw new AdapterError(
-      KIND,
-      'デスクトップではドラッグをまだ持っていない（人が自分で動かす必要がある）',
-    );
+    /**
+     * **掴んで運ぶ。**押すのと違い、AX には口が無いので実際のマウス操作を送る。
+     * そのため**1 回だけ前面に出る**（途中で焦点が動くと、掴んだものが落ちる）。
+     */
+    const from = await resolvePoint(action.from, look, lookWindow);
+    const to = await resolvePoint(action.to, look, lookWindow);
+    await osa(dragScript(app, from.x, from.y, to.x, to.y));
+    return;
   }
 
   // swipe。デスクトップではスクロールとして送る（指でなぞる相手ではない）。
