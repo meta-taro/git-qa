@@ -66,6 +66,9 @@ const ja = {
   'setup.operator.placeholder': '個人名ではなく、名乗る名前（例: めたたろ / octocat）',
   'setup.device': '1. 見る相手を選ぶ',
   'setup.web': 'ウェブページを見るなら、URL を入れる（端末より優先）',
+  'live.desktop.note':
+    'ここから押すのは、そのまま届きます（相手は前に出てきません）。' +
+    'なぞる・掴んで運ぶは、指が一瞬そちらへ飛びます。気になるときは実物の窓を直接触ってください。',
   'setup.app': 'デスクトップアプリを見るなら、アプリ名を入れる（窓の持ち主の名前）',
   'setup.app.placeholder': '連絡くん / 計算機 など',
   'setup.web.placeholder': 'http://localhost:3000/ または https://…',
@@ -177,6 +180,10 @@ const en: Record<keyof typeof ja, string> = {
   'setup.operator.placeholder': 'A handle, not a personal name (e.g. octocat)',
   'setup.device': '1. Pick what to look at',
   'setup.web': 'To verify a web page, enter its URL (takes priority over a device)',
+  'live.desktop.note':
+    'Clicks from here reach the app directly (it will not come to the front). ' +
+    'Scrolling and dragging move your pointer there for a moment — ' +
+    'operate the real window if that gets in the way.',
   'setup.app': 'To verify a desktop app, enter its name (the window owner)',
   'setup.app.placeholder': 'e.g. Calculator',
   'setup.web.placeholder': 'http://localhost:3000/ or https://…',

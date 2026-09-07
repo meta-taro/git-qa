@@ -28,11 +28,12 @@ import { createLivePlayer } from './live/player.js';
 import { createImagePlayer } from './live/images.js';
 import {
   liveKindFromLocation,
+  targetKindFromLocation,
   liveStreamUrlFromLocation,
   openLiveStream,
   pumpLiveStream,
 } from './live/stream.js';
-import { mountLiveView, showLiveViewError } from './live/view.js';
+import { mountLiveView, showDesktopNote, showLiveViewError } from './live/view.js';
 import { createWebCodecsDecoder, isLiveViewSupported } from './live/webcodecs.js';
 import './styles.css';
 
@@ -161,6 +162,8 @@ async function startLiveView(
   // 実寸は最初の絵が来た時点で合わせ直す（view.ts）。ここは仮の大きさ。
   const surface = mountLiveView(container, { width: 1080, height: 2220 });
   onCanvas(surface.canvas);
+  // **できないことを、できるふりで隠さない**（相手がデスクトップのときだけ・C57）。
+  showDesktopNote(container, targetKindFromLocation(window.location.search));
 
   const drew = (frame: Parameters<typeof surface.draw>[0]): void => {
     diagnostics.decoded += 1;

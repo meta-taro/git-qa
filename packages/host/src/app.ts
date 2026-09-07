@@ -44,6 +44,11 @@ export interface TauriDevArgsOptions {
    * Android は H.264、ウェブはブラウザの画像 1 枚ずつ（C54）。
    */
   readonly liveKind?: 'h264' | 'images';
+  /**
+   * 何を相手にしているか。**画面が断りを出すかどうかを、これで決める。**
+   * デスクトップだけ、なぞる・掴んで運ぶで指が一瞬飛ぶ（C57）。
+   */
+  readonly targetKind?: 'desktop';
 }
 
 /**
@@ -64,6 +69,7 @@ export function tauriDevArgs(
   if (options.setupUrl !== undefined) target.searchParams.set('setup', options.setupUrl);
   // 既定は H.264（Android）。**知らせないと、画面はブラウザの絵を H.264 として復号しようとする。**
   if (options.liveKind === 'images') target.searchParams.set('livekind', 'images');
+  if (options.targetKind !== undefined) target.searchParams.set('targetkind', options.targetKind);
 
   return ['dev', '--config', JSON.stringify({ build: { devUrl: target.toString() } })];
 }

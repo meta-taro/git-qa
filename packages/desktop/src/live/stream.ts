@@ -27,6 +27,17 @@ export function liveKindFromLocation(search: string): LiveKind {
 }
 
 /**
+ * 何を相手にしているか。**断りを出すかどうかを、これで決める。**
+ *
+ * デスクトップアプリだけ、なぞる・掴んで運ぶで**指が一瞬飛ぶ**
+ * （macOS に、指を動かさず窓へ届ける口が無い・C57）。
+ * ウェブと Android では起きない（ブラウザ／端末の中へ命令を送るので、Mac の指は動かない）。
+ */
+export function targetKindFromLocation(search: string): 'desktop' | undefined {
+  return new URLSearchParams(search).get('targetkind') === 'desktop' ? 'desktop' : undefined;
+}
+
+/**
  * 届いた順に再生へ渡す。ストリームが尽きたら `end()` する。
  *
  * **どちらの映像かをここでは問わない。**使うのは `push` と `end` だけで、

@@ -587,3 +587,13 @@ body {
   width: 1.5em;
   text-align: center;
 }
+
+/* **できないことの断り。**映像の下に置いて、映像を隠さない（C57）。 */
+.live-note {
+  order: 1;
+  flex: 0 0 auto;
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  opacity: 0.7;
+}

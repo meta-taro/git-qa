@@ -89,7 +89,11 @@ const child = spawn(
     '@git-qa/desktop',
     'exec',
     'tauri',
-    ...tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl, liveKind: 'images' }),
+    ...tauriDevArgs(session.liveUrl, {
+      controlUrl: session.controlUrl,
+      liveKind: 'images',
+      targetKind: 'desktop',
+    }),
   ],
   { stdio: 'inherit' },
 );

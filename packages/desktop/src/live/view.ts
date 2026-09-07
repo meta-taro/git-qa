@@ -1,4 +1,5 @@
 import { MAIN_COLUMN_ID } from '../columns.js';
+import { t } from '../i18n/current.js';
 import type { DecodedFrame } from './player.js';
 
 /**
@@ -94,4 +95,25 @@ export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions):
       if (placeholder !== null && placeholder !== undefined) column.append(placeholder);
     },
   };
+}
+
+/**
+ * 相手がデスクトップアプリのときだけ、断りを出す（C57・人の判断）。
+ *
+ * > デスクトップアプリの時だけ最悪補助ボタンとかでいいです。注意書きで、
+ * > もしくは実物を操作してくださいみたいな
+ *
+ * **押すのは飛ばない。なぞる・運ぶだけ飛ぶ。**そこを混ぜて書かない
+ * （全部だめだと読ませると、押すことまでやめてしまう）。
+ */
+export function showDesktopNote(root: HTMLElement, kind: 'desktop' | undefined): void {
+  if (kind !== 'desktop') return;
+
+  const column = liveColumn(root);
+  if (column.querySelector('.live-note') !== null) return;
+
+  const note = root.ownerDocument.createElement('p');
+  note.className = 'live-note';
+  note.textContent = t('live.desktop.note');
+  column.append(note);
 }
