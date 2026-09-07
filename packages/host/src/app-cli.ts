@@ -1,8 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
@@ -25,6 +23,7 @@ import type { Run } from '@git-qa/core';
 import { tauriDevArgs } from './app.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
+import { findOcr } from './ocr-path.js';
 import { startRunSession } from './run-session.js';
 import type { RunSession } from './run-session.js';
 import { startSetupServer } from './setup-server.js';
@@ -54,19 +53,7 @@ const serveOnly = process.argv.includes('--serve');
  * **配布物には同梱されている**（`resources/git-qa-ocr`）。この実行器は同じ所から
  * 呼ばれるので、隣を見に行けば見つかる。**無ければ段 1 だけで動く。**
  */
-const ocrPath = await (async (): Promise<string | undefined> => {
-  const fromEnv = process.env['GIT_QA_OCR'];
-  if (fromEnv !== undefined) return fromEnv;
-
-  const beside = join(dirname(fileURLToPath(import.meta.url)), 'git-qa-ocr');
-  try {
-    await access(beside);
-    return beside;
-  } catch {
-    // 同梱されていない（開発中に直接動かした等）。**段 1 だけで動く。**
-    return undefined;
-  }
-})();
+const ocrPath = await findOcr();
 
 /** `20260902-150000`。人が ls で並べ替えられる形にする。 */
 const runIdFrom = (at: Date): string => {

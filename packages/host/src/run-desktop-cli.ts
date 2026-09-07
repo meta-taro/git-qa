@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
 import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
 
+import { findOcr } from './ocr-path.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
 import { tauriDevArgs } from './app.js';
@@ -54,7 +55,7 @@ if (app === undefined || app === '') {
 }
 
 /** 絵から文字を読む道具（段 2）。**無ければ段 1 だけで動く。** */
-const ocrPath = process.env['GIT_QA_OCR'];
+const ocrPath = await findOcr();
 
 const session = await startRunSession({
   adapter: createDesktopAdapter({
