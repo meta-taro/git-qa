@@ -41,6 +41,44 @@ export function windowScript(app: string): string {
 }
 
 /**
+ * **画面に出ていない窓も数える** JXA。
+ *
+ * `windowScript` は `kCGWindowListOptionOnScreenOnly`（1）なので、
+ * **別のデスクトップ（Space）に居る・最小化されている・フルスクリーンの裏**では
+ * 何も返らない。そこで「閉じられた」と言うと、人は閉じていない窓を探しに行く。
+ * 2026-09-07、ライブビューを押しても動かず、ログにこれが 16 回並んだ。
+ */
+export function anyWindowScript(app: string): string {
+  return [
+    'ObjC.bindFunction("CGWindowListCopyWindowInfo", ["id", ["unsigned int", "unsigned int"]]);',
+    `var want = ${JSON.stringify(app)};`,
+    // 0 = 全部（1 は「いま画面に出ているものだけ」）
+    'var list = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo(0, 0));',
+    'String(list.filter(function (w) {',
+    '  return w.kCGWindowOwnerName === want && w.kCGWindowLayer === 0',
+    '    && w.kCGWindowBounds.Width > 1 && w.kCGWindowBounds.Height > 1;',
+    '}).length);',
+  ].join('\n');
+}
+
+/**
+ * 窓が取れなかったときの言い分。**「無い」と「見えていない」を分ける。**
+ */
+export function missingWindowMessage(app: string, elsewhere: number): string {
+  if (elsewhere > 0) {
+    return (
+      `${app} の窓はあるが、いま画面に出ていない。` +
+      '別のデスクトップ（Space）に居る・最小化されている・フルスクリーンの裏、のどれか。' +
+      `git-qa の画面と ${app} を、同じデスクトップに並べて置く。`
+    );
+  }
+  return (
+    `窓が見つからない: ${app}。アプリを起動して、窓を出してから始める` +
+    '（名前は窓の持ち主のもの。「情報を見る」の名前とは違うことがある）'
+  );
+}
+
+/**
  * ある一点で**いちばん手前に居る窓**を聞く JXA。
  *
  * **撮るのと押すのでは、隠れの効き方が違う。**

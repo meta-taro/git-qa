@@ -78,3 +78,6 @@ export type {
 // 対象なしでテストを書くために要る。だから輸出する。
 export { createFakeAdapter } from './adapter/fake.js';
 export type { FakeAdapter, FakeAdapterOptions } from './adapter/fake.js';
+
+// 打鍵の割り当ての正本（`./session` からも出している）。
+export { VERDICT_KEYS, verdictKeyHint } from './session/verdict-keys.js';

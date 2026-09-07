@@ -8,7 +8,7 @@ import {
   createWebAdapter,
   readWebScreenText,
 } from '@git-qa/adapter-web';
-import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, verdictKeyHint, writeRunJson } from '@git-qa/core';
 
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
@@ -117,7 +117,7 @@ const session = await startRunSession({
 
 console.log(`[git-qa] 見る場所: ${target}`);
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
-console.log('[git-qa] 画面で v=VERIFIED / f=FAIL / b=BLOCKED / s=SKIP / Space=置かずに次へ');
+console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
 const child = spawn(
   'pnpm',

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
-import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, verdictKeyHint, writeRunJson } from '@git-qa/core';
 
 import { findOcr } from './ocr-path.js';
 import { startRunSession } from './run-session.js';
@@ -78,7 +78,7 @@ const session = await startRunSession({
 
 console.log(`[git-qa] 見るアプリ: ${app}${ocrPath === undefined ? '（段 1 のみ）' : ''}`);
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
-console.log('[git-qa] 画面で v=VERIFIED / f=FAIL / b=BLOCKED / s=SKIP / Space=置かずに次へ');
+console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
 const child = spawn(
   'pnpm',

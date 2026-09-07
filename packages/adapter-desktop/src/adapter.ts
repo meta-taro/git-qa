@@ -23,7 +23,9 @@ import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
 import {
+  anyWindowScript,
   captureArgs,
+  missingWindowMessage,
   notFrontmost,
   occludedBy,
   parseTopWindow,
@@ -105,10 +107,10 @@ export function createDesktopAdapter(options: DesktopAdapterOptions): TargetAdap
       const window = parseWindow(await osa(windowScript(options.app)));
       if (window === undefined) {
         // **黙って空の絵を返さない。**見つからないことと、何も映っていないことは別。
+        const elsewhere = Number((await osa(anyWindowScript(options.app)).catch(() => '0')).trim());
         throw new AdapterError(
           KIND,
-          `窓が見つからない: ${options.app}。アプリを起動して、窓を出してから始める` +
-            '（名前は窓の持ち主のもの。「情報を見る」の名前とは違うことがある）',
+          missingWindowMessage(options.app, Number.isFinite(elsewhere) ? elsewhere : 0),
         );
       }
       /**
@@ -157,7 +159,13 @@ function createSession(deps: SessionDeps): TargetSession {
   const refreshWindow = async (): Promise<WindowRef> => {
     const found = parseWindow(await osa(windowScript(app)));
     if (found === undefined) {
-      throw new AdapterError(KIND, `窓が見つからなくなった: ${app}（閉じられていないかを見る）`);
+      // **「無い」と「見えていない」を分ける。**別のデスクトップ（Space）へ移しただけで
+      // ここは空になる。「閉じられていないか」と言うと、閉じていない窓を探しに行かせる。
+      const elsewhere = Number((await osa(anyWindowScript(app)).catch(() => '0')).trim());
+      throw new AdapterError(
+        KIND,
+        missingWindowMessage(app, Number.isFinite(elsewhere) ? elsewhere : 0),
+      );
     }
     window = found;
     return found;

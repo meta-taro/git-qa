@@ -4,6 +4,8 @@ export { parseHumanInput, parseSessionState } from './protocol.js';
 export type { HumanInput, SessionCase, SessionPhase, SessionState } from './protocol.js';
 // 結果の語彙は run.json と同じものを使う。画面側で別の語を作らない。
 export { AI_RESULTS, CASE_RESULTS, HUMAN_RESULTS } from '../run/types.js';
+// 打鍵の割り当ての正本。**画面もターミナルの案内もここから作る。**
+export { VERDICT_KEYS, verdictKeyHint } from './verdict-keys.js';
 export type { AiResult, CaseResult, HumanResult } from '../run/types.js';
 
 // 置いた人のハンドルの規則。**画面（webview）からも要る**ので、

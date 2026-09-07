@@ -1,5 +1,7 @@
 export {
+  anyWindowScript,
   captureArgs,
+  missingWindowMessage,
   notFrontmost,
   occludedBy,
   parseTopWindow,

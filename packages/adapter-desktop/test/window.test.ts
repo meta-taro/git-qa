@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { captureArgs, parseWindow, windowScript } from '../src/window.js';
+import {
+  anyWindowScript,
+  captureArgs,
+  missingWindowMessage,
+  parseWindow,
+  windowScript,
+} from '../src/window.js';
 
 /**
  * 見る窓を決めて、撮る（C55）。
@@ -72,5 +78,44 @@ describe('captureArgs', () => {
 
   it('画面の四角で切らない（手前に重なった窓を写さない）', () => {
     expect(captureArgs(217, '/tmp/a.jpg')).not.toContain('-R');
+  });
+});
+
+/**
+ * **2026-09-07、人がライブビューを押しても何も起きなかった。**
+ *
+ * ログにはこれが 16 回並んでいた。
+ *
+ *   窓が見つからなくなった: Electron（閉じられていないかを見る）
+ *
+ * **閉じてはいなかった。**`kCGWindowListOptionOnScreenOnly` は
+ * 「いま画面に出ている窓」しか返さない。別のデスクトップ（Space）に居る・
+ * 最小化されている・フルスクリーンの裏、のいずれでも消える。
+ * **「無い」と「見えていない」を同じ文言にしない。**
+ */
+describe('anyWindowScript', () => {
+  it('画面に出ていない窓も数える（見えていないだけ、を見分けるため）', () => {
+    const script = anyWindowScript('Electron');
+
+    // 0 = 全部（1 は「いま画面に出ているものだけ」）
+    expect(script).toContain('CGWindowListCopyWindowInfo(0, 0)');
+    expect(script).toContain('"Electron"');
+  });
+});
+
+describe('missingWindowMessage', () => {
+  it('本当に無いなら、起動を促す', () => {
+    const message = missingWindowMessage('Electron', 0);
+
+    expect(message).toContain('起動');
+    expect(message).not.toContain('デスクトップ');
+  });
+
+  it('あるのに見えていないなら、そう言う', () => {
+    const message = missingWindowMessage('Electron', 1);
+
+    expect(message).toContain('画面に出ていない');
+    expect(message).toContain('デスクトップ');
+    expect(message).toContain('最小化');
   });
 });

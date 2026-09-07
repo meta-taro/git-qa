@@ -1,3 +1,4 @@
+import { VERDICT_KEYS } from '@git-qa/core/session';
 import type { HumanResult } from '@git-qa/core/session';
 
 import type { MessageKey } from '../i18n/index.js';
@@ -60,12 +61,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { key: 'ArrowDown', labelKey: 'key.next', noteKey: 'key.move.note' },
 ];
 
-const VERDICTS: Readonly<Record<string, HumanResult>> = {
-  d: 'VERIFIED',
-  f: 'FAIL',
-  a: 'BLOCKED',
-  s: 'SKIP',
-};
+const VERDICTS = VERDICT_KEYS;
 
 export function commandForKey(press: KeyPress): KeyCommand | undefined {
   if (press.ctrlKey === true || press.metaKey === true || press.altKey === true) return undefined;
