@@ -20,6 +20,7 @@ import type {
 import { axScript, findInElements, parseElements } from './ax.js';
 import type { AxElement } from './ax.js';
 import { findInOcr, parseOcr } from './ocr.js';
+import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
 import { captureArgs, parseWindow, windowScript } from './window.js';
 import type { WindowRef } from './window.js';
@@ -77,7 +78,7 @@ function run(command: string, args: readonly string[]): Promise<string> {
         resolve(out);
         return;
       }
-      reject(new AdapterError(KIND, `${command} が失敗した: ${err.trim()}`));
+      reject(new AdapterError(KIND, explainToolFailure(command, err)));
     });
   });
 }

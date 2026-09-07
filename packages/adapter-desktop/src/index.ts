@@ -7,3 +7,4 @@ export type { OcrLine } from './ocr.js';
 export { createDesktopAdapter, screenTextOf } from './adapter.js';
 export type { DesktopAdapterOptions } from './adapter.js';
 export { readDesktopScreenText } from './screen-text.js';
+export { explainToolFailure } from './permission.js';
