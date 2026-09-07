@@ -18,25 +18,37 @@ const cases = (ran: number): SessionCase[] =>
   }));
 
 describe('nextCursor', () => {
-  it('走り終わったケースの中で前後に動く', () => {
+  /**
+   * **2026-09-07、方針を変えた。**
+   *
+   * > した矢印おしても、したまでいかないね。
+   *
+   * それまでは「走り終わったケースの中だけ」を行き来していた。まだ走っていない
+   * ケースには判定を置けないので、そこへ行かせない、という考えだった。
+   *
+   * **見るのと置くのは別。**キーの説明も「次のケースを見る」と書いてある。
+   * 先に何が来るかを見るのは、人の当たり前の動き。**見るのは全部許す。**
+   * 置けないケースへ置こうとしたときは、そこで理由を出す（`whyCannotPlace`）。
+   */
+  it('走っていないケースも含めて、前後に動く', () => {
     expect(nextCursor(cases(3), 2, 3, 1)).toBe(3);
     expect(nextCursor(cases(3), 2, 3, -1)).toBe(1);
+    expect(nextCursor(cases(3), 3, 3, 1)).toBe(4);
+    expect(nextCursor(cases(3), 4, 3, 1)).toBe(5);
   });
 
-  it('**まだ走っていないケースへは行けない**（見て判断する材料が無い）', () => {
-    expect(nextCursor(cases(3), 3, 3, 1)).toBe(3);
-  });
-
-  it('先頭より前へは行かない', () => {
+  it('先頭より前・末尾より後ろへは行かない', () => {
     expect(nextCursor(cases(3), 1, 3, -1)).toBe(1);
+    expect(nextCursor(cases(3), 5, 3, 1)).toBe(5);
   });
 
   it('カーソルが無ければ、打鍵待ちのケースから動く', () => {
     expect(nextCursor(cases(3), undefined, 3, -1)).toBe(2);
+    expect(nextCursor(cases(3), undefined, 3, 1)).toBe(4);
   });
 
-  it('走ったケースが 1 つも無ければ動かない', () => {
-    expect(nextCursor(cases(0), undefined, 1, 1)).toBeUndefined();
+  it('ケースが 1 つも無ければ動かない', () => {
+    expect(nextCursor([], undefined, 1, 1)).toBeUndefined();
   });
 });
 

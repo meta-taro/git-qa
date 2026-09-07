@@ -228,7 +228,12 @@ const startSession = (
       onIgnored: (reason) => console.warn('[git-qa] 押した操作を送らなかった:', reason),
     });
     // **長い画面の下を見られるようにする。**タップとなぞるだけでは届かない。
-    installDeviceWheel({ canvas, state: () => latest, send });
+    installDeviceWheel({
+      canvas,
+      state: () => latest,
+      send,
+      onIgnored: (reason) => console.warn('[git-qa] 回した操作を送らなかった:', reason),
+    });
   }).catch((error: unknown) => {
     // **映らない理由を画面に出す。**console だけだと人には見えず、待ち続けることになる。
     console.error('[live-view]', error);

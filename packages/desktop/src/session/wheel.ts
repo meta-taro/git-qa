@@ -48,6 +48,11 @@ export interface InstallDeviceWheelOptions {
   readonly canvas: HTMLCanvasElement;
   /** いまの実行状態。**人の番かどうかはここで見る。** */
   readonly state: () => SessionState | undefined;
+  /**
+   * 回した操作を捨てたときに、その理由を渡す。
+   * **黙って捨てない**（2026-09-07、押す側で同じことを踏んだ）。
+   */
+  readonly onIgnored?: (reason: string) => void;
   readonly send: (input: HumanInput) => void;
 }
 
@@ -68,12 +73,20 @@ export function installDeviceWheel(options: InstallDeviceWheelOptions): () => vo
     acc = { dx: 0, dy: 0 };
     anchor = undefined;
     if (from === undefined || (dx === 0 && dy === 0)) return;
+    const ignored = (reason: string): void => options.onIgnored?.(reason);
 
     const state = options.state();
     const caseNo = state?.awaiting;
     // **人の番のときだけ送る。**AI が操作している最中に割り込むと、
     // どちらが触ったのか証跡から読めなくなる。
-    if (state === undefined || state.phase !== 'waiting' || caseNo === undefined) return;
+    if (state === undefined) {
+      ignored('まだ実行の状態を受け取っていない（橋が繋がっていない）');
+      return;
+    }
+    if (state.phase !== 'waiting' || caseNo === undefined) {
+      ignored(`人の番ではないので送らない（phase=${state.phase}）`);
+      return;
+    }
 
     const screen = { x: options.canvas.width, y: options.canvas.height };
     // 縁から始めない。縁は通知や「戻る」の縄張り。
@@ -89,7 +102,12 @@ export function installDeviceWheel(options: InstallDeviceWheelOptions): () => vo
       x: clamp(Math.round(startX - dx), 0, screen.x - 1),
       y: clamp(Math.round(startY - dy), 0, screen.y - 1),
     };
-    if (to.x === startX && to.y === startY) return;
+    if (to.x === startX && to.y === startY) {
+      ignored(
+        `動く先が同じ所になった（dx=${String(Math.round(dx))} dy=${String(Math.round(dy))}）`,
+      );
+      return;
+    }
 
     const distance = Math.hypot(to.x - startX, to.y - startY);
     options.send({
@@ -110,7 +128,10 @@ export function installDeviceWheel(options: InstallDeviceWheelOptions): () => vo
       canvas: { width: options.canvas.width, height: options.canvas.height },
     });
     // 余白（黒い所）で回している。端末のどこでもない。
-    if (point === undefined) return;
+    if (point === undefined) {
+      options.onIgnored?.('映像の外（余白）で回したので送らない');
+      return;
+    }
     // 画面ごと動かさない。**枠の中で回している間は、こちらが受け取る。**
     event.preventDefault();
 

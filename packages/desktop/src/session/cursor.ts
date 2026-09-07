@@ -9,8 +9,16 @@ import type { KeyCommand } from './keys.js';
  */
 
 /**
- * 前後に動かす。**走り終わったケースの中だけ**を行き来する
- * （まだ走っていないケースは、AI が操作していないので見て判断する材料が無い）。
+ * 前後に動かす。**シートの全部のケースを行き来する。**
+ *
+ * 2026-09-07 まで「走り終わったケースの中だけ」に絞っていた。判定を置けないケースへは
+ * 行かせない、という考えだったが、人にこう言われた。
+ *
+ * > した矢印おしても、したまでいかないね。
+ *
+ * **見るのと置くのは別。**キーの説明も「次のケースを見る」と書いてある。
+ * 先に何が来るかを見るのは当たり前の動きで、止める理由が無い。
+ * 置けないケースへ置こうとしたときに、そこで理由を出せばよい（`whyCannotPlace`）。
  */
 export function nextCursor(
   cases: readonly SessionCase[],
@@ -18,7 +26,7 @@ export function nextCursor(
   awaiting: number | undefined,
   step: -1 | 1,
 ): number | undefined {
-  const visitable = cases.filter((c) => c.aiResult !== undefined).map((c) => c.no);
+  const visitable = cases.map((c) => c.no);
   if (visitable.length === 0) return undefined;
 
   const from = cursor ?? awaiting ?? visitable[0];
