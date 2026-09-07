@@ -1,45 +1,59 @@
 import { describe, expect, it } from 'vitest';
 
-import { clickScript } from '../src/click.js';
+import { clickScript, NOT_FRONT_MARK } from '../src/click.js';
 
 /**
- * **2026-09-07、人にこう言われた。**
+ * **2026-09-07、押してから動くまで 3 秒かかっていた。**
  *
- * > 操作したときに連動くんがいちいち一番うえにくるのはふせげないの？
- * > うーん、おしいw一瞬上にきて引っ込むねw
- *
- * 前面に出していたのは、`click at {x, y}` が**画面の座標へ**送るからだった。
- * 隠れていれば手前の別アプリが受け取る（実際に Chrome のツールバーと warifu を押した）。
- *
- * **宛先をアプリにすれば、その必要が無くなる。**
- * `CGEventPostToPid` は、指定したプロセスにだけ出来事を届ける。
- * 前面に出さない・並び順を気にしない・元の窓を戻す必要もない。
+ * 「ボタンをぽちぽち押すと、反応したのかしなかったのか、遅延しているのか
+ * みたいな動きをする」。osascript が 1 回 250 ms 前後かかるのに、
+ * **1 押しで 4 回**呼んでいた（中身を出す・前面へ出す・前面か確かめる・押す）。
+ * **1 本にまとめる。**
  */
 describe('clickScript', () => {
-  it('プロセスを名指しして届ける（画面へばら撒かない）', () => {
-    const script = clickScript(1398, 100, 200);
+  it('前面に出して、出るのを待って、押すまでを 1 本でやる', () => {
+    const script = clickScript('Electron', 100, 200);
 
-    expect(script).toContain('CGEventPostToPid');
-    expect(script).toContain('1398');
+    expect(script).toContain('activate');
+    expect(script).toContain('click at {100, 200}');
+    // **待たずに確かめると、出る前に断ってしまう**（2026-09-07 に踏んだ）。
+    expect(script).toContain('delay');
   });
 
-  it('押して離すまでを送る（押しっぱなしにしない）', () => {
-    const script = clickScript(1, 2, 3);
+  it('前面に出なかったときは、押さずに目印を返す', () => {
+    const script = clickScript('Electron', 1, 2);
 
-    // 1 = leftMouseDown, 2 = leftMouseUp
-    expect(script).toContain('kCGEventLeftMouseDown');
-    expect(script).toContain('kCGEventLeftMouseUp');
+    expect(script).toContain(NOT_FRONT_MARK);
   });
 
-  it('前面に出す指示を含まない（そこが直したところ）', () => {
-    const script = clickScript(1398, 1, 2);
-
-    expect(script).not.toContain('activate');
-    expect(script).not.toContain('frontmost');
+  it('アプリ名は閉じて渡す（日本語も引用符も落とさない）', () => {
+    expect(clickScript('ローカル連動くん', 1, 2)).toContain('"ローカル連動くん"');
+    expect(clickScript('a"b', 1, 2)).toContain(String.raw`"a\"b"`);
   });
 
-  it('座標は整数にする', () => {
-    expect(clickScript(1, 10.6, 20.4)).toContain('11');
-    expect(clickScript(1, 10.6, 20.4)).toContain('20');
+  it('座標は整数にする（小数を渡すと System Events が受け取らない）', () => {
+    expect(clickScript('X', 10.6, 20.4)).toContain('click at {11, 20}');
+  });
+});
+
+/**
+ * **2026-09-07、人に言われた。**
+ *
+ * > 操作したときに連動くんがいちいち一番うえにくるのはふせげないの？
+ *
+ * 押すには前面へ出すしかない（画面全体の座標へ送るので、隠れていると別のアプリが受け取る）。
+ * **出したあと、元に戻す。**人が見ていた窓を奪ったままにしない。
+ * 戻すのを別の osascript にすると 250 ms 増えるので、**同じ script の中でやる。**
+ */
+describe('clickScript — 押したあと、元の窓へ戻す', () => {
+  it('押す前に前面だったアプリを覚えて、押したあと戻す', () => {
+    const script = clickScript('Electron', 1, 2);
+
+    expect(script).toContain('set wasFront to name of first process whose frontmost is true');
+    expect(script).toContain('set frontmost of process wasFront to true');
+  });
+
+  it('元から目的のアプリが前面だったなら、戻さない（無駄に前面へ出し直さない）', () => {
+    expect(clickScript('Electron', 1, 2)).toContain('if wasFront is not "Electron"');
   });
 });

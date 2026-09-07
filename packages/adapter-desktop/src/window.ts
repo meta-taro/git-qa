@@ -9,8 +9,6 @@
 /** 窓 1 つ。位置と大きさは、絵の中の座標を画面の座標へ戻すのに要る。 */
 export interface WindowRef {
   readonly id: number;
-  /** 窓を持っているプロセスの番号。**押すときの宛先**（前面に出さずに届ける）。 */
-  readonly pid: number;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -36,8 +34,8 @@ export function windowScript(app: string): string {
     '    && w.kCGWindowBounds.Width > 1 && w.kCGWindowBounds.Height > 1;',
     '})[0];',
     'hit',
-    '  ? [hit.kCGWindowNumber, hit.kCGWindowOwnerPID, hit.kCGWindowBounds.X,',
-    '     hit.kCGWindowBounds.Y, hit.kCGWindowBounds.Width, hit.kCGWindowBounds.Height].join(", ")',
+    '  ? [hit.kCGWindowNumber, hit.kCGWindowBounds.X, hit.kCGWindowBounds.Y,',
+    '     hit.kCGWindowBounds.Width, hit.kCGWindowBounds.Height].join(", ")',
     '  : "missing value";',
   ].join('\n');
 }
@@ -80,25 +78,33 @@ export function missingWindowMessage(app: string, elsewhere: number): string {
   );
 }
 
-/** `217, 1398, 100, 50, 800, 600` を読む。**当て推量で撮らない**ので、読めなければ undefined。 */
+/**
+ * 前面が目的のアプリかを確かめる。**押す直前の最後の関門。**
+ *
+ * 窓の一覧（`occludedBy`）だけでは足りなかった。
+ * 2026-09-07、一覧が「連動くんが手前」と答えた点を押したのに、
+ * 実際には Google Chrome のツールバーと warifu の窓を押していた。
+ */
+export function notFrontmost(app: string, frontmost: string): string | undefined {
+  const front = frontmost.trim();
+  if (front === '') return `いま前面に居るアプリが分からないので押さない（目的は ${app}）`;
+  if (front === app) return undefined;
+
+  return `${app} を前面に出せなかった（いま前面に居るのは ${front}）。押すと別のアプリが受け取る`;
+}
+
+/** `217, 100, 50, 800, 600` を読む。**当て推量で撮らない**ので、読めなければ undefined。 */
 export function parseWindow(stdout: string): WindowRef | undefined {
   const numbers = stdout
     .trim()
     .split(',')
     .map((part) => Number(part.trim()));
-  if (numbers.length !== 6 || numbers.some((n) => !Number.isFinite(n))) return undefined;
+  if (numbers.length !== 5 || numbers.some((n) => !Number.isFinite(n))) return undefined;
 
-  const [id, pid, x, y, width, height] = numbers as [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  // 大きさの無い窓は撮れない（畳まれている・出来かけ）。持ち主が分からなければ押せない。
-  if (id <= 0 || pid <= 0 || width <= 0 || height <= 0) return undefined;
-  return { id, pid, x, y, width, height };
+  const [id, x, y, width, height] = numbers as [number, number, number, number, number];
+  // 大きさの無い窓は撮れない（畳まれている・出来かけ）。
+  if (id <= 0 || width <= 0 || height <= 0) return undefined;
+  return { id, x, y, width, height };
 }
 
 /**

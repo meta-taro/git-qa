@@ -18,7 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
-import { clickScript } from './click.js';
+import { clickScript, NOT_FRONT_MARK } from './click.js';
 import type { AxElement } from './ax.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
@@ -27,6 +27,7 @@ import {
   anyWindowScript,
   captureArgs,
   missingWindowMessage,
+  notFrontmost,
   parseWindow,
   windowScript,
 } from './window.js';
@@ -458,15 +459,16 @@ const askForContent = async (app: string): Promise<void> => {
 
 const clickAt = async (
   point: { x: number; y: number },
-  window: WindowRef,
+  _window: WindowRef,
   app: string,
 ): Promise<void> => {
   // **中身を出してくれと頼む**（Electron は聞かれるまで木を作らない・C57）。5 秒に 1 回で足りる。
   await askForContent(app);
 
-  /**
-   * **宛先はアプリ。**画面へ送らないので、前面に出す必要が無い。
-   * 隠れていても、他のアプリを押してしまうこともない。
-   */
-  await osa(clickScript(window.pid, point.x, point.y));
+  // **前面へ出す・出るのを待つ・押す。1 本で済ませる**（分けると 1 押しが 1 秒を超える）。
+  const said = (await run('osascript', ['-e', clickScript(app, point.x, point.y)])).trim();
+  if (said.startsWith(NOT_FRONT_MARK)) {
+    const front = said.slice(NOT_FRONT_MARK.length).trim();
+    throw new AdapterError(KIND, notFrontmost(app, front) ?? `${app} を前面に出せなかった`);
+  }
 };

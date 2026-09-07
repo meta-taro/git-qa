@@ -37,16 +37,9 @@ describe('windowScript', () => {
 });
 
 describe('parseWindow', () => {
-  /**
-   * **持ち主の番号（pid）も読む**（2026-09-07）。
-   *
-   * 押すのを「画面のこの座標」ではなく「**このアプリのこの座標**」へ送るようにしたので、
-   * 相手の pid が要る。これで前面に出す必要が無くなった。
-   */
-  it('番号と持ち主と位置と大きさを読む', () => {
-    expect(parseWindow('217, 1398, 100, 50, 800, 600')).toEqual({
+  it('番号と位置と大きさを読む', () => {
+    expect(parseWindow('217, 100, 50, 800, 600')).toEqual({
       id: 217,
-      pid: 1398,
       x: 100,
       y: 50,
       width: 800,
@@ -61,11 +54,7 @@ describe('parseWindow', () => {
   });
 
   it('大きさの無い窓は撮らない（畳まれている・出来かけ）', () => {
-    expect(parseWindow('217, 1398, 0, 0, 0, 0')).toBeUndefined();
-  });
-
-  it('持ち主の番号が取れなければ押せないので undefined', () => {
-    expect(parseWindow('217, 0, 100, 50, 800, 600')).toBeUndefined();
+    expect(parseWindow('217, 0, 0, 0, 0')).toBeUndefined();
   });
 });
 
