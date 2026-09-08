@@ -38,14 +38,14 @@ describe('scrollScript', () => {
   });
 
   it('アプリ名は閉じて渡す', () => {
-    expect(scrollScript('ローカル連動くん', 1, 2, 1)).toContain('"ローカル連動くん"');
+    expect(scrollScript('テスト計算機', 1, 2, 1)).toContain('"テスト計算機"');
   });
 });
 
 /**
  * **掴んで運ぶ（DnD）。2026-09-07 まで実装が無かった。**
  *
- * > クリックのたびに連動くんが前面に来るので、DnDもできないことになる
+ * > クリックのたびに相手が前面に来るので、DnDもできないことになる
  *
  * 押すのは AX の要素を直接押せるので前面に出さずに済む（`git-qa-input`）。
  * **なぞる・掴んで運ぶには、その口が無い**（`AXScrollArea` に
@@ -76,6 +76,6 @@ describe('dragScript', () => {
   });
 
   it('アプリ名は閉じて渡す', () => {
-    expect(dragScript('ローカル連動くん', 1, 2, 3, 4)).toContain('"ローカル連動くん"');
+    expect(dragScript('テスト計算機', 1, 2, 3, 4)).toContain('"テスト計算機"');
   });
 });

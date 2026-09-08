@@ -6,7 +6,7 @@ describe('explainToolFailure', () => {
   /**
    * **2026-09-07 に実際に踏んだ。**
    *
-   * 連動くん（Electron）で「「管理」を押す」を実行したら、こう出た。
+   * Electron で作られたデスクトップアプリで「「管理」を押す」を実行したら、こう出た。
    *
    *   osascript が失敗した: 36:56: execution error: System Events でエラーが起きました:
    *   osascript には補助アクセスは許可されません。 (-25211)

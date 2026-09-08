@@ -84,7 +84,7 @@ export function missingWindowMessage(app: string, elsewhere: number): string {
  * 前面が目的のアプリかを確かめる。**押す直前の最後の関門。**
  *
  * 窓の一覧（`occludedBy`）だけでは足りなかった。
- * 2026-09-07、一覧が「連動くんが手前」と答えた点を押したのに、
+ * 2026-09-07、一覧が「相手が手前」と答えた点を押したのに、
  * 実際には Google Chrome のツールバーと warifu の窓を押していた。
  */
 export function notFrontmost(app: string, frontmost: string): string | undefined {

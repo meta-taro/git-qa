@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { manualAccessibilityScript } from '../src/ax.js';
 
 /**
- * **2026-09-07、連動くん（Electron）で丸一時間つまずいた所。**
+ * **2026-09-07、Electron で作られたデスクトップアプリで丸一時間つまずいた所。**
  *
  * Electron / Chromium は、**支援技術に聞かれるまで中身を出さない。**
  * 出していない間はこうなる。
@@ -16,9 +16,9 @@ import { manualAccessibilityScript } from '../src/ax.js';
  */
 describe('manualAccessibilityScript', () => {
   it('アプリ名を埋め込まずに閉じる（日本語の名前も落とさない）', () => {
-    const script = manualAccessibilityScript('ローカル連動くん');
+    const script = manualAccessibilityScript('テスト計算機');
 
-    expect(script).toContain('"ローカル連動くん"');
+    expect(script).toContain('"テスト計算機"');
     expect(script).toContain('AXManualAccessibility');
   });
 

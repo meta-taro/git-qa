@@ -5,7 +5,7 @@ import { inputCandidates, ocrCandidates } from '../src/ocr-path.js';
 /**
  * **2026-09-07 に気づいた。**
  *
- * 連動くん（Electron）は、絵から文字を読む道具（段 2）が無いと**何も読めない**。
+ * Electron で作られたデスクトップアプリは、絵から文字を読む道具（段 2）が無いと**何も読めない**。
  * ところが `pnpm run:sheet:desktop` は `GIT_QA_OCR` を渡されたときしか使っていなかった。
  * **試験運用で渡した人は、環境変数のことを知らない。**黙って段 1 だけで動き、
  * 何も読めないまま全部 FAIL になる。

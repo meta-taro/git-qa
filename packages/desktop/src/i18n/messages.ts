@@ -70,7 +70,7 @@ const ja = {
     'ここから押すのは、そのまま届きます（相手は前に出てきません）。' +
     'なぞる・掴んで運ぶは、指が一瞬そちらへ飛びます。気になるときは実物の窓を直接触ってください。',
   'setup.app': 'デスクトップアプリを見るなら、アプリ名を入れる（窓の持ち主の名前）',
-  'setup.app.placeholder': '連絡くん / 計算機 など',
+  'setup.app.placeholder': '計算機 / メモ など',
   'setup.web.placeholder': 'http://localhost:3000/ または https://…',
   'setup.browser': '見るブラウザ（証跡に版が残る）',
   'setup.browser.chrome': 'Chrome',

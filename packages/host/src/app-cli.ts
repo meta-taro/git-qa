@@ -97,7 +97,7 @@ const setup = await startSetupServer({
      */
     const web = /^https?:\/\//.test(serial);
     const url = web ? (sheet.meta['対象'] ?? serial) : undefined;
-    /** `app:連絡くん` の形で来たら、デスクトップアプリ（Issue 016）。 */
+    /** `app:計算機` の形で来たら、デスクトップアプリ（Issue 016）。 */
     const app = serial.startsWith('app:') ? serial.slice(4) : undefined;
 
     /** Firefox と Safari はエンジンが違う。**同じコードには乗らない**（Issue 018）。 */
