@@ -60,13 +60,13 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
   arrow.textContent = '➤';
   mark.append(arrow);
 
-  if (at.label !== undefined && at.label !== '') {
-    const label = doc.createElement('span');
-    label.className = 'live-pointer-label';
-    // **矢印だけだと、何の話か分からない。**指しているものの名前を添える。
-    label.textContent = at.label;
-    mark.append(label);
-  }
+  /**
+   * **名前の札は置かない**（2026-09-08「矢印はいいけど、赤い一覧はじゃまです」）。
+   *
+   * 一度は映像の上に札を出したが、**指したい所の手前を札が覆った。**
+   * 「ずっと出ていると、ちゃんと見れない」という最初の要望と同じ話だった。
+   * 名前（`at.label`）は状態には残してある。**映像の外へ出すなら、そこから使える。**
+   */
 
   column.append(mark);
 }

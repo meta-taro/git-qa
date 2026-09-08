@@ -58,10 +58,18 @@ describe('showPointer', () => {
     expect(root.querySelectorAll('.live-pointer')).toHaveLength(1);
   });
 
-  it('何を指しているかを、文字でも出す（矢印だけだと何の話か分からない）', () => {
+  /**
+   * **2026-09-08、人に言われた。**
+   *
+   * > 矢印はいいけど、赤い一覧はじゃまです。
+   *
+   * 名前の札を映像の上へ置いていた。**指したい所の手前を、札が覆う。**
+   * 「ずっと出ていると、ちゃんと見れない」という最初の要望と、同じ話だった。
+   */
+  it('名前の札は映像の上に置かない（指したい所を覆う）', () => {
     showPointer(root, { x: 10, y: 20, screen: { x: 200, y: 400 }, label: '「管理」' });
 
-    expect(root.querySelector('.live-pointer')?.textContent).toContain('「管理」');
+    expect(root.querySelector('.live-pointer')?.textContent).not.toContain('「管理」');
   });
 
   it('映像の実寸が枠と違っても、描かれている絵の上を指す', () => {
