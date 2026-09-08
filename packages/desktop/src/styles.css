@@ -625,6 +625,19 @@ body {
   white-space: nowrap;
 }
 
+/*
+ * **斜めから指す**（2026-09-08「斜めから矢印をさしてほしかった」）。
+ * 傾ける層と揺らす層を分けてあるのは、CSS の animation が transform を
+ * まるごと置き換えるため（同じ層でやると傾きが消える）。
+ */
+.live-pointer-tilt {
+  display: block;
+}
+
+.live-pointer.is-diagonal .live-pointer-tilt {
+  transform: rotate(38deg);
+}
+
 .live-pointer-arrow {
   display: block;
   font-size: 1.5rem;

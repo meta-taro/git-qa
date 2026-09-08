@@ -105,3 +105,63 @@ describe('showPointer', () => {
     expect(root.querySelector('.live-pointer')).toBeNull();
   });
 });
+
+/**
+ * **2026-09-08、人に言われた。**
+ *
+ * > もうすこしいうと斜めから矢印をさしてほしかったというのがあります。
+ * > ただ、画面外に矢印がでて見切れてしまうならいまのままでいいです。
+ *
+ * 斜めは**左上の角**から指す。ただし**映像の外へはみ出すなら、横向きに落とす**
+ * （見切れた矢印は、どこを指しているか分からない）。
+ */
+describe('showPointer — 斜めから指す', () => {
+  let root: HTMLElement;
+
+  const setup = (): void => {
+    document.body.replaceChildren();
+    root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    const surface = mountLiveView(root, { width: 400, height: 400 });
+    surface.canvas.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 400,
+      right: 400,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  };
+
+  it('余地があるなら、斜めから指す', () => {
+    setup();
+    showPointer(root, { x: 200, y: 200, screen: { x: 400, y: 400 }, width: 60, height: 20 });
+
+    expect(root.querySelector('.live-pointer')?.classList.contains('is-diagonal')).toBe(true);
+  });
+
+  it('上に余地が無ければ、横から指す（斜めだと見切れる）', () => {
+    setup();
+    showPointer(root, { x: 200, y: 8, screen: { x: 400, y: 400 }, width: 60, height: 12 });
+
+    expect(root.querySelector('.live-pointer')?.classList.contains('is-diagonal')).toBe(false);
+  });
+
+  it('左に余地が無ければ、横から指す', () => {
+    setup();
+    showPointer(root, { x: 20, y: 200, screen: { x: 400, y: 400 }, width: 30, height: 20 });
+
+    expect(root.querySelector('.live-pointer')?.classList.contains('is-diagonal')).toBe(false);
+  });
+
+  it('大きさが分からなければ、斜めにしない（角が分からない）', () => {
+    setup();
+    showPointer(root, { x: 200, y: 200, screen: { x: 400, y: 400 } });
+
+    expect(root.querySelector('.live-pointer')?.classList.contains('is-diagonal')).toBe(false);
+  });
+});
