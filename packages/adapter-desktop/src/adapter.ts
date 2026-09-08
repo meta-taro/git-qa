@@ -75,7 +75,13 @@ export interface DesktopAdapterOptions {
    * それまで、触った場所はここから外へ出ていなかった。人の画面が「ここ」と指せるように、
    * **映像の中の座標**（窓の左上を 0 とする）で渡す。
    */
-  readonly onPointed?: (at: { x: number; y: number; label?: string }) => void;
+  readonly onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void;
   /**
    * 画面を触る実行ファイル（`git-qa-input`）。
    * **無ければ、前面へ出して画面の座標を押す道**へ落ちる（人には相手が前面に出て見える）。
@@ -345,7 +351,13 @@ async function resolvePoint(
   look: () => Promise<Seen>,
   lookWindow: () => Promise<WindowRef>,
   /** 触る場所が決まったら知らせる（要望シート No.1）。**人が「ここ」と見られるように。** */
-  onPointed?: (at: { x: number; y: number; label?: string }) => void,
+  onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void,
 ): Promise<{ x: number; y: number }> {
   if (ref.at === 'point') {
     /**
@@ -366,7 +378,13 @@ async function resolvePoint(
   const byAx = findInElements(seen.elements, ref.ref);
   if (byAx !== undefined) {
     // **窓の左上を 0 とした座標で知らせる**（映像の中の座標と同じ数え方）。
-    onPointed?.({ x: byAx.x - seen.window.x, y: byAx.y - seen.window.y, label: ref.ref });
+    onPointed?.({
+      x: byAx.x - seen.window.x,
+      y: byAx.y - seen.window.y,
+      ...(byAx.width === undefined ? {} : { width: byAx.width }),
+      ...(byAx.height === undefined ? {} : { height: byAx.height }),
+      label: ref.ref,
+    });
     return byAx;
   }
 
@@ -374,7 +392,12 @@ async function resolvePoint(
   if (byOcr !== undefined) {
     // 絵の画素 → 窓の中 → 画面。**Retina では絵が 2 倍の大きさで返る。**
     const inWindow = { x: Math.round(byOcr.x / seen.scale), y: Math.round(byOcr.y / seen.scale) };
-    onPointed?.({ ...inWindow, label: ref.ref });
+    onPointed?.({
+      ...inWindow,
+      ...(byOcr.width === undefined ? {} : { width: Math.round(byOcr.width / seen.scale) }),
+      ...(byOcr.height === undefined ? {} : { height: Math.round(byOcr.height / seen.scale) }),
+      label: ref.ref,
+    });
     return { x: seen.window.x + inWindow.x, y: seen.window.y + inWindow.y };
   }
 
@@ -390,7 +413,9 @@ async function dispatch(
   /** 前面に出さずに押す道具。**無ければ前から在る道へ落ちる。** */
   inputPath: string | undefined,
   /** 触る場所が決まったら知らせる（要望シート No.1）。 */
-  onPointed: ((at: { x: number; y: number; label?: string }) => void) | undefined,
+  onPointed:
+    | ((at: { x: number; y: number; width?: number; height?: number; label?: string }) => void)
+    | undefined,
 ): Promise<void> {
   if (action.kind === 'launch') {
     /**

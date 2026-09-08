@@ -62,7 +62,9 @@ const inputPath = await findInput();
  * **AI が触った場所を、画面へ流す道**（要望シート No.1）。
  * アダプタは実行器より先に作るので、知らせ先を後から預ける形にする。
  */
-let reportPointed: ((at: { x: number; y: number; label?: string }) => void) | undefined;
+let reportPointed:
+  | ((at: { x: number; y: number; width?: number; height?: number; label?: string }) => void)
+  | undefined;
 
 const session = await startRunSession({
   adapter: createDesktopAdapter({

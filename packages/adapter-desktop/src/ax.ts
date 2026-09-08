@@ -99,11 +99,17 @@ export function parseElements(stdout: string): AxElement[] {
 export interface Point {
   readonly x: number;
   readonly y: number;
+  /** 見つけたものの大きさ。**指す矢印を、その外へ置くのに要る。** */
+  readonly width?: number;
+  readonly height?: number;
 }
 
+/** 真ん中と、その大きさ。**大きさは、指す矢印を外へ置くのに要る。** */
 const center = (el: AxElement): Point => ({
   x: Math.round(el.x + el.width / 2),
   y: Math.round(el.y + el.height / 2),
+  width: el.width,
+  height: el.height,
 });
 
 /**

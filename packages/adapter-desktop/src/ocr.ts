@@ -17,6 +17,13 @@ export interface OcrLine {
   readonly text: string;
   readonly x: number;
   readonly y: number;
+  /**
+   * その文字の大きさ。**指す矢印を文字の外へ置くのに要る**
+   * （2026-09-08「カレンダーならかぶっちゃだめでしょ」）。
+   * **古い道具は返さない**ので、無いことがある。
+   */
+  readonly width?: number;
+  readonly height?: number;
 }
 
 /** `文字<TAB>x<TAB>y` を 1 行ずつ読む。**半端な行は捨てる。** */
@@ -31,7 +38,15 @@ export function parseOcr(stdout: string): OcrLine[] {
     const y = Number(parts[2]);
     if (text === '' || !Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-    found.push({ text, x, y });
+    // **大きさは無いことがある**（古い道具は 3 つしか返さない）。無くても捨てない。
+    const width = Number(parts[3]);
+    const height = Number(parts[4]);
+    const size =
+      Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+        ? { width, height }
+        : {};
+
+    found.push({ text, x, y, ...size });
   }
   return found;
 }
@@ -39,6 +54,9 @@ export function parseOcr(stdout: string): OcrLine[] {
 export interface Point {
   readonly x: number;
   readonly y: number;
+  /** 見つけたものの大きさ。**無いことがある**（絵から読んだ道具が古い場合）。 */
+  readonly width?: number;
+  readonly height?: number;
 }
 
 /**
@@ -53,9 +71,16 @@ const squeeze = (value: string): string => value.replace(/\s+/g, '');
 export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undefined {
   const want = squeeze(ref);
 
+  const of = (line: OcrLine): Point => ({
+    x: line.x,
+    y: line.y,
+    ...(line.width === undefined ? {} : { width: line.width }),
+    ...(line.height === undefined ? {} : { height: line.height }),
+  });
+
   const exact = lines.find((line) => squeeze(line.text) === want);
-  if (exact !== undefined) return { x: exact.x, y: exact.y };
+  if (exact !== undefined) return of(exact);
 
   const partial = lines.find((line) => squeeze(line.text).includes(want));
-  return partial === undefined ? undefined : { x: partial.x, y: partial.y };
+  return partial === undefined ? undefined : of(partial);
 }

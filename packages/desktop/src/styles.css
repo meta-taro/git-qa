@@ -616,8 +616,11 @@ body {
    * 指す先は**矢印の先端**。印の中心を座標へ置くと、右下を指す。
    * 3px 押し戻しているのは、字形の右側に余白があるぶん
    * （2026-09-08「いちがちょいずれてますね」）。
+   *
+   * **指すものの上には載せない**（同日「カレンダーならかぶっちゃだめでしょ」）。
+   * 置く座標は `pointer.ts` が左端へずらしてある。ここではさらに 4px 離す。
    */
-  transform: translate(-100%, -50%) translateX(3px);
+  transform: translate(-100%, -50%) translateX(-4px);
   pointer-events: none;
   white-space: nowrap;
 }

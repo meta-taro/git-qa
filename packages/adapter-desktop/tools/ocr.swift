@@ -27,5 +27,9 @@ for observation in (request.results ?? []) {
     // Vision は左下を原点とした 0..1 で返す。画素に直し、上下を反転する。
     let x = Int((box.midX) * width)
     let y = Int((1 - box.midY) * height)
-    print("\(best.string)\t\(x)\t\(y)")
+    // **大きさも返す。**指す矢印を文字の外へ置くのに要る
+    // （2026-09-08「カレンダーならかぶっちゃだめでしょ」）。
+    let w = Int(box.width * width)
+    let h = Int(box.height * height)
+    print("\(best.string)\t\(x)\t\(y)\t\(w)\t\(h)")
 }

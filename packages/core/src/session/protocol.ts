@@ -64,6 +64,13 @@ export interface Pointing {
   readonly y: number;
   /** その座標が乗っている映像の実寸。**0 は受けない**（枠へ直せない）。 */
   readonly screen: { readonly x: number; readonly y: number };
+  /**
+   * 指しているものの大きさ。**矢印を、その外へ置くために要る**
+   * （2026-09-08「カレンダーならかぶっちゃだめでしょ」）。
+   * **無いことがある**（絵から文字を読む道具が古いと、中心しか返らない）。
+   */
+  readonly width?: number;
+  readonly height?: number;
   /** 何を指しているか（`「管理」` など）。人が読んで分かるもの。 */
   readonly label?: string;
 }
@@ -261,10 +268,16 @@ function parsePointing(raw: unknown): Pointing | undefined {
   const label = raw['label'];
   if (label !== undefined && typeof label !== 'string') return undefined;
 
+  // **大きさは無くてよい。**無ければ矢印は点を指す（外へは置けない）。
+  const width = raw['width'];
+  const height = raw['height'];
+  const sized = typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0;
+
   return {
     x: raw['x'],
     y: raw['y'],
     screen: { x: screen['x'], y: screen['y'] },
+    ...(sized ? { width: width as number, height: height as number } : {}),
     ...(label === undefined ? {} : { label }),
   };
 }

@@ -28,8 +28,17 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
   const canvas = column.querySelector<HTMLCanvasElement>('.live-canvas');
   if (canvas === null) return;
 
+  /**
+   * **指すものの外へ置く**（2026-09-08「カレンダーならかぶっちゃだめでしょ」）。
+   *
+   * 座標は指すものの**中心**なので、そこへ矢印の先端を置くと、文字の上に載る。
+   * 大きさが分かっているなら**左端**へずらす。分からなければ点をそのまま指す
+   * （**当て推量で離すと、別のものを指す**）。
+   */
+  const aimX = at.width === undefined ? at.x : at.x - at.width / 2;
+
   const on = screenPoint({
-    x: at.x,
+    x: aimX,
     y: at.y,
     rect: canvas.getBoundingClientRect(),
     canvas: { width: at.screen.x, height: at.screen.y },
@@ -40,7 +49,7 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
     return;
   }
 
-  const key = `${String(Math.round(at.x))},${String(Math.round(at.y))},${at.label ?? ''}`;
+  const key = `${String(Math.round(aimX))},${String(Math.round(at.y))},${at.label ?? ''}`;
   // **同じ所を続けて指すなら、置き直さない。**置き直すと揺れが最初から始まる。
   if (existing !== null && existing.dataset['at'] === key) return;
   existing?.remove();

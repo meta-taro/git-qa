@@ -72,7 +72,24 @@ describe('showPointer', () => {
     expect(root.querySelector('.live-pointer')?.textContent).not.toContain('「管理」');
   });
 
-  it('映像の実寸が枠と違っても、描かれている絵の上を指す', () => {
+  /**
+   * **2026-09-08、人に言われた。**
+   *
+   * > カレンダー？カレンダーならかぶっちゃだめでしょ。
+   *
+   * 指した文字の上に矢印が載っていた。**押した物が見えないと意味が無い。**
+   * 大きさが分かっているなら、**その左の外**へ置く。
+   */
+  it('大きさが分かっているなら、指すものの左の外へ置く', () => {
+    // 200x400 の映像を 400x400 の枠へ入れると、倍率 1・横に余白が 100 ずつ。
+    showPointer(root, { x: 100, y: 200, screen: { x: 200, y: 400 }, width: 40, height: 10 });
+
+    const at = root.querySelector<HTMLElement>('.live-pointer');
+    // 中心 100 の左端は 80。枠では 100 + 80 = 180。
+    expect(at?.style.left).toBe('180px');
+  });
+
+  it('大きさが分からなければ、点をそのまま指す（当て推量で離さない）', () => {
     // 200x400 の映像を 400x400 の枠へ入れると、横に余白が 100 ずつ出る。
     showPointer(root, { x: 100, y: 200, screen: { x: 200, y: 400 } });
 
