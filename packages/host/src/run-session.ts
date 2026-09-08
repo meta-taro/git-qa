@@ -8,12 +8,13 @@ import {
 import type {
   Action,
   Actor,
+  CaseContext,
+  CaseVerdict,
   HumanAction,
   HumanInputCounts,
   HumanResult,
-  CaseContext,
-  CaseVerdict,
   HumanVerdict,
+  Pointing,
   Run,
   SheetRef,
   TargetAdapter,
@@ -56,6 +57,15 @@ export interface StartRunSessionOptions {
     readonly limitMs?: number;
     readonly sleep?: (ms: number) => Promise<void>;
   };
+  /**
+   * **AI が触った場所の受け取り口**（要望シート No.1）。
+   *
+   * アダプタは実行器より先に作られるので、直接は渡せない。
+   * **知らせ先を後から預ける**形にして、輪にならないようにする。
+   */
+  readonly registerPointing?: (
+    report: (at: { x: number; y: number; label?: string }) => void,
+  ) => void;
   readonly now?: () => Date;
 }
 
@@ -142,6 +152,30 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   let saveError: string | undefined;
   /** 映像が止まった理由。**黙って真っ黒にしない。** */
   let liveError: string | undefined;
+  /**
+   * **AI がいま触った場所**（要望シート No.1）。
+   * ケースが始まるたびに消す —— 前のケースの矢印が残っていると、人が別の所を見る。
+   */
+  let pointing: Pointing | undefined;
+  /** 映像の実寸。**毎回は聞かない**（1 回 250 ms かかる相手がいる）。 */
+  let screen: { x: number; y: number } | undefined;
+
+  options.registerPointing?.((at) => {
+    void (async () => {
+      if (screen === undefined) {
+        const size = await live.session.screenSize?.();
+        if (size === undefined) return;
+        screen = { x: size.width, y: size.height };
+      }
+      pointing = {
+        x: at.x,
+        y: at.y,
+        screen,
+        ...(at.label === undefined ? {} : { label: at.label }),
+      };
+      publish();
+    })();
+  });
 
   const publish = (): void => {
     const state: SessionState = {
@@ -155,6 +189,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       ...(liveError === undefined ? {} : { liveError }),
       ...(runJsonPath === undefined ? {} : { runJsonPath }),
       ...(saveError === undefined ? {} : { saveError }),
+      ...(pointing === undefined ? {} : { pointing }),
       cases: [...cases.values()],
     };
     live.bridge.publish(state);
@@ -326,6 +361,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     }
     phase = 'running';
     awaiting = undefined;
+    // **前のケースの矢印を残さない。**残っていると、人が別の所を見る。
+    pointing = undefined;
     publish();
 
     const verdict = await runner(ctx);

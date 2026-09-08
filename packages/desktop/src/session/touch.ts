@@ -177,3 +177,29 @@ export function installDeviceTouch(options: InstallDeviceTouchOptions): () => vo
     options.canvas.removeEventListener('mouseup', onUp);
   };
 }
+
+/**
+ * **`devicePoint` の逆。**映像の中の座標を、枠の中のどこに描かれているかへ直す。
+ *
+ * 指す側（矢印）に要る（要望シート No.1）。
+ * canvas は `object-fit: contain` なので、**枠と映像で比が違えば余白が出る。**
+ * そこを踏まないと、矢印が映像の外を指す。
+ */
+export function screenPoint(params: {
+  readonly x: number;
+  readonly y: number;
+  readonly rect: { left: number; top: number; width: number; height: number };
+  readonly canvas: { width: number; height: number };
+}): { x: number; y: number } | undefined {
+  const { rect, canvas } = params;
+  if (rect.width <= 0 || rect.height <= 0 || canvas.width <= 0 || canvas.height <= 0) {
+    // 測れないまま置くと、見当違いの所を指す。**指さないほうがよい。**
+    return undefined;
+  }
+
+  const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+  const originX = rect.left + (rect.width - canvas.width * scale) / 2;
+  const originY = rect.top + (rect.height - canvas.height * scale) / 2;
+
+  return { x: originX + params.x * scale, y: originY + params.y * scale };
+}

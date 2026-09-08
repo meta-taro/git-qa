@@ -597,3 +597,63 @@ body {
   line-height: 1.5;
   opacity: 0.7;
 }
+
+/*
+ * **「ここ、ここ」と指す矢印**（要望シート No.1・2026-09-04）。
+ *
+ * > まぁ赤い矢印がここ、ここ🎵みたいにゆれてるほうがいいか。
+ *
+ * 色は起票者の言葉どおり赤。**DESIGN.md にはまだ無い色**なので、
+ * 残すかアクセント（緑）へ寄せるかは人が決める（§11・AI は見た目を決めない）。
+ *
+ * **ずっと出ていると、ちゃんと見れない。**だから四角で囲まず、
+ * 矢印 1 つを揺らして目を引く。映像そのものは隠さない。
+ */
+.live-pointer {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  /* 指す先が矢印の先端。**印の中心を座標へ置くと、少し下を指す。** */
+  transform: translate(-100%, -50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.live-pointer-arrow {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #e5484d;
+  /* 映像が明るくても暗くても沈まないよう、縁を付ける。 */
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.7),
+    0 0 6px rgba(0, 0, 0, 0.4);
+  animation: live-pointer-wave 1.1s ease-in-out infinite;
+}
+
+.live-pointer-label {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: rgba(229, 72, 77, 0.92);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+/* **うにうに。**大きく動かすと、指している場所が読めなくなる。 */
+@keyframes live-pointer-wave {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-0.35rem);
+  }
+}
+
+/* 動きを減らす設定の人には、揺らさない。 */
+@media (prefers-reduced-motion: reduce) {
+  .live-pointer-arrow {
+    animation: none;
+  }
+}

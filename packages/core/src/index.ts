@@ -81,3 +81,4 @@ export type { FakeAdapter, FakeAdapterOptions } from './adapter/fake.js';
 
 // 打鍵の割り当ての正本（`./session` からも出している）。
 export { VERDICT_KEYS, verdictKeyHint } from './session/verdict-keys.js';
+export type { Pointing } from './session/protocol.js';

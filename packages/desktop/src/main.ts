@@ -34,6 +34,7 @@ import {
   pumpLiveStream,
 } from './live/stream.js';
 import { mountLiveView, showDesktopNote, showLiveViewError } from './live/view.js';
+import { showPointer } from './live/pointer.js';
 import { createWebCodecsDecoder, isLiveViewSupported } from './live/webcodecs.js';
 import './styles.css';
 
@@ -452,6 +453,8 @@ function startControl(controlUrl: string): void {
       }
       // 打鍵待ちが進んだら、見ている所も追いかける（戻って見ている最中は動かさない）。
       if (cursor === undefined || cursor === previousAwaiting) cursor = state.awaiting;
+      // **「ここ」と指す**（要望シート No.1）。AI が触った場所を、映像の上に出す。
+      showPointer(app, state.pointing);
       previousAwaiting = state.awaiting;
       renderSession(app, state, { ...(cursor === undefined ? {} : { cursor }) });
     },

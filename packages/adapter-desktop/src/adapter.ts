@@ -70,6 +70,13 @@ export interface DesktopAdapterOptions {
   /** OCR を呼ぶ実行ファイル。無ければ段 2 は使えない（段 1 だけで動く）。 */
   readonly ocrPath?: string;
   /**
+   * **AI がどこを触ったかを知らせる**（要望シート No.1）。
+   *
+   * それまで、触った場所はここから外へ出ていなかった。人の画面が「ここ」と指せるように、
+   * **映像の中の座標**（窓の左上を 0 とする）で渡す。
+   */
+  readonly onPointed?: (at: { x: number; y: number; label?: string }) => void;
+  /**
    * 画面を触る実行ファイル（`git-qa-input`）。
    * **無ければ、前面へ出して画面の座標を押す道**へ落ちる（人には相手が前面に出て見える）。
    */
@@ -273,7 +280,7 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action: Action): Promise<void> {
       ensureOpen();
-      await dispatch(app, action, look, recentWindow, deps.inputPath);
+      await dispatch(app, action, look, recentWindow, deps.inputPath, deps.onPointed);
     },
 
     async observe(): Promise<Observation> {
@@ -337,6 +344,8 @@ async function resolvePoint(
   ref: PointerRef,
   look: () => Promise<Seen>,
   lookWindow: () => Promise<WindowRef>,
+  /** 触る場所が決まったら知らせる（要望シート No.1）。**人が「ここ」と見られるように。** */
+  onPointed?: (at: { x: number; y: number; label?: string }) => void,
 ): Promise<{ x: number; y: number }> {
   if (ref.at === 'point') {
     /**
@@ -355,15 +364,18 @@ async function resolvePoint(
   const seen = await look();
 
   const byAx = findInElements(seen.elements, ref.ref);
-  if (byAx !== undefined) return byAx;
+  if (byAx !== undefined) {
+    // **窓の左上を 0 とした座標で知らせる**（映像の中の座標と同じ数え方）。
+    onPointed?.({ x: byAx.x - seen.window.x, y: byAx.y - seen.window.y, label: ref.ref });
+    return byAx;
+  }
 
   const byOcr = findInOcr(seen.ocr, ref.ref);
   if (byOcr !== undefined) {
     // 絵の画素 → 窓の中 → 画面。**Retina では絵が 2 倍の大きさで返る。**
-    return {
-      x: Math.round(seen.window.x + byOcr.x / seen.scale),
-      y: Math.round(seen.window.y + byOcr.y / seen.scale),
-    };
+    const inWindow = { x: Math.round(byOcr.x / seen.scale), y: Math.round(byOcr.y / seen.scale) };
+    onPointed?.({ ...inWindow, label: ref.ref });
+    return { x: seen.window.x + inWindow.x, y: seen.window.y + inWindow.y };
   }
 
   throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
@@ -377,6 +389,8 @@ async function dispatch(
   lookWindow: () => Promise<WindowRef>,
   /** 前面に出さずに押す道具。**無ければ前から在る道へ落ちる。** */
   inputPath: string | undefined,
+  /** 触る場所が決まったら知らせる（要望シート No.1）。 */
+  onPointed: ((at: { x: number; y: number; label?: string }) => void) | undefined,
 ): Promise<void> {
   if (action.kind === 'launch') {
     /**
@@ -411,7 +425,7 @@ async function dispatch(
    */
   if (action.kind === 'type') {
     if (action.target !== undefined) {
-      const point = await resolvePoint(action.target, look, lookWindow);
+      const point = await resolvePoint(action.target, look, lookWindow, onPointed);
       await clickAt(point, await lookWindow(), app, inputPath);
     }
     // `keystroke` は IME を通すので、日本語もそのまま入る。
@@ -432,7 +446,7 @@ async function dispatch(
 
   if (action.kind === 'tap') {
     await clickAt(
-      await resolvePoint(action.target, look, lookWindow),
+      await resolvePoint(action.target, look, lookWindow, onPointed),
       await lookWindow(),
       app,
       inputPath,
@@ -446,8 +460,8 @@ async function dispatch(
      * そのため**1 回だけ前面に出て、指も実際に動く**（途中で焦点が動くと、掴んだものが落ちる）。
      * 道具がある場合は、**終わったら指と前面を元へ返す。**
      */
-    const from = await resolvePoint(action.from, look, lookWindow);
-    const to = await resolvePoint(action.to, look, lookWindow);
+    const from = await resolvePoint(action.from, look, lookWindow, onPointed);
+    const to = await resolvePoint(action.to, look, lookWindow, onPointed);
     const window = await lookWindow();
     if (inputPath !== undefined) {
       const done = await run(inputPath, [
@@ -468,8 +482,8 @@ async function dispatch(
   }
 
   // swipe。デスクトップではスクロールとして送る（指でなぞる相手ではない）。
-  const from = await resolvePoint(action.from, look, lookWindow);
-  const to = await resolvePoint(action.to, look, lookWindow);
+  const from = await resolvePoint(action.from, look, lookWindow, onPointed);
+  const to = await resolvePoint(action.to, look, lookWindow, onPointed);
   const amount = Math.round((from.y - to.y) / 10);
   if (amount === 0) return;
 

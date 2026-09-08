@@ -45,7 +45,27 @@ export interface SessionState {
   readonly saveError?: string;
   /** 人の判定を待っているケース番号。待っていなければ持たない。 */
   readonly awaiting?: number;
+  /**
+   * **いま指している場所**（要望シート No.1・2026-09-04）。
+   *
+   * > ある場所に矢印うにうにしたり、該当箇所四角く案内したりできますかね？
+   *
+   * AI がどこを触ったのかは、それまで**アダプタの中にしか無かった。**
+   * 座標は**映像の中の座標**で、`screen` がその映像の実寸。
+   * **枠の大きさへ直すのは画面側の仕事**（映像は枠より小さく描かれている）。
+   */
+  readonly pointing?: Pointing;
   readonly cases: readonly SessionCase[];
+}
+
+/** 指す場所。**名前は無くてよい**（座標だけでも指せる）。 */
+export interface Pointing {
+  readonly x: number;
+  readonly y: number;
+  /** その座標が乗っている映像の実寸。**0 は受けない**（枠へ直せない）。 */
+  readonly screen: { readonly x: number; readonly y: number };
+  /** 何を指しているか（`「管理」` など）。人が読んで分かるもの。 */
+  readonly label?: string;
 }
 
 /** 画面から実行器へ送る、打鍵 1 回分。 */
@@ -228,6 +248,27 @@ function parseCase(raw: unknown): SessionCase | undefined {
   };
 }
 
+function parsePointing(raw: unknown): Pointing | undefined {
+  if (!isRecord(raw)) return undefined;
+  if (typeof raw['x'] !== 'number' || typeof raw['y'] !== 'number') return undefined;
+
+  const screen = raw['screen'];
+  if (!isRecord(screen)) return undefined;
+  if (typeof screen['x'] !== 'number' || typeof screen['y'] !== 'number') return undefined;
+  // 実寸が無いと枠へ直せない。**当て推量で置かない。**
+  if (screen['x'] <= 0 || screen['y'] <= 0) return undefined;
+
+  const label = raw['label'];
+  if (label !== undefined && typeof label !== 'string') return undefined;
+
+  return {
+    x: raw['x'],
+    y: raw['y'],
+    screen: { x: screen['x'], y: screen['y'] },
+    ...(label === undefined ? {} : { label }),
+  };
+}
+
 export function parseSessionState(raw: unknown): SessionState | undefined {
   if (!isRecord(raw) || typeof raw['runId'] !== 'string') return undefined;
   if (!isOneOf(PHASES, raw['phase'])) return undefined;
@@ -250,12 +291,20 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
   const liveError = raw['liveError'];
   if (liveError !== undefined && typeof liveError !== 'string') return undefined;
 
+  // **形が違えば、状態ごと捨てる。**当て推量で別の場所を指すと、人を誤らせる。
+  let pointing: Pointing | undefined;
+  if (raw['pointing'] !== undefined) {
+    pointing = parsePointing(raw['pointing']);
+    if (pointing === undefined) return undefined;
+  }
+
   return {
     runId: raw['runId'],
     phase: raw['phase'],
     ...(awaiting === undefined ? {} : { awaiting }),
     ...(sheetPath === undefined ? {} : { sheetPath }),
     ...(liveError === undefined ? {} : { liveError }),
+    ...(pointing === undefined ? {} : { pointing }),
     cases,
   };
 }
