@@ -268,16 +268,19 @@ function parsePointing(raw: unknown): Pointing | undefined {
   const label = raw['label'];
   if (label !== undefined && typeof label !== 'string') return undefined;
 
-  // **大きさは無くてよい。**無ければ矢印は点を指す（外へは置けない）。
   const width = raw['width'];
   const height = raw['height'];
-  const sized = typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0;
+  // **大きさは無くてよい。**無ければ矢印は点を指す（外へは置けない）。
+  const size =
+    typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0
+      ? { width, height }
+      : {};
 
   return {
     x: raw['x'],
     y: raw['y'],
     screen: { x: screen['x'], y: screen['y'] },
-    ...(sized ? { width: width as number, height: height as number } : {}),
+    ...size,
     ...(label === undefined ? {} : { label }),
   };
 }

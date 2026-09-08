@@ -165,3 +165,47 @@ describe('showPointer — 斜めから指す', () => {
     expect(root.querySelector('.live-pointer')?.classList.contains('is-diagonal')).toBe(false);
   });
 });
+
+/**
+ * **矢印 1 つが要る余地。**
+ *
+ * ここに数字（`ARROW_ROOM`）があるのに、**検査で留めていなかった**
+ * （2026-09-08、矢印を大きくしたついでに 26 → 38 へ動かした。テストを書いていない）。
+ * **留めていない数字は、次に触った人が理由なく動かせる。**
+ */
+describe('showPointer — 斜めにする境目', () => {
+  const setup = (): HTMLElement => {
+    document.body.replaceChildren();
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    const surface = mountLiveView(root, { width: 400, height: 400 });
+    surface.canvas.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 400,
+      right: 400,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    return root;
+  };
+
+  const diagonalAt = (top: number): boolean => {
+    const root = setup();
+    // 高さ 20 の物の上端が `top` に来るように、中心を置く。
+    showPointer(root, { x: 200, y: top + 10, screen: { x: 400, y: 400 }, width: 60, height: 20 });
+    return root.querySelector('.live-pointer')?.classList.contains('is-diagonal') === true;
+  };
+
+  it('上に 38px あれば斜めにする', () => {
+    expect(diagonalAt(38)).toBe(true);
+  });
+
+  it('37px しか無ければ横から指す', () => {
+    expect(diagonalAt(37)).toBe(false);
+  });
+});

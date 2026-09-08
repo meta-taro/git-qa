@@ -60,13 +60,22 @@ describe('findInElements', () => {
     { role: 'AXStaticText', name: '保存しました', x: 10, y: 300, width: 200, height: 20 },
   ];
 
+  /**
+   * 真ん中と、**その大きさ**を返す。
+   * 大きさは、指す矢印をその外へ置くのに要る（2026-09-08・要望シート No.1）。
+   */
   it('完全に一致するものを先に選ぶ', () => {
-    expect(findInElements(elements, '保存')).toEqual({ x: 140, y: 215 });
+    expect(findInElements(elements, '保存')).toEqual({ x: 140, y: 215, width: 80, height: 30 });
   });
 
   it('完全一致が無ければ、含むもののうち小さいほうを選ぶ', () => {
     // **大きい親を押すと、別の所が反応する。**
-    expect(findInElements(elements, '保存し')).toEqual({ x: 110, y: 310 });
+    expect(findInElements(elements, '保存し')).toEqual({
+      x: 110,
+      y: 310,
+      width: 200,
+      height: 20,
+    });
   });
 
   it('見つからなければ undefined（次の段へ降りるため）', () => {

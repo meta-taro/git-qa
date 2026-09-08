@@ -64,7 +64,7 @@ export interface StartRunSessionOptions {
    * **知らせ先を後から預ける**形にして、輪にならないようにする。
    */
   readonly registerPointing?: (
-    report: (at: { x: number; y: number; label?: string }) => void,
+    report: (at: { x: number; y: number; width?: number; height?: number; label?: string }) => void,
   ) => void;
   readonly now?: () => Date;
 }
