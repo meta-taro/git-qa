@@ -171,6 +171,9 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
         x: at.x,
         y: at.y,
         screen,
+        // **大きさも運ぶ。**矢印を、指したものの外へ置くのに要る。
+        ...(at.width === undefined ? {} : { width: at.width }),
+        ...(at.height === undefined ? {} : { height: at.height }),
         ...(at.label === undefined ? {} : { label: at.label }),
       };
       publish();
