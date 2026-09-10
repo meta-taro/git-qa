@@ -1,11 +1,13 @@
 import { execFile } from 'node:child_process';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { createAndroidAdapter } from '@git-qa/adapter-android';
 
+import { renderAbout } from './about.js';
 import { createWindowCapture } from './screen.js';
 import { createMcpServer, serveOverStdio } from './server.js';
 import { createDeviceTools } from './tools.js';
@@ -56,4 +58,37 @@ const captureWindow = createWindowCapture({
   tmpPath: () => join(tmpdir(), `git-qa-window-${String(Date.now())}.png`),
 });
 
-await serveOverStdio(createMcpServer(tools, { captureWindow }));
+/**
+ * この道具の説明を組み立てる（`about`）。
+ *
+ * **文書を正本にする**（`docs/agent-brief.md` / `CHANGELOG.md`）。
+ * ここに文字列を埋めると、文書と実装がずれる（§10「古い文書は、無い文書より悪い」）。
+ *
+ * **概要が読めなければ、読めないと言う。**黙って空を返すと、
+ * 聞いた側は「そういう道具なのだ」と受け取ってしまう。
+ */
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+const readAbout = async (options: { version?: string }): Promise<string> => {
+  const read = async (name: string): Promise<string | undefined> => {
+    try {
+      return await readFile(join(repoRoot, name), 'utf8');
+    } catch {
+      // 無いこと自体はあり得る（配布物の形によっては同梱していない）。**言う。**
+      return undefined;
+    }
+  };
+
+  const brief = await read('docs/agent-brief.md');
+  if (brief === undefined) {
+    return '**概要の文書（docs/agent-brief.md）を読めなかった。**git-qa は、人と AI で動作検証をする道具。';
+  }
+
+  return renderAbout({
+    brief,
+    changelog: await read('CHANGELOG.md'),
+    ...(options.version === undefined ? {} : { version: options.version }),
+  });
+};
+
+await serveOverStdio(createMcpServer(tools, { captureWindow, readAbout }));

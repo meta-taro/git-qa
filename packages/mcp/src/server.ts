@@ -21,6 +21,11 @@ export interface McpServerOptions {
     app: string,
     mode?: 'window' | 'screen',
   ) => Promise<{ mimeType: 'image/png'; base64: string }>;
+  /**
+   * この道具の説明を組み立てて返す（`about`）。
+   * **文書を読むのは呼び側**。ここはファイルの場所を知らない。
+   */
+  readonly readAbout?: (options: { version?: string }) => Promise<string>;
 }
 
 export function createMcpServer(tools: DeviceTools, options: McpServerOptions = {}): McpServer {
@@ -157,6 +162,32 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
       return ok(`${String(size.width)}x${String(size.height)}`);
     },
   );
+
+  /**
+   * **この道具の説明を、AI エージェントへ返す**（2026-09-10・人の指示）。
+   *
+   * 概要（`docs/agent-brief.md`）と変更の記録（`CHANGELOG.md`）を、**そのまま**渡す。
+   * ここで要約しない —— 要約した時点で、書いた人が伝えたかった所が落ちる。
+   */
+  if (options.readAbout !== undefined) {
+    const readAbout = options.readAbout;
+    server.registerTool(
+      'about',
+      {
+        title: 'git-qa とは（AI エージェント向け）',
+        description:
+          'この道具が何をして何をしないか、読める検証シートの書き方、まだ無いもの、守ること。' +
+          '版ごとの変更も返す。version を渡すと、その版の分だけ返す。',
+        inputSchema: {
+          version: z
+            .string()
+            .optional()
+            .describe('この版の変更だけを見たいとき。省くと全部返す（例: 未リリース / 0.1.0）'),
+        },
+      },
+      async ({ version }) => ok(await readAbout(version === undefined ? {} : { version })),
+    );
+  }
 
   return server;
 }

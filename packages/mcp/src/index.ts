@@ -1,3 +1,5 @@
+export { parseChangelog, renderAbout } from './about.js';
+export type { ChangelogEntry, RenderAboutOptions } from './about.js';
 export { createDeviceTools } from './tools.js';
 export type { DeviceTools, DeviceToolsOptions, Point, Screenshot } from './tools.js';
 export {
