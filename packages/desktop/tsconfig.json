@@ -11,5 +11,5 @@
     "sourceMap": false
   },
   "references": [{ "path": "../core" }, { "path": "../live-bridge" }],
-  "include": ["src/**/*.ts", "test/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "vite.config.ts"]
 }
