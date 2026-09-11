@@ -50,7 +50,9 @@ jobs:
       # 配るたびにアプリの実物から取り直す（DESIGN.md の「別の物？と思わせない」）。
       - name: アイコンを写す
         run: |
-          cp packages/desktop/src-tauri/icons/128x128@2x.png site/icon.png
+          # **アットマークの付いた名前は使わない。**個人情報検査がメールアドレスと
+          # 見なして落ちる（2026-09-11・実際に落ちた）。同じ絵の別名を使う。
+          cp packages/desktop/src-tauri/icons/128x128-2x.png site/icon.png
           ls -l site
 
       - uses: actions/configure-pages@v5
