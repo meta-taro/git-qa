@@ -36,3 +36,34 @@ export function missingAssets(
 ): string[] {
   return declared.filter((path) => !exists(path));
 }
+
+/**
+ * **OS ごとの宣言を重ねる**（2026-09-11）。
+ *
+ * `git-qa-ocr`（Vision）・`git-qa-input`（CoreGraphics）・`git-qa-record`
+ * （ScreenCaptureKit）は **macOS 専用**で、Windows では建てられない。
+ * ところが `tauri.conf.json` は 3 つとも**無条件で参照していた。**
+ *
+ * このまま Windows 版を建てると、**建つ前に `pnpm check:assets` が落ちる。**
+ * Windows で動かすのはウェブ検証と Android 検証で、**そもそもこの 3 つは要らない。**
+ *
+ * Tauri も `tauri.<OS>.conf.json` を同じように重ねる。**配列は置き換わる**ので、
+ * ここでも置き換える（足し合わせると、要らないものを消せなくなる）。
+ */
+export function mergeAssetConfig(
+  base: AssetConfig,
+  forPlatform: AssetConfig | undefined,
+): AssetConfig {
+  if (forPlatform?.bundle === undefined) return base;
+
+  return {
+    bundle: {
+      ...base.bundle,
+      // **書かれていない方は消さない。**`resources` だけ書いた設定で、アイコンを失わない。
+      ...(forPlatform.bundle.resources === undefined
+        ? {}
+        : { resources: forPlatform.bundle.resources }),
+      ...(forPlatform.bundle.icon === undefined ? {} : { icon: forPlatform.bundle.icon }),
+    },
+  };
+}

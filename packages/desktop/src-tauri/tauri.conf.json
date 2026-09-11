@@ -38,11 +38,6 @@
     "android": {
       "debugApplicationIdSuffix": ".debug"
     },
-    "resources": [
-      "resources/host-bundle.mjs",
-      "resources/git-qa-ocr",
-      "resources/git-qa-input",
-      "resources/git-qa-record"
-    ]
+    "resources": ["resources/host-bundle.mjs"]
   }
 }

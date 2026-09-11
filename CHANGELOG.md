@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+- 直した: **Windows 版は、押した瞬間に落ちる状態だった。**`tauri.conf.json` が
+  macOS 専用の道具 3 つ（Vision / CoreGraphics / ScreenCaptureKit）を**無条件で参照**
+  していたので、**建つ前に `pnpm check:assets` で止まる。**`tauri.macos.conf.json` へ分けた
+  （Windows で動かすのはウェブ検証と Android 検証で、**そもそもこの 3 つは要らない**）
 - 足した: **鑑賞モード**（`mode: 'watched'`）。**人が押さなくても 1 件ごとに間をおいて進む。**
   押せばその判定になり、押さなければ `AUTO_PASS`（**繰り上げない**）。
   **Esc と押しボタンで止められる** —— 見ているだけの人が止められないのは、

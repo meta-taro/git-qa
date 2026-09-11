@@ -1661,11 +1661,24 @@ packages/desktop/src-tauri/resources/git-qa-ocr   （Mach-O x86_64・37,808 byte
 - 配布物を建てる手順が増えて、**「配る直前」がどこか分からなくなったとき。**
   そのときは「配る」を 1 本の手順にまとめてから、その中へ置く
 
-**残っている宿題**
+**残っていた宿題 → 片付けた（2026-09-11）**
 
-`tauri.conf.json` が **`resources/git-qa-ocr` を無条件で参照している。**
-あれは Vision framework を使う **macOS 専用**で、**Windows 版では建てられない。**
-Windows 版を建てるときに、OS ごとに分けるかを決める。**まだ 1 度も建てていない。**
+`tauri.conf.json` が **macOS 専用の道具を無条件で参照していた**（`git-qa-ocr` に加え、
+その後 `git-qa-input` と `git-qa-record` が増えて 3 つになった）。
+**このまま Windows 版を建てると、建つ前に `pnpm check:assets` で止まる。**
+
+`tauri.macos.conf.json` へ分けた（Tauri が OS ごとの設定を自動で重ねる。**配列は置き換え**）。
+`check:assets` も同じ数え方に揃えた。
+
+```
+macOS:   参照 9 個 / 無い 0 個
+Windows: 参照 6 個 / 無い 0 個
+```
+
+**Windows で動かすのはウェブ検証と Android 検証**で、そもそもこの 3 つは要らない。
+逃げではなく、**要らないものを要らないと書いた。**
+**まだ 1 度も Windows 版を建てていない**ことは変わらない（`build-windows.yml` は
+人が押して走らせる形のまま・実行 0 回）。
 
 ---
 

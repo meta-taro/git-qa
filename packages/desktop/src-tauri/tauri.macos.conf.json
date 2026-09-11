@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "resources": [
+      "resources/host-bundle.mjs",
+      "resources/git-qa-ocr",
+      "resources/git-qa-input",
+      "resources/git-qa-record"
+    ]
+  }
+}

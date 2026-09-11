@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { declaredAssets, missingAssets } from '../scripts/assets.js';
+import { declaredAssets, mergeAssetConfig, missingAssets } from '../scripts/assets.js';
 
 /**
  * **参照されているのに存在しないアセットを見つける**（product-baseline §23）。
@@ -49,5 +49,48 @@ describe('missingAssets', () => {
 
   it('全部あれば空', () => {
     expect(missingAssets(['a'], () => true)).toEqual([]);
+  });
+});
+
+/**
+ * **OS ごとに、配るものが違う**（2026-09-11）。
+ *
+ * `git-qa-ocr`（Vision）・`git-qa-input`（CoreGraphics）・`git-qa-record`
+ * （ScreenCaptureKit）は **macOS 専用**で、Windows では建てられない。
+ * ところが `tauri.conf.json` は 3 つとも**無条件で参照していた。**
+ *
+ * このまま Windows 版を建てると、**`pnpm check:assets` が落ちて、建つ前に止まる。**
+ * Windows で動かすのはウェブ検証と Android 検証で、**そもそもこの 3 つは要らない。**
+ *
+ * Tauri は `tauri.<OS>.conf.json` を自動で重ねる。**配列は置き換わる。**
+ */
+describe('mergeAssetConfig', () => {
+  const base = { bundle: { resources: ['resources/host-bundle.mjs'], icon: ['icons/icon.ico'] } };
+
+  it('その OS の宣言があれば、そちらで置き換える', () => {
+    const merged = mergeAssetConfig(base, {
+      bundle: { resources: ['resources/host-bundle.mjs', 'resources/git-qa-ocr'] },
+    });
+
+    expect(declaredAssets(merged)).toEqual([
+      'resources/host-bundle.mjs',
+      'resources/git-qa-ocr',
+      'icons/icon.ico',
+    ]);
+  });
+
+  /** **その OS の宣言が無ければ、元のまま。**無いことを「空」と取り違えない。 */
+  it('宣言が無ければ、元のまま', () => {
+    expect(declaredAssets(mergeAssetConfig(base, undefined))).toEqual([
+      'resources/host-bundle.mjs',
+      'icons/icon.ico',
+    ]);
+  });
+
+  /** 触れていない側は残す（`resources` だけ書いた OS の設定で、アイコンを消さない）。 */
+  it('書かれていない方は消さない', () => {
+    const merged = mergeAssetConfig(base, { bundle: { resources: ['a'] } });
+
+    expect(declaredAssets(merged)).toContain('icons/icon.ico');
   });
 });
