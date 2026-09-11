@@ -424,6 +424,10 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     runsRoot: options.runsRoot ?? fromInvocationDir('runs'),
     // **在れば webp にする。**無ければ撮れた形のまま（前提を増やさない・§12）。
     imageTools: imageTools(),
+    // **途中経過を書けなかったら言う。**黙ると、残っていないことに気づけない。
+    onProgressError: (reason) => {
+      console.error('[git-qa] 途中経過を書けなかった:', reason);
+    },
     runCase,
     askHuman,
     ...(options.now === undefined ? {} : { now: options.now }),

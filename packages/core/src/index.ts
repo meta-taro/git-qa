@@ -97,3 +97,6 @@ export { mimeTypeOf } from './adapter/shot-format.js';
 export { webpCommand } from './adapter/to-webp.js';
 export type { ImageTools, ToolCommand } from './adapter/to-webp.js';
 export { saveAsWebp } from './run/shot-webp.js';
+
+// 途中経過の証跡（外部レビュー #2）。
+export { saveRunProgress } from './run/save-progress.js';

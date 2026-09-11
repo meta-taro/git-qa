@@ -1,0 +1,13 @@
+# tauri dev の watcher が見ない所（外部レビュー meta-taro/git-qa#2 の補足・2026-09-11）。
+#
+# **自分が作ったものを見て、建て直していた。**
+# `pnpm build` が resources/ の 3 つを作るたびに、watcher が拾って画面を建て直す。
+# 人が判定を置いている最中にライブビューが再起動するので、実用上つらい。
+# 実際に 1 回の走行で 3 回起きている（報告・こちらでも踏んだ）。
+#
+#   Info File src-tauri/resources/host-bundle.mjs changed. Rebuilding application...
+#   Info File src-tauri/resources/git-qa-ocr changed. Rebuilding application...
+#   Info File src-tauri/resources/git-qa-input changed. Rebuilding application...
+#
+# **配布物には入る**（tauri.conf.json の bundle.resources）。見ないのは「変化」だけ。
+resources/

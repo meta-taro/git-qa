@@ -2,9 +2,10 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
-import { parseTestSpecTsv, sheetDigest, verdictKeyHint, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
 
 import { findInput, findOcr } from './ocr-path.js';
+import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
 import { tauriDevArgs } from './app.js';
@@ -118,10 +119,30 @@ child.on('close', (code) => {
   );
 });
 
+/**
+ * **落ちても、人が置いた判定を失わない**（外部レビュー #2）。
+ *
+ * `abort` を通すので、残りのケースは**判断保留として残り**、証跡は完全な形で書ける。
+ * **拾える落ち方だけが対象。**`SIGKILL`・電源・親ごと消える、は救えない。
+ */
+installSaveOnExit({
+  on: (name, handler) => {
+    process.on(name as NodeJS.Signals, handler);
+  },
+  save: async () => {
+    session.abort('人が実行を止めた（Ctrl-C / 終了の合図）');
+    const partial = await session.done;
+    await session.close();
+    const saved = await saveRunProgress(fromInvocationDir('runs'), partial);
+    console.log(`\n[git-qa] 途中で止めた。ここまでの証跡: ${saved}`);
+  },
+  exit: (code) => process.exit(code),
+});
+
 const run = await session.done;
 await session.close();
 
-const path = await writeRunJson(fromInvocationDir('runs'), run);
+const path = await saveRunProgress(fromInvocationDir('runs'), run);
 console.log(`[git-qa] 証跡: ${path}`);
 
 const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;

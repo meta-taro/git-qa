@@ -1,6 +1,7 @@
 import type { TargetAdapter, TargetSession } from '../adapter/types.js';
 import type { ImageTools } from '../adapter/to-webp.js';
 import { captureCaseShot } from './case-shot.js';
+import { saveRunProgress } from './save-progress.js';
 import { resolveCaseResult } from './result.js';
 import type {
   Actor,
@@ -90,6 +91,8 @@ export interface ExecuteRunOptions {
    * 前提を増やさないため、**在れば使う**形にしてある。
    */
   imageTools?: ImageTools;
+  /** 途中経過を書けなかったときの理由。**黙らない**ためだけに使う。 */
+  onProgressError?: (reason: string) => void;
   /** 時刻の出どころ。既定は実時計。 */
   now?: () => Date;
 }
@@ -254,17 +257,8 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
   const cases: RunCase[] = [];
   const findings: Finding[] = [];
 
-  try {
-    // 人が横で見られる状態にしてから走らせる（C4）。開けずに走ると、見る先が無い。
-    if (borrowed === undefined) await session.liveView.open();
-    for (const subject of subjects) {
-      cases.push(await runOneCase(subject, session, options, now));
-    }
-  } finally {
-    if (borrowed === undefined) await session.close();
-  }
-
-  return {
+  /** **いまの時点の証跡。**途中経過にも、最後にも、同じ形を使う。 */
+  const assemble = (): Run => ({
     schemaVersion: RUN_SCHEMA_VERSION,
     runId: options.runId,
     startedAt,
@@ -276,5 +270,33 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     recording: { requested: session.recording.requested },
     cases,
     findings,
-  };
+  });
+
+  try {
+    // 人が横で見られる状態にしてから走らせる（C4）。開けずに走ると、見る先が無い。
+    if (borrowed === undefined) await session.liveView.open();
+    for (const subject of subjects) {
+      cases.push(await runOneCase(subject, session, options, now));
+
+      /**
+       * **1 件終わるたびに書く**（外部レビュー meta-taro/git-qa#2）。
+       *
+       * 証跡を最後に 1 回だけ書いていたので、**途中で落ちると人が置いた判定が全部消えた。**
+       * signal を拾う道は、この道具では効かない（CLI は `vite-node` の下で走り、
+       * **signal がスクリプトまで来ない**・実測）。**落ち方を選ばない方法はこれだけ。**
+       *
+       * **書けなくても実行は続ける。**途中経過が残せないことを理由に、
+       * 人が置いている最中の実行を止めない。
+       */
+      if (options.runsRoot !== undefined) {
+        await saveRunProgress(options.runsRoot, assemble()).catch((error: unknown) => {
+          options.onProgressError?.(errorMessage(error));
+        });
+      }
+    }
+  } finally {
+    if (borrowed === undefined) await session.close();
+  }
+
+  return assemble();
 }

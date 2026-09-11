@@ -16,7 +16,7 @@ import {
   listAndroidDevices,
   readAndroidScreenText,
 } from '@git-qa/adapter-android';
-import { parseTestSpecTsv, sheetDigest, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, sheetDigest, saveRunProgress } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
 import { tauriDevArgs } from './app.js';
@@ -161,7 +161,7 @@ const setup = await startSetupServer({
       // どこにも残らないまま終わっていた（2026-09-04・実機で踏んだ）。
       // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
       saveRun: async (run) => {
-        const path = await writeRunJson(runsDir('runs'), run);
+        const path = await saveRunProgress(runsDir('runs'), run);
         const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
         console.log(`[git-qa] 証跡: ${path}`);
         console.log(
