@@ -8,6 +8,10 @@ import type { AssetConfig } from './assets.js';
 /**
  * 配布物が参照しているものが、本当に在るかを数える（§23）。
  *
+ * **普段のゲート（`pnpm verify`）には入れない。**建てる道具（`xcrun swiftc` / `cargo`）が
+ * 無い環境でも開発は進められるようにしてあり、そこで落とすと開発が止まる。
+ * **配る直前に数える** —— §23 の狙いは「配ったあとで初めて壊れる」を止めることなので。
+ *
  * **ここは配線なので検査していない。**判断のある所は `assets.ts` にあり、そちらは検査してある。
  */
 const here = dirname(fileURLToPath(import.meta.url));

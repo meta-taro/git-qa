@@ -28,7 +28,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "check:assets": "pnpm --filter @git-qa/host exec vite-node ../desktop/scripts/check-assets.ts",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build && pnpm check:assets"
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

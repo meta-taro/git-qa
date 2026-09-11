@@ -48,6 +48,12 @@ jobs:
       - name: format / lint / typecheck / test
         run: pnpm verify
 
+      # **配る前に数える**（§23）。参照されているのに無いものがあれば、ここで止める。
+      # 普段のゲート（`pnpm verify`）には入れていない —— 建てる道具が無い環境でも
+      # 開発は進められるようにしてあり、そこで落とすと開発が止まるため。
+      - name: 配布物が参照しているものが在るか数える
+        run: pnpm check:assets
+
       - name: Windows 版を建てる
         run: pnpm --filter @git-qa/desktop exec tauri build
 
