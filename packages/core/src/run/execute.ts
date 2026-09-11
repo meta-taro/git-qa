@@ -1,4 +1,5 @@
 import type { TargetAdapter, TargetSession } from '../adapter/types.js';
+import { captureCaseShot } from './case-shot.js';
 import { resolveCaseResult } from './result.js';
 import type {
   Actor,
@@ -78,6 +79,11 @@ export interface ExecuteRunOptions {
    * `AUTO_PASS` になる。繰り上げない。
    */
   askHuman?: (ctx: CaseContext, verdict: CaseVerdict) => Promise<HumanVerdict | undefined>;
+  /**
+   * 証跡の置き場所。**渡すと、ケースごとに画面を 1 枚残す。**
+   * 渡さなければ撮らない（`screenshot.state` が `not_requested` になる）。
+   */
+  runsRoot?: string;
   /** 時刻の出どころ。既定は実時計。 */
   now?: () => Date;
 }
@@ -180,6 +186,19 @@ async function runOneCase(
   // 録画はケースの操作までで閉じる。人が考えている時間は動画に入れない。
   const recording = await stopRecording(session);
 
+  /**
+   * **判定を置く時点の画面を残す**（2026-09-11）。
+   *
+   * 人へ渡す前に撮る —— 人が考えている間に画面が動くと、
+   * **「人が見たもの」と「残った絵」がずれる。**
+   */
+  const screenshot = await captureCaseShot({
+    session,
+    ...(options.runsRoot === undefined ? {} : { runsRoot: options.runsRoot }),
+    runId: options.runId,
+    caseNo: subject.no,
+  });
+
   const human = await options.askHuman?.(ctx, verdict);
 
   const finishedAt = now().toISOString();
@@ -202,6 +221,7 @@ async function runOneCase(
     result,
     steps,
     recording,
+    screenshot,
     ...(note === undefined ? {} : { note }),
   };
 }

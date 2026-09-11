@@ -307,7 +307,9 @@ function createSession(deps: SessionDeps): TargetSession {
     async screenshot(): Promise<Screenshot> {
       ensureOpen();
       const shot = await shoot();
-      return { format: 'png', bytes: shot.bytes, capturedAt: now().toISOString() };
+      // **`screencapture -t jpg` で撮っている**（`window.ts` の `captureArgs`）。
+      // png と名乗っていた時期があり、MCP がそれを image/png として渡していた。
+      return { format: 'jpg', bytes: shot.bytes, capturedAt: now().toISOString() };
     },
 
     close(): Promise<void> {

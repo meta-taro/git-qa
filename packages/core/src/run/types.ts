@@ -63,6 +63,18 @@ export interface Target {
   build: TargetBuild;
 }
 
+/**
+ * 判定を置く時点の画面（2026-09-11）。
+ *
+ * 動画（`CaseRecording`）と同じ形にしてある。**無いときに、撮らなかったのか
+ * 失敗したのかが読めること**が大事で、そこは静止画でも同じ。
+ */
+export type CaseScreenshot =
+  | { state: 'saved'; file: string }
+  | { state: 'not_requested' }
+  | { state: 'failed'; reason: string }
+  | { state: 'unsupported'; reason: string };
+
 /** 動画が無いとき、録画オフだったのか失敗したのかを区別できるようにする（C11）。 */
 export type CaseRecording =
   | { state: 'recorded'; file: string; durationMs: number }
@@ -131,6 +143,11 @@ export interface RunCase {
   /** 判定まわりの打鍵回数。無ければ、人はこのケースに何も打っていない。 */
   humanInputs?: HumanInputCounts;
   recording: CaseRecording;
+  /**
+   * 判定を置く時点の画面。**動画と同じで、無いときは理由が分かる形にする。**
+   * 2026-09-11 まで、証跡フォルダには `run.json` しか無かった。
+   */
+  screenshot?: CaseScreenshot;
   note?: string;
 }
 

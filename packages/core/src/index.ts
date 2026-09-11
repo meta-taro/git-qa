@@ -86,3 +86,10 @@ export type { Pointing } from './session/protocol.js';
 // 証跡が何に対して置かれたのかを確かめる（外部レビュー #1）。
 export { compareSheet, renderSheetCheck, sheetDigest } from './run/sheet-check.js';
 export type { CheckedRun, SheetCheck } from './run/sheet-check.js';
+
+// 判定を置く時点の画面（2026-09-11）。
+export { captureCaseShot } from './run/case-shot.js';
+export type { CaptureCaseShotOptions } from './run/case-shot.js';
+
+// 撮った絵の名乗りと中身を結ぶ（2026-09-11）。
+export { mimeTypeOf } from './adapter/shot-format.js';

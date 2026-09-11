@@ -223,6 +223,9 @@
         "recording": {
           "$ref": "#/$defs/caseRecording"
         },
+        "screenshot": {
+          "$ref": "#/$defs/caseScreenshot"
+        },
         "note": {
           "type": "string"
         }
@@ -443,6 +446,55 @@
           "$ref": "#/$defs/point"
         }
       }
+    },
+    "caseScreenshot": {
+      "description": "判定を置く時点の画面。動画と同じで、無いときは「撮らなかった」のか「失敗した」のかを区別できるようにする。**黙って空にしない。**",
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": ["saved", "not_requested", "failed", "unsupported"]
+        },
+        "file": {
+          "description": "証跡フォルダからの相対。例: case-001/screen.png",
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "description": "撮れなかった理由。state が failed / unsupported のときに要る。",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "saved"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "required": ["file"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": ["failed", "unsupported"]
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "required": ["reason"]
+          }
+        }
+      ]
     }
   }
 }

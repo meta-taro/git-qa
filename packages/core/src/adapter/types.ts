@@ -109,7 +109,14 @@ export interface Observation {
 }
 
 export interface Screenshot {
-  readonly format: 'png';
+  /**
+   * **撮った絵の、本当の形。**
+   *
+   * 2026-09-11 まで `'png'` しか無く、**デスクトップは JPEG を返しながら
+   * png と名乗っていた。**MCP はそれを `image/png` として AI へ渡していた。
+   * **名乗りと中身を合わせる**（合わないなら、合わない側を直す）。
+   */
+  readonly format: 'png' | 'jpg';
   readonly bytes: Uint8Array;
   readonly capturedAt: string;
 }

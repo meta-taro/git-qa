@@ -1,3 +1,4 @@
+import { mimeTypeOf } from '@git-qa/core';
 import type { TargetSession } from '@git-qa/core';
 import { screenText as textFromDump } from '@git-qa/adapter-android';
 
@@ -15,7 +16,7 @@ export interface Point {
 }
 
 export interface Screenshot {
-  readonly mimeType: 'image/png';
+  readonly mimeType: 'image/png' | 'image/jpeg';
   readonly base64: string;
 }
 
@@ -75,7 +76,12 @@ export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
 
     async screenshot() {
       const shot = await (await use()).screenshot();
-      return { mimeType: 'image/png', base64: Buffer.from(shot.bytes).toString('base64') };
+      // **名乗られた形をそのまま渡す。**png と決め打ちにすると、
+      // JPEG を image/png として渡すことになる（2026-09-11 に実際に起きていた）。
+      return {
+        mimeType: mimeTypeOf(shot.format),
+        base64: Buffer.from(shot.bytes).toString('base64'),
+      };
     },
 
     async screenText() {

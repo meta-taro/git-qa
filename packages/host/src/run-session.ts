@@ -26,6 +26,7 @@ import type { HumanInput, SessionCase, SessionPhase, SessionState } from '@git-q
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
 import { startLiveSession } from './live-session.js';
+import { fromInvocationDir } from './paths.js';
 
 /**
  * 一本道 — シートを読む → 端末を操作する → **人が 1 打鍵で置く** → `run.json` の中身が出る。
@@ -63,6 +64,11 @@ export interface StartRunSessionOptions {
    * アダプタは実行器より先に作られるので、直接は渡せない。
    * **知らせ先を後から預ける**形にして、輪にならないようにする。
    */
+  /**
+   * 証跡の置き場所。**ケースごとの画面もここへ置く。**
+   * 省くと、打った場所の `runs/`。
+   */
+  readonly runsRoot?: string;
   readonly registerPointing?: (
     report: (at: { x: number; y: number; width?: number; height?: number; label?: string }) => void,
   ) => void;
@@ -413,6 +419,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     session: live.session,
     operator: options.operator,
     mode: 'assisted',
+    // **ケースごとに画面を 1 枚残す**（2026-09-11）。証跡と同じ所へ置く。
+    runsRoot: options.runsRoot ?? fromInvocationDir('runs'),
     runCase,
     askHuman,
     ...(options.now === undefined ? {} : { now: options.now }),
