@@ -82,3 +82,7 @@ export type { FakeAdapter, FakeAdapterOptions } from './adapter/fake.js';
 // 打鍵の割り当ての正本（`./session` からも出している）。
 export { VERDICT_KEYS, verdictKeyHint } from './session/verdict-keys.js';
 export type { Pointing } from './session/protocol.js';
+
+// 証跡が何に対して置かれたのかを確かめる（外部レビュー #1）。
+export { compareSheet, renderSheetCheck, sheetDigest } from './run/sheet-check.js';
+export type { CheckedRun, SheetCheck } from './run/sheet-check.js';

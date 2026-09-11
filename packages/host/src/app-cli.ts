@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
@@ -17,7 +16,7 @@ import {
   listAndroidDevices,
   readAndroidScreenText,
 } from '@git-qa/adapter-android';
-import { parseTestSpecTsv, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, sheetDigest, writeRunJson } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
 import { tauriDevArgs } from './app.js';
@@ -147,7 +146,7 @@ const setup = await startSetupServer({
       sheet,
       sheetRef: {
         path: sheetPath,
-        sha256: createHash('sha256').update(text).digest('hex'),
+        sha256: sheetDigest(text),
         ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
         ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
       },

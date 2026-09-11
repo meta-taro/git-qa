@@ -37,7 +37,13 @@ export interface Actor {
 
 export interface SheetRef {
   path: string;
-  /** 読んだ時点のシートの中身。実行後にシートが変わったら突き合わせで分かる。 */
+  /**
+   * 読んだ時点のシートの中身。
+   *
+   * **突き合わせる側は `compareSheet` にある**（`run/sheet-check.ts`）。
+   * 2026-09-11 までは書く側しか無く、**型のコメントだけが「分かる」と言っていた**
+   * （外部レビュー meta-taro/git-qa#1）。**意図を書くだけにしない。**
+   */
   sha256: string;
   title?: string;
   documentNumber?: string;

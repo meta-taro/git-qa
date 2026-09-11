@@ -1,9 +1,8 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-android';
-import { parseTestSpecTsv, verdictKeyHint, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, sheetDigest, verdictKeyHint, writeRunJson } from '@git-qa/core';
 
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
@@ -60,7 +59,7 @@ const session = await startRunSession({
   sheetRef: {
     path: sheetPath,
     // 実行後にシートが変わったら、突き合わせで分かるようにする。
-    sha256: createHash('sha256').update(text).digest('hex'),
+    sha256: sheetDigest(text),
     ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
     ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
   },

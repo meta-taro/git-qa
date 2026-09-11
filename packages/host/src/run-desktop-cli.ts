@@ -1,9 +1,8 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
-import { parseTestSpecTsv, verdictKeyHint, writeRunJson } from '@git-qa/core';
+import { parseTestSpecTsv, sheetDigest, verdictKeyHint, writeRunJson } from '@git-qa/core';
 
 import { findInput, findOcr } from './ocr-path.js';
 import { startRunSession } from './run-session.js';
@@ -80,7 +79,7 @@ const session = await startRunSession({
   sheet,
   sheetRef: {
     path: sheetPath,
-    sha256: createHash('sha256').update(text).digest('hex'),
+    sha256: sheetDigest(text),
     ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
     ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
   },
