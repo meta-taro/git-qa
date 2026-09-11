@@ -441,8 +441,22 @@ body {
 }
 
 /* **この画面で人がやることは 1 つ**。だからここだけアクセント色を使う（DESIGN.md）。 */
+/*
+ * 鑑賞で走らせるかの選択。**1 行を丸ごと使う**（2026-09-11・実物を見て直した）。
+ * ボタンの間に挟むと、押す物の列に埋もれて**選択肢だと分からない。**
+ */
+.setup-watch-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
 .setup-start {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   padding: 0.5rem 1rem;
   font: inherit;
   font-size: 0.875rem;

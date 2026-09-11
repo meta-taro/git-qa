@@ -20,7 +20,7 @@ import type {
 import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
 import { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 import type { AxElement } from './ax.js';
-import { exePathScript, fingerprintOf } from './fingerprint.js';
+import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
@@ -326,8 +326,9 @@ function createSession(deps: SessionDeps): TargetSession {
       const target = await recentWindow().catch(() => undefined);
       if (target === undefined) return undefined;
 
-      const path = (await osa(exePathScript(target.pid)).catch(() => '')).trim();
-      if (path === '' || path === 'missing value') return undefined;
+      const ask = exePathArgs(target.pid);
+      const path = parseExePath(await run(ask.command, ask.args).catch(() => ''));
+      if (path === undefined) return undefined;
 
       const info = await stat(path).catch(() => undefined);
       return info === undefined ? undefined : fingerprintOf(path, info.size, info.mtime);
