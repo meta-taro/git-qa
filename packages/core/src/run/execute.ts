@@ -289,11 +289,21 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
   // 1 件終わるたびに測り直す。**途中経過の証跡にも、そこまでの結果が入る。**
   let after = before;
 
-  const assemble = (): Run => ({
+  /**
+   * いまの時点の証跡。
+   *
+   * **`finishedAt` は走り切ったときにだけ押す。**「**無いことが『途中で止まった』の
+   * 記録になる**」という約束で作ってある（`types.ts`）。
+   *
+   * 途中経過にも押していた時期がある（2026-09-11）。そのときは、
+   * **落ちた実行の証跡を翌日に開いても、走り切ったものと見分けが付かなかった。**
+   * 証跡が残ること（外部レビュー #2）と、**残った証跡が何なのかが読めること**は別の話。
+   */
+  const assemble = (finished: boolean): Run => ({
     schemaVersion: RUN_SCHEMA_VERSION,
     runId: options.runId,
     startedAt,
-    finishedAt: now().toISOString(),
+    ...(finished ? { finishedAt: now().toISOString() } : {}),
     operator: options.operator,
     mode: options.mode,
     sheet: options.sheetRef,
@@ -322,7 +332,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
        * 人が置いている最中の実行を止めない。
        */
       if (options.runsRoot !== undefined) {
-        await saveRunProgress(options.runsRoot, assemble()).catch((error: unknown) => {
+        await saveRunProgress(options.runsRoot, assemble(false)).catch((error: unknown) => {
           options.onProgressError?.(errorMessage(error));
         });
       }
@@ -331,5 +341,13 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     if (borrowed === undefined) await session.close();
   }
 
-  return assemble();
+  const run = assemble(true);
+  // **最後にもう一度書く。**途中経過の最後の 1 枚は「まだ終わっていない」形なので、
+  // ここで押し直さないと、**走り切った実行がファイル上では途中に見える。**
+  if (options.runsRoot !== undefined) {
+    await saveRunProgress(options.runsRoot, run).catch((error: unknown) => {
+      options.onProgressError?.(errorMessage(error));
+    });
+  }
+  return run;
 }
