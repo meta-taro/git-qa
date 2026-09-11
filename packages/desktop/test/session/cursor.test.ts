@@ -74,3 +74,20 @@ describe('humanInputFor', () => {
     expect(humanInputFor({ kind: 'next' }, 2)).toBeUndefined();
   });
 });
+
+/**
+ * **鑑賞を止める**（2026-09-11・人の指示）。
+ *
+ * 止めるのは判定ではない。**まだ走っていないケースを見ていても、止められる。**
+ * 止めたいときに止まらないのが、いちばん困る。
+ */
+describe('humanInputFor — 止める', () => {
+  it('止める指示になる', () => {
+    expect(humanInputFor({ kind: 'stop' }, 3)).toEqual({ kind: 'stop', caseNo: 3 });
+  });
+
+  /** 宛先が無ければ送らない（ほかと同じ）。 */
+  it('どのケースを見ているか分からなければ、送らない', () => {
+    expect(humanInputFor({ kind: 'stop' }, undefined)).toBeUndefined();
+  });
+});

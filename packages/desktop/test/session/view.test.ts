@@ -247,3 +247,55 @@ describe('証跡の行方', () => {
     expect(column('verdict').textContent).toContain('EROFS');
   });
 });
+
+/**
+ * **鑑賞モードの案内**（2026-09-11・人の指示）。
+ *
+ * > 人はぼーっとみながら AI のテストを鑑賞します。……途中で止められる配慮も必要です。
+ *
+ * 押さなくても進む形であることと、**止める手**を、画面に出し続ける。
+ * 出ていなければ、人は「押さないと進まない」と思って待つ。
+ */
+describe('renderSession — 鑑賞中', () => {
+  const watching = (): SessionState => ({
+    runId: '20260911-190000',
+    phase: 'watching',
+    awaiting: 1,
+    watch: { pauseMs: 4000 },
+    cases: [
+      { no: 1, title: 'メモを保存できる', aiResult: 'PASS' },
+      { no: 2, title: 'メモを削除できる' },
+    ],
+  });
+
+  it('鑑賞中であることを出す', () => {
+    renderSession(root, watching());
+
+    expect(root.textContent).toContain('鑑賞');
+  });
+
+  /** **押さなくても進む**ことを、押す前に言う。 */
+  it('押さなければ進むことを出す', () => {
+    renderSession(root, watching());
+
+    expect(root.querySelector('.verdict-watching')?.textContent).toContain('4');
+  });
+
+  /** **止める手を出す。**打鍵だけにしない —— 初めて触る人は Esc を知らない。 */
+  it('止める押しボタンを出す', () => {
+    renderSession(root, watching());
+
+    const stop = root.querySelector<HTMLElement>('.key-action[data-key="Escape"]');
+    expect(stop).not.toBeNull();
+    expect(stop?.textContent).toContain('止め');
+  });
+
+  /** 鑑賞でないときは出さない。**要らない案内で画面を埋めない。** */
+  it('普段の実行では出さない', () => {
+    const { watch: _watch, ...rest } = watching();
+    renderSession(root, { ...rest, phase: 'waiting' });
+
+    expect(root.querySelector('.verdict-watching')).toBeNull();
+    expect(root.querySelector('.key-action[data-key="Escape"]')).toBeNull();
+  });
+});

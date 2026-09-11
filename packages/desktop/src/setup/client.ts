@@ -93,6 +93,8 @@ export async function requestStart(
     operator?: string;
     browser?: string;
     browserPath?: string;
+    /** **鑑賞モードで始める**（2026-09-11）。選ばれたときだけ持つ。 */
+    watch?: true;
   },
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {

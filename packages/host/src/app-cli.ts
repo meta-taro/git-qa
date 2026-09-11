@@ -24,6 +24,8 @@ import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from '.
 import { fromInvocationDir, runsDir } from './paths.js';
 import { findInput, findOcr } from './ocr-path.js';
 import { startRunSession } from './run-session.js';
+import { gitQaWindowRecording } from './window-recording.js';
+import { imageTools } from './image-tools.js';
 import type { RunSession } from './run-session.js';
 import { startSetupServer } from './setup-server.js';
 import { watchParent } from './watch-parent.js';
@@ -84,7 +86,7 @@ const setup = await startSetupServer({
       SHEET_LIMIT,
     ),
 
-  start: async ({ serial, sheetPath, operator, browser, browserPath }) => {
+  start: async ({ serial, sheetPath, operator, browser, browserPath, watch }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -102,6 +104,27 @@ const setup = await startSetupServer({
     /** Firefox と Safari はエンジンが違う。**同じコードには乗らない**（Issue 018）。 */
     const chromium =
       browser === 'firefox' || browser === 'safari' || browser === undefined ? undefined : browser;
+
+    const runId = runIdFrom(new Date());
+    const runsRoot = runsDir('runs');
+
+    /**
+     * **鑑賞モードでは git-qa の窓を録る**（2026-09-11・人の判断）。
+     *
+     * > 録画ですが、git-qa を最大化して、そのアプリを録画するとどうですか？
+     *
+     * 相手のアプリだけ録っても、判定の根拠は写らない。
+     * **道具が無ければ録らないだけ**（`unsupported` が証跡に残る）。
+     */
+    const recording =
+      watch === true
+        ? await gitQaWindowRecording({
+            runsRoot,
+            runId,
+            tools: imageTools(),
+            onNote: (text) => console.log(`[git-qa] ${text}`),
+          })
+        : undefined;
 
     session = await startRunSession({
       adapter:
@@ -150,8 +173,11 @@ const setup = await startSetupServer({
         ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
         ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
       },
-      runId: runIdFrom(new Date()),
+      runId,
       sheetPath,
+      // **鑑賞モード。**押さなくても 1 件ごとに間をおいて進む（止める口はある）。
+      ...(watch === true ? { watch: {} } : {}),
+      ...(recording === undefined ? {} : { recording }),
       // **置いた人。**画面から受け取る。無ければ環境変数、それも無ければ unknown
       // （unknown のまま残ると「誰が保証したか」が読めないので、画面側で入力を促す）。
       operator: { handle: operator ?? process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
@@ -161,7 +187,7 @@ const setup = await startSetupServer({
       // どこにも残らないまま終わっていた（2026-09-04・実機で踏んだ）。
       // 動画は既定で Git に入れない（C29）。`runs/` は .gitignore にある。
       saveRun: async (run) => {
-        const path = await saveRunProgress(runsDir('runs'), run);
+        const path = await saveRunProgress(runsRoot, run);
         const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
         console.log(`[git-qa] 証跡: ${path}`);
         console.log(

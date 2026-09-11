@@ -196,3 +196,60 @@ describe('parseSessionState — 映像が止まった理由', () => {
     expect(parseSessionState({ ...base, liveError: 5 })).toBeUndefined();
   });
 });
+
+/**
+ * **鑑賞モード**（2026-09-11・人の指示）。
+ *
+ * > 人はぼーっとみながら AI のテストを鑑賞します。……途中で止められる配慮も必要です。
+ *
+ * 人が判定を置かなくても先へ進む。**だから「止める」を、ちゃんと口として持つ。**
+ * 見ているだけの人が、止めたいときに止められないのは、見ているだけより悪い。
+ */
+describe('parseHumanInput — 止める', () => {
+  it('止める指示を受け取る', () => {
+    expect(parseHumanInput({ kind: 'stop', caseNo: 3 })).toEqual({ kind: 'stop', caseNo: 3 });
+  });
+
+  /** **宛先のないものは受け取らない**（他の打鍵と同じ扱い）。 */
+  it('ケース番号が無ければ受け取らない', () => {
+    expect(parseHumanInput({ kind: 'stop' })).toBeUndefined();
+  });
+});
+
+describe('parseSessionState — 鑑賞中', () => {
+  it('鑑賞中という段を受け取る', () => {
+    const state = parseSessionState({
+      runId: '20260911-190000',
+      phase: 'watching',
+      cases: [{ no: 1, title: '起動する' }],
+    });
+
+    expect(state?.phase).toBe('watching');
+  });
+});
+
+describe('parseSessionState — 鑑賞の案内', () => {
+  /** **人が押さなくても進むことを、画面に出し続ける**ための値。 */
+  it('間の長さを受け取る', () => {
+    const state = parseSessionState({
+      runId: '20260911-190000',
+      phase: 'watching',
+      watch: { pauseMs: 4000 },
+      cases: [{ no: 1, title: '起動する' }],
+    });
+
+    expect(state?.watch).toEqual({ pauseMs: 4000 });
+  });
+
+  /** **形のおかしいものは持たない。**当て推量で埋めると、画面が嘘の長さを出す。 */
+  it('形がおかしければ持たない', () => {
+    const state = parseSessionState({
+      runId: '20260911-190000',
+      phase: 'watching',
+      watch: { pauseMs: '4 秒' },
+      cases: [{ no: 1, title: '起動する' }],
+    });
+
+    expect(state?.watch).toBeUndefined();
+  });
+});

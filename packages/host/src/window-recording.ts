@@ -1,4 +1,11 @@
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+
+import { parseWindow, windowScript } from '@git-qa/adapter-desktop';
+import { caseDir, saveAsWebm } from '@git-qa/core';
+import type { ImageTools } from '@git-qa/core';
+
+import { findRecord } from './ocr-path.js';
 
 import { caseDirName } from '@git-qa/core';
 import type { CaseRecording, RecordingControl } from '@git-qa/core';
@@ -185,4 +192,54 @@ export function spawnRecorder(command: string, args: readonly string[]): Recordi
       await ended;
     },
   };
+}
+
+/**
+ * 鑑賞モードで使う録画を、そのまま組み立てる。
+ *
+ * **道具が無ければ `unsupported` を返す録画**になる（止まらない）。
+ * `git-qa-record` は macOS 専用、webm 化は ffmpeg が要る。**どちらも前提にしない。**
+ */
+export async function gitQaWindowRecording(options: {
+  readonly runsRoot: string;
+  readonly runId: string;
+  readonly tools: ImageTools;
+  readonly onNote?: (text: string) => void;
+}): Promise<RecordingControl> {
+  const recordPath = await findRecord();
+
+  return createWindowRecording({
+    recordPath,
+    windowId: () =>
+      findGitQaWindow(async (owner) => {
+        const said = await run('osascript', ['-l', 'JavaScript', '-e', windowScript(owner)]);
+        return parseWindow(said)?.id;
+      }),
+    dirFor: (caseNo) => caseDir(options.runsRoot, options.runId, caseNo),
+    ensureDir: async (dir) => {
+      await mkdir(dir, { recursive: true });
+    },
+    spawn: spawnRecorder,
+    toWebm: (dir, name) =>
+      saveAsWebm({
+        dir,
+        name,
+        tools: options.tools,
+        run: async (command, args) => {
+          await run(command, args);
+        },
+      }),
+    now: () => new Date(),
+    ...(options.onNote === undefined ? {} : { onNote: options.onNote }),
+  });
+}
+
+/** 外の道具を 1 本動かす。**言い分をそのまま上へ返す**（黙って飲まない）。 */
+function run(command: string, args: readonly string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(command, [...args], (error, stdout, stderr) => {
+      if (error) reject(new Error(stderr.trim() || error.message));
+      else resolve(stdout);
+    });
+  });
 }

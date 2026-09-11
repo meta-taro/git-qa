@@ -272,4 +272,62 @@ describe('担当者ハンドル', () => {
 
     expect(response.status).toBe(202);
   });
+
+  /**
+   * **鑑賞モード**（2026-09-11・人の指示）。
+   *
+   * > 人はぼーっとみながら AI のテストを鑑賞します。
+   *
+   * 押さなくても進む形で始めたいかどうかは、**始める人が決める。**
+   */
+  it('鑑賞で始めたいという指定を、実行へ渡す', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv', watch: true }),
+    });
+
+    for (let i = 0; i < 50; i += 1) {
+      if (start.mock.calls.length > 0) {
+        expect(start).toHaveBeenCalledWith({
+          serial: 'emulator-5554',
+          sheetPath: '/repo/a.tsv',
+          watch: true,
+        });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error('start が呼ばれなかった');
+  });
+
+  /** **指定が無ければ、今までどおり**（押すまで進まない）。 */
+  it('指定が無ければ、鑑賞では始めない', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv' }),
+    });
+
+    for (let i = 0; i < 50; i += 1) {
+      if (start.mock.calls.length > 0) {
+        expect(start.mock.calls[0]?.[0]).not.toHaveProperty('watch');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error('start が呼ばれなかった');
+  });
 });

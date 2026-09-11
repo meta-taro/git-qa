@@ -21,7 +21,16 @@ export interface SessionCase {
 }
 
 /** `running` = AI が操作中 / `waiting` = 人の打鍵待ち / `finished` = 実行が終わった */
-export type SessionPhase = 'running' | 'waiting' | 'finished';
+/**
+ * `'watching'` は**鑑賞モード**（2026-09-11・人の指示）。
+ *
+ * > 人はぼーっとみながら AI のテストを鑑賞します。
+ *
+ * `'waiting'` との違いは、**人が押さなくても先へ進む**こと。
+ * 押せば置ける（見ていた人の判定になる）が、押さなければ `AUTO_PASS`。
+ * **繰り上げない**（C1）。
+ */
+export type SessionPhase = 'running' | 'waiting' | 'watching' | 'finished';
 
 export interface SessionState {
   readonly runId: string;
@@ -55,6 +64,13 @@ export interface SessionState {
    * **枠の大きさへ直すのは画面側の仕事**（映像は枠より小さく描かれている）。
    */
   readonly pointing?: Pointing;
+  /**
+   * **鑑賞モードの案内**（2026-09-11・人の指示）。
+   *
+   * 在るときは、**人が押さなくても先へ進む。**
+   * 押さずに進むことを、画面に出し続けるために要る（`pauseMs` は 1 件を見せる間）。
+   */
+  readonly watch?: { readonly pauseMs: number };
   readonly cases: readonly SessionCase[];
 }
 
@@ -80,6 +96,15 @@ export type HumanInput =
   | { readonly kind: 'verdict'; readonly caseNo: number; readonly humanResult: HumanResult }
   /** 人が判定を置かずに次へ送った。**繰り上げない**ので、結果は `AUTO_PASS` になる。 */
   | { readonly kind: 'advance'; readonly caseNo: number }
+  /**
+   * **鑑賞をここで止める**（2026-09-11・人の指示）。
+   *
+   * > 途中で止められる配慮も必要です。
+   *
+   * 残りは「やっていない」ではなく **`BLOCKED`（判断保留）**として残る。
+   * 走らせなかったものを「通った」にしない。
+   */
+  | { readonly kind: 'stop'; readonly caseNo: number }
   /**
    * 人がライブビューの中を触った。座標は**端末の画素**（画面の表示寸法ではない）。
    *
@@ -169,6 +194,9 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
 
   if (raw['kind'] === 'advance') return { kind: 'advance', caseNo };
 
+  // **鑑賞を止める。**見ているだけの人が止められないのは、見ているだけより悪い。
+  if (raw['kind'] === 'stop') return { kind: 'stop', caseNo };
+
   if (raw['kind'] === 'swipe') {
     const from = parsePoint(raw['from']);
     const to = parsePoint(raw['to']);
@@ -227,7 +255,7 @@ export function parseHumanInput(raw: unknown): HumanInput | undefined {
   return undefined;
 }
 
-const PHASES: readonly SessionPhase[] = ['running', 'waiting', 'finished'];
+const PHASES: readonly SessionPhase[] = ['running', 'waiting', 'watching', 'finished'];
 
 function parseCase(raw: unknown): SessionCase | undefined {
   if (!isRecord(raw) || !isCaseNo(raw['no']) || typeof raw['title'] !== 'string') return undefined;
@@ -314,6 +342,19 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
     if (pointing === undefined) return undefined;
   }
 
+  /**
+   * **形がおかしければ、この値だけ落とす**（`pointing` と違って、状態ごとは捨てない）。
+   *
+   * 矢印は**間違った場所を指す**ので、疑わしければ状態ごと捨てるのが正しい。
+   * こちらは案内の長さで、落としても画面は正しく出る。
+   * **走っている最中に一覧が丸ごと消えるほうが、よほど困る。**
+   */
+  const watchRaw = raw['watch'];
+  const watch =
+    isRecord(watchRaw) && isPixel(watchRaw['pauseMs'])
+      ? { pauseMs: watchRaw['pauseMs'] }
+      : undefined;
+
   return {
     runId: raw['runId'],
     phase: raw['phase'],
@@ -321,6 +362,7 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
     ...(sheetPath === undefined ? {} : { sheetPath }),
     ...(liveError === undefined ? {} : { liveError }),
     ...(pointing === undefined ? {} : { pointing }),
+    ...(watch === undefined ? {} : { watch }),
     cases,
   };
 }

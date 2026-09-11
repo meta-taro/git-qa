@@ -123,3 +123,27 @@ describe('左手ホーム段への割り当て', () => {
     expect(new Set(typed)).toEqual(new Set(['a', 's', 'd', 'f', ' ']));
   });
 });
+
+/**
+ * **鑑賞を止める**（2026-09-11・人の指示）。
+ *
+ * > 途中で止められる配慮も必要です。
+ *
+ * 鑑賞モードは押さなくても進む。**止めたいときに止められないのは、
+ * 見ているだけより悪い。**
+ */
+describe('commandForKey — 止める', () => {
+  it('Esc で止まる', () => {
+    expect(commandForKey({ key: 'Escape' })).toEqual({ kind: 'stop' });
+  });
+
+  /** **判定のキーは奪わない。**止めるのは、判定とは別の手。 */
+  it('判定のキーは今までどおり', () => {
+    expect(commandForKey({ key: 'd' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
+  });
+
+  /** 修飾キー付きは受け取らない（ほかと同じ）。**⌘Esc を奪わない。** */
+  it('修飾キー付きの Esc は受け取らない', () => {
+    expect(commandForKey({ key: 'Escape', metaKey: true })).toBeUndefined();
+  });
+});

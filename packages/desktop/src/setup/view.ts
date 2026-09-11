@@ -19,6 +19,15 @@ export interface RenderSetupOptions {
     browser?: string;
     /** 名前の無いブラウザの場所。 */
     browserPath?: string;
+    /**
+     * **鑑賞モードで始める**（2026-09-11・人の指示）。
+     *
+     * > 人はぼーっとみながら AI のテストを鑑賞します。
+     *
+     * **選ばれたときだけ持つ。**`false` を運ぶと「選ばなかった」と
+     * 「鑑賞ではないと指定した」が同じ形になる。
+     */
+    watch?: true;
   }) => void;
   /**
    * 自分で検証シートを選ぶ。
@@ -312,6 +321,23 @@ export function renderSetup(
   sheetHeading.className = 'setup-heading';
   sheetHeading.textContent = t('setup.sheet');
 
+  /**
+   * **鑑賞モード**（2026-09-11・人の指示）。
+   *
+   * > 人はぼーっとみながら AI のテストを鑑賞します。
+   *
+   * **既定は今までどおり**（押すまで進まない）。押さなくても進むのは、
+   * 選んだ人が分かっていて選んだときだけにする。
+   */
+  const watchLabel = doc.createElement('label');
+  watchLabel.className = 'setup-watch-label';
+  const watch = doc.createElement('input');
+  watch.type = 'checkbox';
+  watch.className = 'setup-watch';
+  const watchText = doc.createElement('span');
+  watchText.textContent = t('setup.watch');
+  watchLabel.append(watch, watchText);
+
   const start = doc.createElement('button');
   start.type = 'button';
   start.className = 'setup-start';
@@ -339,6 +365,7 @@ export function renderSetup(
       ...(browser.value === 'other' && browserPath.value.trim() !== ''
         ? { browserPath: browserPath.value.trim() }
         : {}),
+      ...(watch.checked ? { watch: true as const } : {}),
     });
   });
 
@@ -411,7 +438,7 @@ export function renderSetup(
     section.append(pick);
   }
 
-  section.append(start);
+  section.append(watchLabel, start);
 
   // **保存済みの値を戻したときも印を立てる。**打ち始めるまで黙っていては遅い。
   // 組み上がってから当てるので、理由の行はボタンの下に入る。

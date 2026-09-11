@@ -41,8 +41,8 @@
       "$ref": "#/$defs/actor"
     },
     "mode": {
-      "description": "manual = 人が全部操作 / assisted = AI が操作し人が見る / auto = AI だけ",
-      "enum": ["manual", "assisted", "auto"]
+      "description": "manual = 人が全部操作 / assisted = AI が操作し人が押すまで待つ / watched = 人は見ているが押さなくても進む（鑑賞） / auto = 誰も見ていない",
+      "enum": ["manual", "assisted", "watched", "auto"]
     },
     "sheet": {
       "type": "object",

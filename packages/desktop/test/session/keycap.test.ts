@@ -27,3 +27,10 @@ describe('keyCap', () => {
     expect(keyCap('f')).toBe('F');
   });
 });
+
+describe('keyCap — 止める', () => {
+  /** **キーボードに刻まれている名前を出す**（`Escape` は内部の名前）。 */
+  it('Esc と出す', () => {
+    expect(keyCap('Escape')).toBe('Esc');
+  });
+});

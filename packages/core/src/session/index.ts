@@ -2,6 +2,9 @@
 // Node 専用のもの（ファイル IO）を巻き込まない（`./live` と同じ理由）。
 export { parseHumanInput, parseSessionState } from './protocol.js';
 export type { HumanInput, Pointing, SessionCase, SessionPhase, SessionState } from './protocol.js';
+// 鑑賞モードの「間」。**画面にも実行器にも要る。**
+export { WATCH_PAUSE_MS, watchPause } from './watch.js';
+export type { WatchOutcome, WatchPauseOptions } from './watch.js';
 // 結果の語彙は run.json と同じものを使う。画面側で別の語を作らない。
 export { AI_RESULTS, CASE_RESULTS, HUMAN_RESULTS } from '../run/types.js';
 // 打鍵の割り当ての正本。**画面もターミナルの案内もここから作る。**

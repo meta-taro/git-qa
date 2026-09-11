@@ -30,7 +30,15 @@ export const CASE_RESULTS = ['VERIFIED', 'AUTO_PASS', 'FAIL', 'BLOCKED', 'SKIP']
 export type CaseResult = (typeof CASE_RESULTS)[number];
 
 /** manual = 人が全部操作 / assisted = AI が操作し人が見る / auto = AI だけ */
-export type RunMode = 'manual' | 'assisted' | 'auto';
+/**
+ * 誰がどこまで関わった実行か。
+ *
+ * `'watched'` は**鑑賞**（2026-09-11・人の指示）。
+ * `assisted` は**人が押すまで次へ行かない**、`auto` は**誰も見ていない**。
+ * 鑑賞はどちらでもない —— **人は見ているが、押さなくても進む。**
+ * どちらかの名前を借りると、証跡を読んだ人が実際と違うものを思い浮かべる。
+ */
+export type RunMode = 'manual' | 'assisted' | 'watched' | 'auto';
 
 export interface Actor {
   /** 個人名・個人メールアドレスは入れない（公開リポジトリ）。 */

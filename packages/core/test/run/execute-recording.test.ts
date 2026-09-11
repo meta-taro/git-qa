@@ -7,6 +7,7 @@ import {
   type SheetRef,
   createFakeAdapter,
   executeRun,
+  validateRun,
   parseTestSpecTsv,
 } from '../../src/index.js';
 
@@ -93,5 +94,44 @@ describe('executeRun — 録るものを差し替える', () => {
 
     expect(run.recording).toEqual({ requested: false });
     expect(run.cases[0]?.recording).toEqual({ state: 'not_requested' });
+  });
+});
+
+/**
+ * **鑑賞モード**は 3 つ目の形（2026-09-11・人の指示）。
+ *
+ * > 人はぼーっとみながら AI のテストを鑑賞します。
+ *
+ * `assisted` は**人が押すまで次へ行かない。**`auto` は**誰も見ていない。**
+ * 鑑賞はどちらでもない —— **人は見ているが、押さなくても進む。**
+ * どちらかの名前を借りると、証跡を読んだ人が実際と違うものを思い浮かべる。
+ */
+describe('mode: watched', () => {
+  it('人に聞く口を持てる（auto と違って、人は見ている）', async () => {
+    const asked: number[] = [];
+
+    const run = await executeRun(
+      options({
+        mode: 'watched',
+        askHuman: (ctx) => {
+          asked.push(ctx.subject.no);
+          // 押さずに見ていた。**繰り上げない。**
+          return Promise.resolve(undefined);
+        },
+      }),
+    );
+
+    expect(asked).toEqual([1, 2]);
+    expect(run.mode).toBe('watched');
+    // **証跡の形としても通ること。**形の正本は JSON Schema（C18）。
+    expect(validateRun(run)).toEqual({ valid: true, errors: [] });
+    expect(run.cases.map((c) => c.result)).toEqual(['AUTO_PASS', 'AUTO_PASS']);
+  });
+
+  /** **`auto` の約束は変えない。**誰も見ない実行に、人へ聞く口は無い。 */
+  it('auto は今までどおり、人に聞く口を持てない', async () => {
+    await expect(
+      executeRun(options({ mode: 'auto', askHuman: () => Promise.resolve(undefined) })),
+    ).rejects.toThrow('askHuman');
   });
 });

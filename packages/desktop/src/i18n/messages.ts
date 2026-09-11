@@ -38,6 +38,10 @@ const ja = {
   'key.next': '次のケースを見る',
   'key.move.note': '見る場所が動く。走ったケースなら、戻って置き直せる',
   'verdict.running': 'AI が操作している。判定はまだ置けない',
+  // **鑑賞モード**（2026-09-11）。押さなくても進むことを、出し続ける。
+  'setup.watch': '鑑賞で走らせる（押さなくても進む。Esc で止められる）',
+  'verdict.watching': '鑑賞中 — 押さなければ {seconds} 秒で次へ進みます',
+  'verdict.stop': '鑑賞を止める',
   'verdict.finished': '検証は終了しました',
   'setup.operator.rule':
     '39 文字まで。空白と / \\ は使えない。個人名ではなく、名乗る名前を入れる（証跡に残る）',
@@ -152,6 +156,9 @@ const en: Record<keyof typeof ja, string> = {
   'key.next': 'Look at the next case',
   'key.move.note': 'Moves what you are looking at; you can re-place on cases that ran',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
+  'setup.watch': 'Run in watch mode (moves on without you; Esc stops it)',
+  'verdict.watching': 'Watching — moves on in {seconds}s unless you place a verdict',
+  'verdict.stop': 'Stop watching',
   'verdict.finished': 'This run has finished.',
   'setup.operator.rule':
     'Letters, digits and hyphens only (must start with a letter or digit, up to 39 characters).',

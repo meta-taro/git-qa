@@ -48,23 +48,35 @@ export interface StartedRun {
   readonly liveKind?: 'h264' | 'images';
 }
 
+/** 画面から来た「これで始めてくれ」。 */
+export interface StartRequest {
+  /**
+   * 見る相手。**端末の serial か、ウェブページの URL。**
+   * どちらかは呼ばれた側（`app-cli`）が形で見分ける。
+   */
+  readonly serial: string;
+  readonly sheetPath: string;
+  /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */
+  readonly operator?: string;
+  /** どのブラウザで見るか（ウェブのときだけ）。**証跡に版が残る。** */
+  readonly browser?:
+    'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'chromium' | 'firefox' | 'safari';
+  /** 名前の無いブラウザの場所。**中身が Chromium なら動く。** */
+  readonly browserPath?: string;
+  /**
+   * **鑑賞モードで始める**（2026-09-11・人の指示）。
+   *
+   * > 人はぼーっとみながら AI のテストを鑑賞します。
+   *
+   * 押さなくても 1 件ごとに間をおいて進む。**真のときだけ持つ。**
+   */
+  readonly watch?: true;
+}
+
 export interface StartSetupServerOptions {
   readonly listDevices: () => Promise<readonly SetupDevice[]>;
   readonly findSheets: () => Promise<readonly string[]>;
-  readonly start: (params: {
-    /**
-     * 見る相手。**端末の serial か、ウェブページの URL。**
-     * どちらかは呼ばれた側（`app-cli`）が形で見分ける。
-     */
-    serial: string;
-    sheetPath: string;
-    /** 置いた人。**個人名ではなくハンドル**（公開リポジトリ・§25）。 */
-    operator?: string;
-    /** どのブラウザで見るか（ウェブのときだけ）。**証跡に版が残る。** */
-    browser?: 'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'chromium' | 'firefox' | 'safari';
-    /** 名前の無いブラウザの場所。**中身が Chromium なら動く。** */
-    browserPath?: string;
-  }) => Promise<StartedRun>;
+  readonly start: (params: StartRequest) => Promise<StartedRun>;
   readonly port?: number;
 }
 
@@ -132,32 +144,11 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     ...(failure === undefined ? {} : { error: failure }),
   });
 
-  const begin = (
-    serial: string,
-    sheetPath: string,
-    operator: string | undefined,
-    browser:
-      | 'chrome'
-      | 'edge'
-      | 'brave'
-      | 'opera'
-      | 'vivaldi'
-      | 'chromium'
-      | 'firefox'
-      | 'safari'
-      | undefined,
-    browserPath: string | undefined,
-  ): void => {
+  const begin = (request: StartRequest): void => {
     phase = 'starting';
     failure = undefined;
     void options
-      .start({
-        serial,
-        sheetPath,
-        ...(operator === undefined ? {} : { operator }),
-        ...(browser === undefined ? {} : { browser }),
-        ...(browserPath === undefined ? {} : { browserPath }),
-      })
+      .start(request)
       .then((run) => {
         started = run;
         phase = 'running';
@@ -239,7 +230,24 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
           typeof wantedPath === 'string' && wantedPath !== '' && wantedPath.length <= 500
             ? wantedPath
             : undefined;
-        begin(serial, sheetPath, operator, browser, browserPath);
+        /**
+         * **鑑賞モードで始めるかどうか**（2026-09-11・人の指示）。
+         *
+         * > 人はぼーっとみながら AI のテストを鑑賞します。
+         *
+         * **真のときだけ渡す。**`false` を運ぶと「鑑賞ではないと指定された」と
+         * 「何も言われていない」が同じ形になる。
+         */
+        const watch = (body as { watch?: unknown }).watch === true;
+
+        begin({
+          serial,
+          sheetPath,
+          ...(operator === undefined ? {} : { operator }),
+          ...(browser === undefined ? {} : { browser }),
+          ...(browserPath === undefined ? {} : { browserPath }),
+          ...(watch ? { watch: true } : {}),
+        });
         res.writeHead(202, cors).end();
       });
       return;

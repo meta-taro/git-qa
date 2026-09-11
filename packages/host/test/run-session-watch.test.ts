@@ -1,0 +1,177 @@
+import { describe, expect, it } from 'vitest';
+
+import { parseTestSpecTsv } from '@git-qa/core';
+import type { SessionState } from '@git-qa/core/session';
+import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
+
+import { startRunSession } from '../src/index.js';
+import { stubAdapter } from './stub-adapter.js';
+
+/**
+ * **鑑賞モード**（2026-09-11・人の指示）。
+ *
+ * > auto を git-qa まんま操作するパターンを実装します。……人はぼーっとみながら
+ * > AI のテストを鑑賞します。そのときに AI 側は、テスト判定のキャプチャと、
+ * > 動画をとっていきます。途中で止められる配慮も必要です。
+ *
+ * 普段の一本道は**人が押すまで進まない。**鑑賞モードはその逆で、
+ * **押さなければ進む。**押せば、その判定になる。
+ * **押していないものを「人が見て置いた」にはしない**（`AUTO_PASS`・C1）。
+ */
+
+const SHEET = parseTestSpecTsv(
+  [
+    '#! md-business:test-spec-tsv/v1',
+    'No.:number!\t項目!\t手順:multiline!\t期待結果:multiline!',
+    '1\tメモを保存できる\t保存をタップする\t「保存しました」と表示される',
+    '2\tメモを削除できる\t削除をタップする\t「保存しました」と表示される',
+    '3\t検索できる\t検索をタップする\t「保存しました」と表示される',
+    '',
+  ].join('\n'),
+);
+
+function fakeBridge(): {
+  start: (options: LiveBridgeOptions) => Promise<LiveBridge>;
+  states: SessionState[];
+  send: (input: unknown) => void;
+} {
+  const states: SessionState[] = [];
+  const handlers = new Set<(input: unknown) => void>();
+
+  const bridge: LiveBridge = {
+    url: 'http://127.0.0.1:65000/live/token.h264',
+    controlUrl: 'http://127.0.0.1:65000/live/token/control',
+    port: 65000,
+    publish: (state) => states.push(state as SessionState),
+    onInput: (handler) => {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    close: () => Promise.resolve(),
+  };
+
+  return {
+    start: () => Promise.resolve(bridge),
+    states,
+    send: (input) => {
+      for (const handler of handlers) handler(input);
+    },
+  };
+}
+
+/** 待たない「間」。**検査で本当に 4 秒待つ理由は無い。** */
+const noPause = (): Promise<void> => Promise.resolve();
+
+const start = (
+  bridge: ReturnType<typeof fakeBridge>,
+  watch: { pauseMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+) =>
+  startRunSession({
+    adapter: stubAdapter({}),
+    sheet: SHEET,
+    sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+    runId: '20260911-190000',
+    operator: { handle: 'octocat' },
+    readScreenText: () => Promise.resolve('保存しました'),
+    startBridge: bridge.start,
+    watch: { sleep: noPause, ...watch },
+  });
+
+async function waitFor(predicate: () => boolean, label: string): Promise<void> {
+  for (let i = 0; i < 400; i += 1) {
+    if (predicate()) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error(`待っても起きなかった: ${label}`);
+}
+
+describe('startRunSession — 鑑賞モード', () => {
+  it('人が押さなくても最後まで走る（置いていないので AUTO_PASS）', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases.map((c) => c.result)).toEqual(['AUTO_PASS', 'AUTO_PASS', 'AUTO_PASS']);
+    // **見ていた人の名前を勝手に置かない。**押していないものは、誰のものでもない。
+    expect(run.cases.map((c) => c.verifiedBy)).toEqual([undefined, undefined, undefined]);
+  });
+
+  /**
+   * **証跡に「押さなくても進む形だった」と書く。**
+   * `assisted`（押すまで待つ）とも `auto`（誰も見ていない）とも混ぜない。
+   */
+  it('証跡のモードは watched', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    expect((await session.done).mode).toBe('watched');
+    await session.close();
+  });
+
+  /** 見ている人が押したら、**その判定になる。** */
+  it('押せば、見ていた人の判定として残る', async () => {
+    const bridge = fakeBridge();
+    // 1 件目だけ、押されるまで進まないようにする。
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let first = true;
+    const session = await start(bridge, {
+      sleep: () => {
+        if (!first) return Promise.resolve();
+        first = false;
+        return held;
+      },
+    });
+
+    await waitFor(() => bridge.states.at(-1)?.awaiting === 1, '1 件目を見せている');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'FAIL' });
+    release();
+
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.result).toBe('FAIL');
+    expect(run.cases[0]?.verifiedBy).toBe('octocat');
+  });
+
+  /** **止められる配慮。**残りは「やっていない」ではなく判断保留として残す。 */
+  it('止めたら、そこで終わる（残りは判断保留）', async () => {
+    const bridge = fakeBridge();
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let first = true;
+    const session = await start(bridge, {
+      sleep: () => {
+        if (!first) return Promise.resolve();
+        first = false;
+        return held;
+      },
+    });
+
+    await waitFor(() => bridge.states.at(-1)?.awaiting === 1, '1 件目を見せている');
+    bridge.send({ kind: 'stop', caseNo: 1 });
+    release();
+
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.result).toBe('AUTO_PASS');
+    // 2 件目から後は走っていない。**通ったことにしない。**
+    expect(run.cases.slice(1).map((c) => c.aiResult)).toEqual(['BLOCKED', 'BLOCKED']);
+    expect(run.cases[1]?.note).toContain('止め');
+  });
+
+  /** **押さなくても進むことを、画面に出し続ける。** */
+  it('鑑賞中であることと、間の長さを画面へ渡す', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge, { pauseMs: 2500 });
+    await session.done;
+    await session.close();
+
+    const watching = bridge.states.filter((s) => s.phase === 'watching');
+    expect(watching.length).toBeGreaterThan(0);
+    expect(watching[0]?.watch).toEqual({ pauseMs: 2500 });
+  });
+});

@@ -477,6 +477,22 @@ function startControl(controlUrl: string): void {
       return;
     }
 
+    /**
+     * **止めるのは判定ではない**（2026-09-11・鑑賞モード）。
+     *
+     * 走っていないケースを見ていても止められる。**止めたいときに止まらない**のが
+     * いちばん困るので、置けるかどうかの検査を通さない。光らせもしない。
+     */
+    if (command.kind === 'stop') {
+      const at = latest?.awaiting ?? cursor;
+      const input = humanInputFor(command, at);
+      if (input === undefined) return;
+      sendHumanInput(controlUrl, input).catch((error: unknown) => {
+        showSessionError(app, error instanceof Error ? error.message : String(error));
+      });
+      return;
+    }
+
     // **見ているケースへ置く。**戻って直しているなら、そのケースが相手になる。
     const caseNo = cursor ?? latest?.awaiting;
     const input = humanInputFor(command, caseNo);

@@ -15,13 +15,14 @@ import type {
   HumanResult,
   HumanVerdict,
   Pointing,
+  RecordingControl,
   Run,
   SheetRef,
   TargetAdapter,
   TargetSession,
   TestSpecSheet,
 } from '@git-qa/core';
-import { parseHumanInput } from '@git-qa/core/session';
+import { WATCH_PAUSE_MS, parseHumanInput, watchPause } from '@git-qa/core/session';
 import type { HumanInput, SessionCase, SessionPhase, SessionState } from '@git-qa/core/session';
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
@@ -73,6 +74,24 @@ export interface StartRunSessionOptions {
   readonly registerPointing?: (
     report: (at: { x: number; y: number; width?: number; height?: number; label?: string }) => void,
   ) => void;
+  /**
+   * **鑑賞モード**（2026-09-11・人の指示）。
+   *
+   * > 人はぼーっとみながら AI のテストを鑑賞します。……途中で止められる配慮も必要です。
+   *
+   * 渡すと、**人が押さなくても 1 件ごとに間をおいて進む。**
+   * 押せばその判定になる。押さなければ `AUTO_PASS`（**繰り上げない**・C1）。
+   */
+  readonly watch?: {
+    readonly pauseMs?: number;
+    /** 間をおく。**検査では差し替える**（本当に 4 秒待つ理由は無い）。 */
+    readonly sleep?: (ms: number) => Promise<void>;
+  };
+  /**
+   * **録るものの差し替え。**渡さなければアダプタのもの（相手のアプリ）を使う。
+   * 鑑賞モードでは **git-qa の窓**を録る（人が見たものが全部入っている）。
+   */
+  readonly recording?: RecordingControl;
   readonly now?: () => Date;
 }
 
@@ -187,6 +206,11 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     })();
   });
 
+  /** 鑑賞モードの「間」。**0 にしない**（0 だと人は何も見られない）。 */
+  const pauseMs = options.watch?.pauseMs ?? WATCH_PAUSE_MS;
+  const sleep =
+    options.watch?.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+
   const publish = (): void => {
     const state: SessionState = {
       runId: options.runId,
@@ -200,6 +224,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       ...(runJsonPath === undefined ? {} : { runJsonPath }),
       ...(saveError === undefined ? {} : { saveError }),
       ...(pointing === undefined ? {} : { pointing }),
+      // **押さなくても進むことを、画面に出し続ける。**
+      ...(options.watch === undefined ? {} : { watch: { pauseMs } }),
       cases: [...cases.values()],
     };
     live.bridge.publish(state);
@@ -237,12 +263,37 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   /** ケース番号ごとの「打鍵待ち」。**宛先の違う打鍵は捨てる。** */
   const waiting = new Map<number, (input: HumanInput | undefined) => void>();
 
+  /**
+   * 途中で終える。**残りは「やっていない」ではなく判断保留として残す。**
+   *
+   * 待っている打鍵を解く —— 解かないと、実行が終わらないまま残る。
+   */
+  const stop = (reason: string): void => {
+    aborted = reason;
+    for (const [no, resolve] of waiting) {
+      waiting.delete(no);
+      resolve(undefined);
+    }
+  };
+
   /** 人が触った分を、**1 つずつ順に**端末へ送るための列。 */
   let humanWork: Promise<void> = Promise.resolve();
 
   live.bridge.onInput((raw) => {
     const input = parseHumanInput(raw);
     if (input === undefined) return;
+
+    /**
+     * **鑑賞を止める**（2026-09-11・人の指示）。
+     *
+     * 見ているだけの人が止められないのは、見ているだけより悪い。
+     * 待っているケース宛かどうかに関わらず受ける —— **止めたいときに止まらない**のが
+     * いちばん困る。
+     */
+    if (input.kind === 'stop') {
+      stop(`人が止めた（${String(input.caseNo)} 件目を見ているとき）`);
+      return;
+    }
 
     if (!waiting.has(input.caseNo)) {
       // 待っているケース宛でないものは、**既に走ったケースへの置き直し**としてだけ受ける。
@@ -333,7 +384,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     const resolve = waiting.get(input.caseNo);
     if (resolve === undefined) return;
     waiting.delete(input.caseNo);
-    countInput(input.caseNo, input.kind);
+    if (input.kind === 'verdict' || input.kind === 'advance') countInput(input.caseNo, input.kind);
     resolve(input);
   });
 
@@ -389,13 +440,25 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   ): Promise<HumanVerdict | undefined> => {
     if (aborted !== undefined) return undefined;
 
-    phase = 'waiting';
+    // **鑑賞モードは「押さなければ進む」。**押すまで止まる普段の形とは逆。
+    phase = options.watch === undefined ? 'waiting' : 'watching';
     awaiting = ctx.subject.no;
     publish();
 
-    const input = await new Promise<HumanInput | undefined>((resolve) => {
+    const waited = new Promise<HumanInput | undefined>((resolve) => {
       waiting.set(ctx.subject.no, resolve);
     });
+
+    let input: HumanInput | undefined;
+    if (options.watch === undefined) {
+      input = await waited;
+    } else {
+      const outcome = await watchPause({ input: waited, pauseMs, sleep });
+      // **間が過ぎたら、待ちを畳む。**残したままだと、次のケースの打鍵を横取りする。
+      waiting.delete(ctx.subject.no);
+      if (outcome.kind === 'placed') input = outcome.input;
+      // `stopped` のときは `onInput` が既に `stop()` を呼んでいる。ここでは置かない。
+    }
 
     awaiting = undefined;
     // tap はここへ来ない（`onInput` で処理して待ち続ける）。**型の上でも判定だけに絞る。**
@@ -419,7 +482,13 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     sheetRef: options.sheetRef,
     session: live.session,
     operator: options.operator,
-    mode: 'assisted',
+    /**
+     * **鑑賞モードは `watched`。**`assisted`（押すまで待つ）でも `auto`（誰も見ていない）
+     * でもない。**人は見ているが、押さなくても進む形**だったことを、そのまま残す。
+     */
+    mode: options.watch === undefined ? 'assisted' : 'watched',
+    // **録るものの差し替え**（鑑賞モードでは git-qa の窓を録る）。
+    ...(options.recording === undefined ? {} : { recording: options.recording }),
     // **ケースごとに画面を 1 枚残す**（2026-09-11）。証跡と同じ所へ置く。
     runsRoot: options.runsRoot ?? fromInvocationDir('runs'),
     // **在れば webp にする。**無ければ撮れた形のまま（前提を増やさない・§12）。
@@ -462,14 +531,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     liveUrl: live.liveUrl,
     controlUrl: live.bridge.controlUrl,
     done,
-    abort(reason: string): void {
-      aborted = reason;
-      // 待っている打鍵を解く。解かないと、実行が終わらないまま残る。
-      for (const [no, resolve] of waiting) {
-        waiting.delete(no);
-        resolve(undefined);
-      }
-    },
+    abort: stop,
     close: () => live.close(),
   };
 }

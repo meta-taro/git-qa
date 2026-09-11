@@ -147,6 +147,9 @@ function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | 
   const target = column(root, VERDICT_COLUMN);
   resetBody(target);
 
+  // **鑑賞中は、いちばん上に出す。**押さなくても進むことと、止める手。
+  target.append(...renderWatching(doc, state));
+
   // 見ているケース。指していなければ、打鍵待ちのケースを見ている。
   const looking = cursor ?? state.awaiting;
   const awaiting = state.cases.find((c) => c.no === looking);
@@ -185,6 +188,37 @@ function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | 
   }
 
   target.append(renderKeyHelp(doc, true));
+}
+
+/**
+ * **鑑賞中の案内**（2026-09-11・人の指示）。
+ *
+ * > 人はぼーっとみながら AI のテストを鑑賞します。……途中で止められる配慮も必要です。
+ *
+ * **押さなくても進むことを、出し続ける。**出ていなければ、人は
+ * 「押さないと進まない」と思って待つ。
+ *
+ * **止める手も、押しボタンで出す。**打鍵だけにしない —— 初めて触る人は Esc を知らない
+ * （判定のボタンを足したときと同じ理由）。
+ */
+function renderWatching(doc: Document, state: SessionState): HTMLElement[] {
+  if (state.phase !== 'watching' || state.watch === undefined) return [];
+
+  const banner = doc.createElement('p');
+  banner.className = 'verdict-watching';
+  banner.textContent = t('verdict.watching', {
+    // 秒で出す。ミリ秒は人が読む単位ではない。
+    seconds: String(Math.round(state.watch.pauseMs / 100) / 10),
+  });
+
+  const stop = doc.createElement('button');
+  stop.type = 'button';
+  stop.className = 'key-action verdict-stop';
+  // **判定のボタンと同じ道を通す**（`installVerdictButtons` が拾う）。
+  stop.dataset['key'] = 'Escape';
+  stop.textContent = `${t('verdict.stop')}（${keyCap('Escape')}）`;
+
+  return [banner, stop];
 }
 
 /**

@@ -45,6 +45,8 @@ export function humanInputFor(
 ): HumanInput | undefined {
   if (caseNo === undefined) return undefined;
   if (command.kind === 'advance') return { kind: 'advance', caseNo };
+  // **止めるのは判定ではない。**まだ走っていないケースを見ていても、止められる。
+  if (command.kind === 'stop') return { kind: 'stop', caseNo };
   if (command.kind === 'verdict') {
     return { kind: 'verdict', caseNo, humanResult: command.humanResult };
   }

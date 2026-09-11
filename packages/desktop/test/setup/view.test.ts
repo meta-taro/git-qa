@@ -414,3 +414,56 @@ describe('最近開いた検証シート', () => {
     expect(root.querySelector<HTMLButtonElement>('.setup-start')?.disabled).toBe(false);
   });
 });
+
+/**
+ * **鑑賞モード**（2026-09-11・人の指示）。
+ *
+ * > auto を git-qa まんま操作するパターンを実装します。……人はぼーっとみながら
+ * > AI のテストを鑑賞します。
+ *
+ * **始める人が選ぶ。**既定は今までどおり（押すまで進まない）。
+ * 押さなくても進むのは、選んだ人が分かっていて選んだときだけにする。
+ */
+/**
+ * **鑑賞モード**（2026-09-11・人の指示）。
+ *
+ * > auto を git-qa まんま操作するパターンを実装します。……人はぼーっとみながら
+ * > AI のテストを鑑賞します。
+ *
+ * **始める人が選ぶ。**既定は今までどおり（押すまで進まない）。
+ * 押さなくても進むのは、選んだ人が分かっていて選んだときだけにする。
+ */
+describe('renderSetup — 鑑賞モード', () => {
+  const choose = (): void => {
+    live().querySelector<HTMLElement>('.setup-device[data-serial="R5CT1234"]')?.click();
+    live().querySelector<HTMLElement>('.setup-sheet[data-path="/repo/docs/b.tsv"]')?.click();
+  };
+
+  it('鑑賞で始めるかを選べる', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
+
+    expect(live().querySelector('input.setup-watch')).not.toBeNull();
+  });
+
+  it('選ばなければ、鑑賞では始めない', () => {
+    const onStart = vi.fn();
+    renderSetup(root, idle, { onStart, operator: 'octocat' });
+
+    choose();
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(onStart.mock.calls[0]?.[0]).not.toHaveProperty('watch');
+  });
+
+  it('選べば、鑑賞で始める', () => {
+    const onStart = vi.fn();
+    renderSetup(root, idle, { onStart, operator: 'octocat' });
+
+    choose();
+    live().querySelector<HTMLInputElement>('input.setup-watch')!.checked = true;
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart.mock.calls[0]?.[0]).toMatchObject({ watch: true });
+  });
+});

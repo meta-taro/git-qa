@@ -170,6 +170,21 @@ body {
   opacity: 0.7;
 }
 
+/*
+ * 鑑賞中の案内（2026-09-11・人の指示）。**押さなくても進む**ことを出し続ける。
+ * 色は決めない（DESIGN.md が空・§11）。**周りとの差は、線と余白だけで付ける。**
+ */
+.verdict-watching {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.verdict-stop {
+  margin: 0 0.75rem 0.75rem;
+}
+
 .key-help {
   display: grid;
   gap: 0.375rem;

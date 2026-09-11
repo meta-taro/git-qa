@@ -23,6 +23,15 @@ export type KeyCommand =
   | { readonly kind: 'verdict'; readonly humanResult: HumanResult }
   /** 置かずに次へ。**繰り上げない**ので結果は `AUTO_PASS` になる。 */
   | { readonly kind: 'advance' }
+  /**
+   * **鑑賞を止める**（2026-09-11・人の指示）。
+   *
+   * > 途中で止められる配慮も必要です。
+   *
+   * 押さなくても進むモードなので、**止める手が要る。**
+   * 判定のキーは奪わない —— 止めるのは判定とは別の行い。
+   */
+  | { readonly kind: 'stop' }
   /** 見ているケースを前後に動かす。**実行の進行とは別のカーソル**（Issue 013）。 */
   | { readonly kind: 'prev' }
   | { readonly kind: 'next' };
@@ -72,6 +81,7 @@ export function commandForKey(press: KeyPress): KeyCommand | undefined {
   const humanResult = VERDICTS[key];
   if (humanResult !== undefined) return { kind: 'verdict', humanResult };
   if (key === ' ') return { kind: 'advance' };
+  if (key === 'Escape') return { kind: 'stop' };
   // 一覧は縦に並んでいるので、左右でも上下でも動かせるようにする。
   if (key === 'ArrowLeft' || key === 'ArrowUp') return { kind: 'prev' };
   if (key === 'ArrowRight' || key === 'ArrowDown') return { kind: 'next' };
@@ -106,6 +116,7 @@ const CAPS: Readonly<Record<string, string>> = {
   ArrowLeft: '←',
   ArrowRight: '→',
   ' ': 'スペース',
+  Escape: 'Esc',
 };
 
 export function keyCap(key: string): string {
