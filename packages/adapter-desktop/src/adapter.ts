@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,6 +20,7 @@ import type {
 import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
 import { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 import type { AxElement } from './ax.js';
+import { exePathScript, fingerprintOf } from './fingerprint.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
@@ -310,6 +311,26 @@ function createSession(deps: SessionDeps): TargetSession {
       // **`screencapture -t jpg` で撮っている**（`window.ts` の `captureArgs`）。
       // png と名乗っていた時期があり、MCP がそれを image/png として渡していた。
       return { format: 'jpg', bytes: shot.bytes, capturedAt: now().toISOString() };
+    },
+
+    /**
+     * **走行中に相手が入れ替わっていないか**（外部レビュー meta-taro/git-qa#3）。
+     *
+     * 窓の持ち主の**実行ファイル**の、場所と大きさと更新時刻を 1 本にする。
+     * 再ビルドされれば、ここが変わる。
+     *
+     * **測れないときは `undefined`。**空文字を返すと「変わっていない」と混ざる。
+     * **完全ではない**（中身だけ差し替わるホットリロードは、実行ファイルを変えない）。
+     */
+    async fingerprint(): Promise<string | undefined> {
+      const target = await recentWindow().catch(() => undefined);
+      if (target === undefined) return undefined;
+
+      const path = (await osa(exePathScript(target.pid)).catch(() => '')).trim();
+      if (path === '' || path === 'missing value') return undefined;
+
+      const info = await stat(path).catch(() => undefined);
+      return info === undefined ? undefined : fingerprintOf(path, info.size, info.mtime);
     },
 
     close(): Promise<void> {

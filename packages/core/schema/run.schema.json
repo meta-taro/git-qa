@@ -122,6 +122,9 @@
         }
       }
     },
+    "targetCheck": {
+      "$ref": "#/$defs/targetCheck"
+    },
     "recording": {
       "description": "録画するかどうかは実行開始時の設定であって、モードには紐づかない。",
       "type": "object",
@@ -486,6 +489,60 @@
             "properties": {
               "state": {
                 "enum": ["failed", "unsupported"]
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "required": ["reason"]
+          }
+        }
+      ]
+    },
+    "targetCheck": {
+      "description": "走行の前後で、検証の相手が変わっていないかを測った結果。シートには sha256 があるのに相手には何も無かった（外部レビュー #3）。**「変わっていない」と「測れなかった」を混ぜない。**",
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": ["same", "changed", "unmeasurable"]
+        },
+        "before": {
+          "description": "走る前に測った指紋。",
+          "type": "string",
+          "minLength": 1
+        },
+        "after": {
+          "description": "走り終えて測った指紋。",
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "description": "測れなかった理由。state が unmeasurable のときに要る。",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": ["same", "changed"]
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "required": ["before", "after"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unmeasurable"
               }
             },
             "required": ["state"]

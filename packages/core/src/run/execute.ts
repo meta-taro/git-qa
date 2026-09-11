@@ -2,6 +2,7 @@ import type { TargetAdapter, TargetSession } from '../adapter/types.js';
 import type { ImageTools } from '../adapter/to-webp.js';
 import { captureCaseShot } from './case-shot.js';
 import { saveRunProgress } from './save-progress.js';
+import { compareFingerprint } from './target-check.js';
 import { resolveCaseResult } from './result.js';
 import type {
   Actor,
@@ -258,6 +259,24 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
   const findings: Finding[] = [];
 
   /** **いまの時点の証跡。**途中経過にも、最後にも、同じ形を使う。 */
+  /**
+   * **相手が走行中に入れ替わっていないかを測る**（外部レビュー meta-taro/git-qa#3）。
+   *
+   * 測れない相手は `undefined`。**測れなかったことを、測った結果に混ぜない。**
+   * 測る途中で投げられても、実行は止めない（証跡のための測りで、検証そのものではない）。
+   */
+  const fingerprint = async (): Promise<string | undefined> => {
+    try {
+      return await session.fingerprint?.();
+    } catch {
+      return undefined;
+    }
+  };
+
+  const before = await fingerprint();
+  // 1 件終わるたびに測り直す。**途中経過の証跡にも、そこまでの結果が入る。**
+  let after = before;
+
   const assemble = (): Run => ({
     schemaVersion: RUN_SCHEMA_VERSION,
     runId: options.runId,
@@ -267,6 +286,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     mode: options.mode,
     sheet: options.sheetRef,
     target: session.target,
+    targetCheck: compareFingerprint(before, after),
     recording: { requested: session.recording.requested },
     cases,
     findings,
@@ -277,6 +297,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     if (borrowed === undefined) await session.liveView.open();
     for (const subject of subjects) {
       cases.push(await runOneCase(subject, session, options, now));
+      after = await fingerprint();
 
       /**
        * **1 件終わるたびに書く**（外部レビュー meta-taro/git-qa#2）。

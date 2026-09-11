@@ -4,6 +4,8 @@
  * ここの union と JSON Schema の enum がずれていないことは、テストで見ている。
  */
 
+import type { TargetCheck } from './target-check.js';
+
 /** この形の版。`run.json` の `schemaVersion` に入る。 */
 export const RUN_SCHEMA_VERSION = 'git-qa/run/v1';
 
@@ -170,6 +172,13 @@ export interface Run {
   mode: RunMode;
   sheet: SheetRef;
   target: Target;
+  /**
+   * **走行中に相手が入れ替わっていないか**（外部レビュー meta-taro/git-qa#3）。
+   *
+   * 測る口を持たない相手では `unmeasurable` になる。**無いことにしない。**
+   * 古い証跡には無いので、任意にしてある。
+   */
+  targetCheck?: TargetCheck;
   /** 録画するかどうかは実行開始時の設定であって、モードには紐づかない（C11）。 */
   recording: { requested: boolean };
   cases: RunCase[];

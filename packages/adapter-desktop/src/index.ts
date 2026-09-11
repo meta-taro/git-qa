@@ -16,3 +16,4 @@ export type { DesktopAdapterOptions } from './adapter.js';
 export { readDesktopScreenText } from './screen-text.js';
 export { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 export { explainToolFailure } from './permission.js';
+export { exePathScript, fingerprintOf } from './fingerprint.js';

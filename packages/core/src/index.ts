@@ -100,3 +100,5 @@ export { saveAsWebp } from './run/shot-webp.js';
 
 // 途中経過の証跡（外部レビュー #2）。
 export { saveRunProgress } from './run/save-progress.js';
+export { compareFingerprint } from './run/target-check.js';
+export type { TargetCheck } from './run/target-check.js';

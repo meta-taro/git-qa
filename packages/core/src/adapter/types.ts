@@ -59,6 +59,21 @@ export interface TargetSession {
   screenSize?(): Promise<{ readonly width: number; readonly height: number }>;
   observe(): Promise<Observation>;
   screenshot(): Promise<Screenshot>;
+  /**
+   * **相手が走行中に入れ替わっていないかを測る指紋**（外部レビュー meta-taro/git-qa#3）。
+   *
+   * シートは同一性を持っているのに、**検証対象は持っていない。**
+   * 前半は旧ビルド、後半は新ビルド、という証跡ができても、
+   * `run.json` を読んだ人には 1 つのビルドに見える。
+   *
+   * **測り方は相手ごとに違う**（実行ファイル / バージョン番号 / URL）ので、
+   * ここは**文字列を 1 本返すだけ**にしてある。同じかどうかは core が決める。
+   *
+   * **任意にしてある。**測る口を持たない相手に空文字を返させると、
+   * 「変わっていない」と「測れなかった」が混ざる。
+   * **持たない相手は、持たないことが読めるほうがよい。**
+   */
+  fingerprint?(): Promise<string | undefined>;
   close(): Promise<void>;
 }
 

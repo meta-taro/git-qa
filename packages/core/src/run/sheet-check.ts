@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import type { TargetCheck } from './target-check.js';
 import type { SheetRef } from './types.js';
 
 /**
@@ -81,6 +82,29 @@ export interface CheckedRun {
   readonly runId: string;
   readonly sheet: SheetRef;
   readonly cases: readonly { readonly no: number; readonly result?: string }[];
+  /** 相手が走行中に入れ替わっていないか。**古い証跡は持っていない。** */
+  readonly targetCheck?: TargetCheck;
+}
+
+/**
+ * 相手が入れ替わっていないかを、報告に 1 行で出す（外部レビュー meta-taro/git-qa#3）。
+ *
+ * **`run.json` に書いてあるだけでは足りない。**読む人が開くのは報告のほう。
+ * **持っていない証跡には、何も足さない**（無いものを「測れなかった」と言い換えない）。
+ */
+function renderTargetCheck(check: TargetCheck | undefined): string[] {
+  if (check === undefined) return [];
+  if (check.state === 'unmeasurable') {
+    return [`検証対象が入れ替わっていないかは、測れていない（${check.reason}）`];
+  }
+  if (check.state === 'same') return ['検証対象は、走っている間ずっと同じ'];
+
+  return [
+    '検証対象が、走っている途中で入れ替わっている',
+    `  走る前: ${check.before}`,
+    `  走った後: ${check.after}`,
+    '  **前半と後半で、別のものを見ている。**どこで入れ替わったかは証跡から読む',
+  ];
 }
 
 /** **人が見て置いたもの。**`AUTO_PASS` と `SKIP` は入らない（人は見ていない）。 */
@@ -105,6 +129,7 @@ export function renderSheetCheck(run: CheckedRun, check: SheetCheck): string {
     `証跡: ${run.runId}`,
     `シート: ${head}`,
     `人が見て置いた判定: ${String(placed)} 件 / 全 ${String(run.cases.length)} 件`,
+    ...renderTargetCheck(run.targetCheck),
     '',
     check.reason,
   ].join('\n');

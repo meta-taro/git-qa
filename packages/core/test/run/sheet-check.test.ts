@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { compareSheet, sheetDigest } from '../../src/run/sheet-check.js';
+import { compareSheet, renderSheetCheck, sheetDigest } from '../../src/run/sheet-check.js';
+import type { CheckedRun, SheetCheck } from '../../src/run/sheet-check.js';
+import type { TargetCheck } from '../../src/run/target-check.js';
 
 /**
  * **証跡が何に対して置かれたのかを、後から確かめる。**
@@ -60,5 +62,56 @@ describe('compareSheet', () => {
 
     expect(result.kind).toBe('unreadable');
     expect(result.reason).toContain('not-a-hash');
+  });
+});
+
+/**
+ * **相手が走行中に入れ替わったことを、報告に出す**（外部レビュー meta-taro/git-qa#3）。
+ *
+ * `run.json` に書いてあっても、**読む人が開くのは報告のほう**。
+ * そこに出ていなければ、「1 つのビルドに見える」は直っていない。
+ */
+describe('renderSheetCheck — 相手が変わったことを出す', () => {
+  const run = (targetCheck?: TargetCheck): CheckedRun => ({
+    runId: '20260911-190000',
+    sheet: { path: 'docs/test-specs/001.tsv', sha256: 'a'.repeat(64) },
+    cases: [{ no: 1, result: 'VERIFIED' }],
+    ...(targetCheck === undefined ? {} : { targetCheck }),
+  });
+
+  const check: SheetCheck = { kind: 'same', reason: 'シートは走らせたときと同じ' };
+
+  it('変わっていたら、そう出す', () => {
+    const text = renderSheetCheck(
+      run({ state: 'changed', before: '/A\t100\tt1', after: '/A\t101\tt2' }),
+      check,
+    );
+
+    expect(text).toContain('検証対象が、走っている途中で入れ替わっている');
+    expect(text).toContain('/A\t100\tt1');
+    expect(text).toContain('/A\t101\tt2');
+  });
+
+  /** **「同じ」も出す。**出ていないと、見ていないのか同じなのかが読めない。 */
+  it('同じままなら、そう出す', () => {
+    expect(renderSheetCheck(run({ state: 'same', before: 'x', after: 'x' }), check)).toContain(
+      '検証対象は、走っている間ずっと同じ',
+    );
+  });
+
+  /** **測れなかったことを「同じ」に混ぜない。** */
+  it('測れていないなら、理由ごと出す', () => {
+    const text = renderSheetCheck(
+      run({ state: 'unmeasurable', reason: '口を持っていない' }),
+      check,
+    );
+
+    expect(text).toContain('検証対象が入れ替わっていないかは、測れていない');
+    expect(text).toContain('口を持っていない');
+  });
+
+  /** 古い証跡には無い。**無いものを「測れなかった」と言い足さない。** */
+  it('持たない証跡には、その行を足さない', () => {
+    expect(renderSheetCheck(run(), check)).not.toContain('検証対象');
   });
 });
