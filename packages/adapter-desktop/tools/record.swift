@@ -11,9 +11,21 @@
 // なので ScreenCaptureKit を使う。macOS 12.3 以降。
 
 import AVFoundation
+import AppKit
 import CoreMedia
 import Foundation
 import ScreenCaptureKit
+
+// **窓サーバへ繋いでから ScreenCaptureKit を触る。**
+//
+// これが無いと、窓の一覧を取ろうとした時点でこう落ちる（2026-09-11 実測）。
+//
+//     Assertion failed: (did_initialize), function CGS_REQUIRE_INIT,
+//     file CGInitialization.c, line 44.
+//
+// **1 枚も撮らずに死ぬので、録画が「対応していない」ように見える。**
+// 端末から叩く道具は、既定では窓サーバへ繋がない。ここで繋ぐ。
+_ = NSApplication.shared
 
 let args = CommandLine.arguments
 guard args.count >= 3, let windowId = UInt32(args[1]) else {
@@ -35,9 +47,24 @@ if FileManager.default.fileExists(atPath: outputPath) {
 final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     private let writer: AVAssetWriter
     private let input: AVAssetWriterInput
+    private let adaptor: AVAssetWriterInputPixelBufferAdaptor
     private var started = false
     private let lock = NSLock()
     private var finished = false
+    private var startedAt = CFAbsoluteTimeGetCurrent()
+
+    /**
+     * **最後に届いた絵。**
+     *
+     * ScreenCaptureKit は「変わっていない」ときにも枠を送ってくるが、
+     * **その枠は絵を持っていない。**動きの無い窓では、4 秒で 61 枠のうち
+     * 絵つきが 1 枚しか無かった（2026-09-11 実測）。
+     *
+     * 絵の無い枠を捨てるだけだと、**止まっている間の時間が動画から消える。**
+     * 判定を置くために人が手を止めている時間は、まさにそこ。
+     * だから**同じ絵をもう 1 枚置いて、時間を繋ぐ。**
+     */
+    private var last: CVPixelBuffer?
 
     init(url: URL, width: Int, height: Int) throws {
         writer = try AVAssetWriter(outputURL: url, fileType: .mov)
@@ -49,6 +76,8 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
                 AVVideoHeightKey: height,
             ])
         input.expectsMediaDataInRealTime = true
+        adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input, sourcePixelBufferAttributes: nil)
         guard writer.canAdd(input) else { throw NSError(domain: "git-qa", code: 1) }
         writer.add(input)
     }
@@ -56,21 +85,31 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     func stream(
         _ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType
     ) {
-        guard type == .screen, buffer.isValid, CMSampleBufferGetImageBuffer(buffer) != nil else {
-            return
-        }
+        guard type == .screen, buffer.isValid else { return }
+
         lock.lock()
         defer { lock.unlock() }
         if finished { return }
 
+        if let image = CMSampleBufferGetImageBuffer(buffer) {
+            last = image
+        }
+        // 絵がまだ 1 枚も来ていないなら、置くものが無い。時計も始めない。
+        guard let image = last else { return }
+
         if !started {
-            writer.startWriting()
-            writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(buffer))
+            guard writer.startWriting() else { return }
+            writer.startSession(atSourceTime: .zero)
+            startedAt = CFAbsoluteTimeGetCurrent()
             started = true
         }
-        if input.isReadyForMoreMediaData {
-            input.append(buffer)
-        }
+        guard input.isReadyForMoreMediaData else { return }
+
+        // **時刻は実時計で測る。**枠の時刻をそのまま使うと、
+        // 絵を持ち回した枠の時刻が前後して、置けない枠が出る。
+        let at = CMTime(
+            seconds: CFAbsoluteTimeGetCurrent() - startedAt, preferredTimescale: 600)
+        adaptor.append(image, withPresentationTime: at)
     }
 
     /// **書き終えてから終わる。**途中で切ると壊れた動画が残る。
@@ -145,11 +184,24 @@ func stop() {
     }
 }
 
+/**
+ * **止めてくれと言われたら、書き終えてから終わる。**
+ *
+ * 見張りは**主線ではない列**に置く。`.main` に置くと 1 度も動かなかった
+ * （2026-09-11 実測。`NSApplication` を作った後の `RunLoop.main.run()` では、
+ * 主列が回らないことがある）。**動かないと、書き終える前に殺される。**
+ * そのときに残るのは、**moov atom を持たない・開けない動画**だった。
+ */
+let watching = DispatchQueue(label: "git-qa.record.signal")
+var sources: [DispatchSourceSignal] = []
 for sig in [SIGINT, SIGTERM] {
-    let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+    let source = DispatchSource.makeSignalSource(signal: sig, queue: watching)
     source.setEventHandler { stop() }
     source.resume()
+    // 見張りへ渡すので、既定の「即死ぬ」ほうは黙らせる。
     signal(sig, SIG_IGN)
+    // **持っておく。**捨てると見張りごと消える。
+    sources.append(source)
 }
 
 DispatchQueue.global().async {

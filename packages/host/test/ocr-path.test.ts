@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { inputCandidates, ocrCandidates } from '../src/ocr-path.js';
+import { inputCandidates, ocrCandidates, recordCandidates } from '../src/ocr-path.js';
 
 /**
  * **2026-09-07 に気づいた。**
@@ -53,6 +53,34 @@ describe('inputCandidates', () => {
 
   it('同じ場所を二度見に行かない', () => {
     const paths = inputCandidates('/x/y');
+
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+/**
+ * 窓を録る道具（`git-qa-record`）を探す。
+ *
+ * **録るのは git-qa の窓**（2026-09-11・人の判断）。
+ * そこには人が見たものが全部入っている —— ライブ映像、いま何を判定しているか、
+ * AI が何と言ったか、矢印がどこを指していたか。
+ */
+describe('recordCandidates', () => {
+  it('配布物の隣を先に見る', () => {
+    expect(recordCandidates('/app/resources')[0]).toBe('/app/resources/git-qa-record');
+  });
+
+  it('手元で建てたときの置き場所も見る', () => {
+    expect(
+      recordCandidates('/repo/packages/host/src').some((p) =>
+        p.endsWith('desktop/src-tauri/resources/git-qa-record'),
+      ),
+    ).toBe(true);
+  });
+
+  /** **同じ場所を 2 回見に行かない。**（配布物では 2 つが同じ所を指す） */
+  it('同じ場所は 1 度だけ', () => {
+    const paths = recordCandidates('/app/resources');
 
     expect(new Set(paths).size).toBe(paths.length);
   });

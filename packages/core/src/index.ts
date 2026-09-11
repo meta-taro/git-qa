@@ -100,5 +100,8 @@ export { saveAsWebp } from './run/shot-webp.js';
 
 // 途中経過の証跡（外部レビュー #2）。
 export { saveRunProgress } from './run/save-progress.js';
+export { webmCommand } from './adapter/to-webm.js';
+export { saveAsWebm } from './run/video-webm.js';
+export type { SaveAsWebmOptions, SavedVideo } from './run/video-webm.js';
 export { compareFingerprint } from './run/target-check.js';
 export type { TargetCheck } from './run/target-check.js';

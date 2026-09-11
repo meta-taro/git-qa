@@ -32,4 +32,5 @@ sheets/*
 # 建てて作る道具（同梱はビルドで行う）。
 packages/desktop/src-tauri/resources/git-qa-ocr
 packages/desktop/src-tauri/resources/git-qa-input
+packages/desktop/src-tauri/resources/git-qa-record
 packages/adapter-desktop/tools/input/target/

@@ -74,3 +74,37 @@ export async function findInput(
   }
   return undefined;
 }
+
+/**
+ * 窓を録る道具（`git-qa-record`）を探す。
+ *
+ * **録るのは相手のアプリではなく、git-qa の窓**（2026-09-11・人の判断）。
+ * そこには**人が見たものが全部入っている** —— ライブ映像、いまどのケースを
+ * 判定していたか、AI が何と言ったか、矢印がどこを指していたか。
+ *
+ * **無くても動く**（録画が `unsupported` になるだけ）。
+ * ScreenCaptureKit を使う **macOS 専用**で、Windows では建てられない。
+ */
+export function recordCandidates(fromDir: string): string[] {
+  const beside = join(fromDir, 'git-qa-record');
+  const inRepo = resolve(fromDir, '..', '..', 'desktop', 'src-tauri', 'resources', 'git-qa-record');
+  return [...new Set([beside, inRepo])];
+}
+
+/** 実際にあるものを 1 つ返す。**無ければ undefined**（録画は `unsupported`）。 */
+export async function findRecord(
+  fromDir = dirname(fileURLToPath(import.meta.url)),
+): Promise<string | undefined> {
+  const fromEnv = process.env['GIT_QA_RECORD'];
+  if (fromEnv !== undefined) return fromEnv;
+
+  for (const path of recordCandidates(fromDir)) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      // ここには無い。次を見る。**無いこと自体は普通**（建てる前・macOS 以外）。
+    }
+  }
+  return undefined;
+}

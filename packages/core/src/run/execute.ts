@@ -1,4 +1,4 @@
-import type { TargetAdapter, TargetSession } from '../adapter/types.js';
+import type { RecordingControl, TargetAdapter, TargetSession } from '../adapter/types.js';
 import type { ImageTools } from '../adapter/to-webp.js';
 import { captureCaseShot } from './case-shot.js';
 import { saveRunProgress } from './save-progress.js';
@@ -92,6 +92,17 @@ export interface ExecuteRunOptions {
    * 前提を増やさないため、**在れば使う**形にしてある。
    */
   imageTools?: ImageTools;
+  /**
+   * **録るものを差し替える**（2026-09-11・人の判断）。
+   *
+   * > 録画ですが、git-qa を最大化して、そのアプリを録画するとどうですか？
+   *
+   * アダプタが持っている録画は**相手のアプリ**を録る。人が見たいのは
+   * **git-qa の窓**（ライブ映像・いま何を判定しているか・AI の言い分・矢印が全部入る）。
+   *
+   * **相手を録る口は消さない。**Android では相手を録るのが正しい。
+   */
+  recording?: RecordingControl;
   /** 途中経過を書けなかったときの理由。**黙らない**ためだけに使う。 */
   onProgressError?: (reason: string) => void;
   /** 時刻の出どころ。既定は実時計。 */
@@ -153,9 +164,9 @@ function assertModeMatchesAskHuman(mode: RunMode, hasAskHuman: boolean): void {
   }
 }
 
-async function stopRecording(session: TargetSession): Promise<CaseRecording> {
+async function stopRecording(recording: RecordingControl): Promise<CaseRecording> {
   try {
-    return await session.recording.stop();
+    return await recording.stop();
   } catch (error: unknown) {
     // 録画の後始末が失敗しても、ケースの合否は落とさない。**黙って握らず、理由を残す。**
     return { state: 'failed', reason: errorMessage(error) };
@@ -181,8 +192,9 @@ async function runOneCase(
   };
 
   const startedAt = now().toISOString();
-  if (session.recording.requested) {
-    await session.recording.start(subject.no);
+  const recorder = options.recording ?? session.recording;
+  if (recorder.requested) {
+    await recorder.start(subject.no);
   }
 
   let verdict: CaseVerdict;
@@ -194,7 +206,7 @@ async function runOneCase(
   }
 
   // 録画はケースの操作までで閉じる。人が考えている時間は動画に入れない。
-  const recording = await stopRecording(session);
+  const recording = await stopRecording(recorder);
 
   /**
    * **判定を置く時点の画面を残す**（2026-09-11）。
@@ -287,7 +299,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     sheet: options.sheetRef,
     target: session.target,
     targetCheck: compareFingerprint(before, after),
-    recording: { requested: session.recording.requested },
+    recording: { requested: (options.recording ?? session.recording).requested },
     cases,
     findings,
   });

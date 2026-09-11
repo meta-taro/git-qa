@@ -15,9 +15,10 @@
     "build": "pnpm bundle:host && tsc --build && vite build",
     "dev": "vite",
     "tauri": "tauri",
-    "bundle:host": "esbuild ../host/src/app-cli.ts --bundle --platform=node --target=node22 --format=esm --outfile=src-tauri/resources/host-bundle.mjs && pnpm bundle:ocr && pnpm bundle:input",
+    "bundle:host": "esbuild ../host/src/app-cli.ts --bundle --platform=node --target=node22 --format=esm --outfile=src-tauri/resources/host-bundle.mjs && pnpm bundle:ocr && pnpm bundle:input && pnpm bundle:record",
     "bundle:ocr": "xcrun swiftc -O ../adapter-desktop/tools/ocr.swift -o src-tauri/resources/git-qa-ocr || echo '[git-qa] OCR を建てられない（段 2 は無しで進む）'",
-    "bundle:input": "cargo build --release --manifest-path ../adapter-desktop/tools/input/Cargo.toml && cp ../adapter-desktop/tools/input/target/release/git-qa-input src-tauri/resources/git-qa-input || echo '[git-qa] 触る道具を建てられない（前面へ出す道で進む）'"
+    "bundle:input": "cargo build --release --manifest-path ../adapter-desktop/tools/input/Cargo.toml && cp ../adapter-desktop/tools/input/target/release/git-qa-input src-tauri/resources/git-qa-input || echo '[git-qa] 触る道具を建てられない（前面へ出す道で進む）'",
+    "bundle:record": "xcrun swiftc -O ../adapter-desktop/tools/record.swift -o src-tauri/resources/git-qa-record || echo '[git-qa] 窓を録る道具を建てられない（録画は unsupported で進む）'"
   },
   "devDependencies": {
     "@git-qa/live-bridge": "workspace:*",
