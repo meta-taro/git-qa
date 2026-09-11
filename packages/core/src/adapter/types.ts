@@ -116,7 +116,7 @@ export interface Screenshot {
    * png と名乗っていた。**MCP はそれを `image/png` として AI へ渡していた。
    * **名乗りと中身を合わせる**（合わないなら、合わない側を直す）。
    */
-  readonly format: 'png' | 'jpg';
+  readonly format: 'png' | 'jpg' | 'webp';
   readonly bytes: Uint8Array;
   readonly capturedAt: string;
 }

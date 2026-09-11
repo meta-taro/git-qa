@@ -1,9 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
 
 import type { Screenshot } from '../adapter/types.js';
+import type { ImageTools } from '../adapter/to-webp.js';
 
 import { caseDir, caseDirName } from './layout.js';
+import { saveAsWebp } from './shot-webp.js';
 import type { CaseScreenshot } from './types.js';
 
 /**
@@ -28,13 +29,14 @@ export interface CaptureCaseShotOptions {
   readonly runsRoot?: string;
   readonly runId: string;
   readonly caseNo: number;
+  /**
+   * webp にする道具の場所。**無ければ、撮れた形のまま置く**（2026-09-11）。
+   * `sips` は webp を書けないので、外の道具が要る。
+   */
+  readonly tools?: ImageTools;
+  /** 外の道具を呼ぶ。**検査では差し替える。** */
+  readonly run?: (command: string, args: readonly string[]) => Promise<void>;
 }
-
-/**
- * 拡張子は**アダプタが名乗った形**から作る。
- * いまは `png` しか無いが、**決め打ちにすると増えたときに黙って嘘になる。**
- */
-const extensionOf = (format: string): string => format;
 
 export async function captureCaseShot(options: CaptureCaseShotOptions): Promise<CaseScreenshot> {
   const { session, runsRoot, runId, caseNo } = options;
@@ -51,11 +53,17 @@ export async function captureCaseShot(options: CaptureCaseShotOptions): Promise<
     const dir = caseDir(runsRoot, runId, caseNo);
     await mkdir(dir, { recursive: true });
 
-    const name = `screen.${extensionOf(shot.format)}`;
-    await writeFile(join(dir, name), shot.bytes);
+    // **できれば webp、できなければ撮れた形のまま。**名前と中身は必ず一致する。
+    const saved = await saveAsWebp({
+      dir,
+      bytes: shot.bytes,
+      format: shot.format,
+      tools: options.tools ?? {},
+      run: options.run ?? runTool,
+    });
 
     // 証跡フォルダからの相対で残す。**読む人が動かしても辿れる。**
-    return { state: 'saved', file: `${caseDirName(caseNo)}/${name}` };
+    return { state: 'saved', file: `${caseDirName(caseNo)}/${saved.name}` };
   } catch (error: unknown) {
     // 握り潰さない。撮れなかったことと、撮らなかったことは別。
     return {
@@ -63,4 +71,11 @@ export async function captureCaseShot(options: CaptureCaseShotOptions): Promise<
       reason: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+/** 外の道具を 1 つ呼ぶ。**出た文字はそのまま理由に載せる。** */
+async function runTool(command: string, args: readonly string[]): Promise<void> {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  await promisify(execFile)(command, [...args]);
 }

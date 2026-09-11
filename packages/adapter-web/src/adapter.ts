@@ -268,13 +268,17 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async screenshot(): Promise<Screenshot> {
       ensureOpen();
-      const result = await cdp.send('Page.captureScreenshot', { format: 'png' });
+      /**
+       * **webp で受け取る**（2026-09-11）。CDP がそのまま出せるので、
+       * 変換の道具が要らない。**証跡はケースごとに積むので、小ささが効く。**
+       */
+      const result = await cdp.send('Page.captureScreenshot', { format: 'webp' });
       const data = result['data'];
       if (typeof data !== 'string' || data === '') {
         throw new AdapterError(KIND, 'ブラウザの画面を撮れなかった（空が返った）');
       }
       return {
-        format: 'png',
+        format: 'webp',
         bytes: new Uint8Array(Buffer.from(data, 'base64')),
         capturedAt: now().toISOString(),
       };

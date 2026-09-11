@@ -79,12 +79,16 @@
 ```
 runs/<日時>/
   run.json              判定・手順・時刻
-  case-001/screen.png   **判定を置く時点の画面**（ケースごと）
+  case-001/screen.webp  **判定を置く時点の画面**（ケースごと）
   case-001/screen.mp4   録画（いまは Android のみ）
 ```
 
 **画面は、人へ渡す前に撮る。**人が考えている間に画面が動くと、
 「人が見たもの」と「残った絵」がずれるため。
+
+**形は webp。**ウェブはブラウザがそのまま出す。デスクトップと Android は
+`cwebp` か `ffmpeg` が**在れば**変換し、**無ければ撮れた形のまま置く**
+（`screen.jpg` / `screen.png`）。**名前と中身は必ず一致する。**
 
 **無いときは理由が残る。**`screenshot.state` が
 `saved` / `not_requested` / `failed` / `unsupported` のどれかになる。**黙って空にしない。**

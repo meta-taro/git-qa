@@ -16,7 +16,7 @@ export interface Point {
 }
 
 export interface Screenshot {
-  readonly mimeType: 'image/png' | 'image/jpeg';
+  readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
   readonly base64: string;
 }
 

@@ -1,4 +1,5 @@
 import type { TargetAdapter, TargetSession } from '../adapter/types.js';
+import type { ImageTools } from '../adapter/to-webp.js';
 import { captureCaseShot } from './case-shot.js';
 import { resolveCaseResult } from './result.js';
 import type {
@@ -84,6 +85,11 @@ export interface ExecuteRunOptions {
    * 渡さなければ撮らない（`screenshot.state` が `not_requested` になる）。
    */
   runsRoot?: string;
+  /**
+   * 絵を webp にする道具の場所。**無ければ、撮れた形のまま置く**（2026-09-11）。
+   * 前提を増やさないため、**在れば使う**形にしてある。
+   */
+  imageTools?: ImageTools;
   /** 時刻の出どころ。既定は実時計。 */
   now?: () => Date;
 }
@@ -195,6 +201,7 @@ async function runOneCase(
   const screenshot = await captureCaseShot({
     session,
     ...(options.runsRoot === undefined ? {} : { runsRoot: options.runsRoot }),
+    ...(options.imageTools === undefined ? {} : { tools: options.imageTools }),
     runId: options.runId,
     caseNo: subject.no,
   });

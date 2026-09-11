@@ -93,3 +93,7 @@ export type { CaptureCaseShotOptions } from './run/case-shot.js';
 
 // 撮った絵の名乗りと中身を結ぶ（2026-09-11）。
 export { mimeTypeOf } from './adapter/shot-format.js';
+
+export { webpCommand } from './adapter/to-webp.js';
+export type { ImageTools, ToolCommand } from './adapter/to-webp.js';
+export { saveAsWebp } from './run/shot-webp.js';

@@ -26,6 +26,7 @@ import type { HumanInput, SessionCase, SessionPhase, SessionState } from '@git-q
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
 import { startLiveSession } from './live-session.js';
+import { imageTools } from './image-tools.js';
 import { fromInvocationDir } from './paths.js';
 
 /**
@@ -421,6 +422,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     mode: 'assisted',
     // **ケースごとに画面を 1 枚残す**（2026-09-11）。証跡と同じ所へ置く。
     runsRoot: options.runsRoot ?? fromInvocationDir('runs'),
+    // **在れば webp にする。**無ければ撮れた形のまま（前提を増やさない・§12）。
+    imageTools: imageTools(),
     runCase,
     askHuman,
     ...(options.now === undefined ? {} : { now: options.now }),

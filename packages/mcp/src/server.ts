@@ -20,7 +20,7 @@ export interface McpServerOptions {
   readonly captureWindow?: (
     app: string,
     mode?: 'window' | 'screen',
-  ) => Promise<{ mimeType: 'image/png'; base64: string }>;
+  ) => Promise<{ mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; base64: string }>;
   /**
    * この道具の説明を組み立てて返す（`about`）。
    * **文書を読むのは呼び側**。ここはファイルの場所を知らない。

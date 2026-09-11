@@ -7,6 +7,10 @@ import type { Screenshot } from './types.js';
  * 名乗りながら JPEG を返していて、MCP がそれを `image/png` として
  * AI エージェントへ渡していた。**名乗りと中身を、1 か所で結ぶ。**
  */
-export function mimeTypeOf(format: Screenshot['format']): 'image/png' | 'image/jpeg' {
-  return format === 'jpg' ? 'image/jpeg' : 'image/png';
+export function mimeTypeOf(
+  format: Screenshot['format'],
+): 'image/png' | 'image/jpeg' | 'image/webp' {
+  if (format === 'jpg') return 'image/jpeg';
+  if (format === 'webp') return 'image/webp';
+  return 'image/png';
 }
