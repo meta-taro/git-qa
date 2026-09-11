@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { describeAdapterContract } from '@git-qa/core/testing';
@@ -396,7 +398,8 @@ describe('録画', () => {
     const result = await session.recording.stop();
     expect(result).toEqual({
       state: 'recorded',
-      file: 'runs/20260902-000000/case-003/screen.mp4',
+      // **区切りは OS が決める。**ここで `/` を直書きすると Windows で落ちる（2026-09-11）。
+      file: join('runs', '20260902-000000', 'case-003', 'screen.mp4'),
       durationMs: 5000,
     });
     expect(runner.started.at(-1)?.some((a) => a.startsWith('--record='))).toBe(true);

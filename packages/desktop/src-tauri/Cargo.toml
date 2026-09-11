@@ -1,6 +1,6 @@
 [package]
 name = "git-qa-desktop"
-version = "0.0.0"
+version = "0.1.0"
 description = "git-qa のデスクトップ画面（Tauri シェル）"
 license = "MIT"
 repository = "https://github.com/meta-taro/git-qa"

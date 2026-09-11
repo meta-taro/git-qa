@@ -1,9 +1,18 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { fromInvocationDir, runsDir } from '../src/paths.js';
+
+/**
+ * その OS での、その場所。
+ *
+ * **区切りも根も OS が決める。**`/repo/docs/a.tsv` と直書きすると、Windows では
+ * `D:\repo\docs\a.tsv` が返って落ちる（2026-09-11・Windows 版を初めて建てて分かった）。
+ * 見たいのは**どこを指すか**であって、区切りが `/` か `\` かではない。
+ */
+const at = (path: string): string => resolve(path);
 
 /**
  * `pnpm --filter @git-qa/host exec ...` は**作業ディレクトリをパッケージへ移す。**
@@ -13,19 +22,21 @@ import { fromInvocationDir, runsDir } from '../src/paths.js';
 
 describe('fromInvocationDir', () => {
   it('人が打った場所（INIT_CWD）を基準に解決する', () => {
-    expect(fromInvocationDir('docs/a.tsv', { INIT_CWD: '/repo' }, '/repo/packages/host')).toBe(
-      '/repo/docs/a.tsv',
-    );
+    expect(
+      fromInvocationDir('docs/a.tsv', { INIT_CWD: at('/repo') }, at('/repo/packages/host')),
+    ).toBe(at('/repo/docs/a.tsv'));
   });
 
   it('INIT_CWD が無ければ、いまの作業ディレクトリを基準にする', () => {
-    expect(fromInvocationDir('a.tsv', {}, '/repo/packages/host')).toBe('/repo/packages/host/a.tsv');
+    expect(fromInvocationDir('a.tsv', {}, at('/repo/packages/host'))).toBe(
+      at('/repo/packages/host/a.tsv'),
+    );
   });
 
   it('絶対パスはそのまま', () => {
-    expect(fromInvocationDir('/tmp/a.tsv', { INIT_CWD: '/repo' }, '/repo/packages/host')).toBe(
-      '/tmp/a.tsv',
-    );
+    expect(
+      fromInvocationDir(at('/tmp/a.tsv'), { INIT_CWD: at('/repo') }, at('/repo/packages/host')),
+    ).toBe(at('/tmp/a.tsv'));
   });
 });
 
@@ -40,7 +51,7 @@ describe('fromInvocationDir', () => {
  */
 describe('証跡の置き場', () => {
   it('打った場所が普通のディレクトリなら、その下に置く', () => {
-    expect(runsDir('runs', { INIT_CWD: '/home/me/project' })).toBe('/home/me/project/runs');
+    expect(runsDir('runs', { INIT_CWD: at('/home/me/project') })).toBe(at('/home/me/project/runs'));
   });
 
   it('作業ディレクトリが / なら、書類フォルダの下へ逃がす', () => {

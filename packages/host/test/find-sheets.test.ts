@@ -3,6 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+/**
+ * 見つけた場所を、探し始めた所からの相対で読む。
+ *
+ * **区切りを直書きしない。**`/docs/a.tsv` と書くと Windows で落ちる（2026-09-11・実測）。
+ * 見たいのは**どこを見つけたか**であって、区切りが `/` か `\` かではない。
+ */
+const under =
+  (root: string) =>
+  (path: string): string =>
+    path.slice(root.length + 1);
+
 import {
   findSheets,
   keepRunnableSheets,
@@ -39,7 +50,7 @@ describe('findSheets', () => {
 
     const found = await findSheets(root);
 
-    expect(found.map((p) => p.replace(root, ''))).toEqual(['/docs/a.tsv', '/docs/deep/b.tsv']);
+    expect(found.map(under(root))).toEqual([join('docs', 'a.tsv'), join('docs', 'deep', 'b.tsv')]);
   });
 
   it('TSV 以外は拾わない', async () => {
@@ -64,7 +75,7 @@ describe('findSheets', () => {
 
     const found = await findSheets(root, { maxDepth: 3 });
 
-    expect(found.map((p) => p.replace(root, ''))).toEqual(['/a/shallow.tsv']);
+    expect(found.map(under(root))).toEqual([join('a', 'shallow.tsv')]);
   });
 
   it('読めない場所でも落ちない（空を返す）', async () => {

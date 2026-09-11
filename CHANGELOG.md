@@ -8,6 +8,13 @@
 
 ## 未リリース
 
+- 足した: **配布ページ**（GitHub Pages・`site/`）。版と落とす先は**ページの JS が Releases から
+  読む** —— 埋め込むと、タグを打つたびにページを直す作業が増え、**忘れた分だけ古い物を配る**
+- 直した: **Windows では `pnpm verify` が 12 件落ちていた。**検査が `/docs/a.tsv` のように
+  POSIX の区切りを直書きしていたため（実装は `path.join` で正しかった）。
+  **Windows 版を初めて建てて分かった。**見たいのは「どこを指すか」であって、
+  区切りが `/` か `\` かではない
+- 変えた: 版を **0.1.0** にした（それまで `0.0.0`）。アルファ版として配り始めるため
 - 直した: **Windows 版は、押した瞬間に落ちる状態だった。**`tauri.conf.json` が
   macOS 専用の道具 3 つ（Vision / CoreGraphics / ScreenCaptureKit）を**無条件で参照**
   していたので、**建つ前に `pnpm check:assets` で止まる。**`tauri.macos.conf.json` へ分けた

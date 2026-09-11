@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { join } from 'node:path';
+
 import { inputCandidates, ocrCandidates, recordCandidates } from '../src/ocr-path.js';
+
+/**
+ * **区切りは OS が決める。**`/app/resources/git-qa-ocr` と直書きすると Windows で落ちる
+ * （2026-09-11・Windows 版を初めて建てて分かった）。
+ * 見たいのは**どの名前をどの順で探すか**であって、区切りが `/` か `\` かではない。
+ */
+const AT = '/app/resources';
 
 /**
  * **2026-09-07 に気づいた。**
@@ -12,17 +21,19 @@ import { inputCandidates, ocrCandidates, recordCandidates } from '../src/ocr-pat
  */
 describe('ocrCandidates', () => {
   it('配布物の隣を先に見る（そこに同梱してある）', () => {
-    const [first] = ocrCandidates('/app/resources');
+    const [first] = ocrCandidates(AT);
 
-    expect(first).toBe('/app/resources/git-qa-ocr');
+    expect(first).toBe(join(AT, 'git-qa-ocr'));
   });
 
   it('手元で動かしたときの置き場所も見る', () => {
     const paths = ocrCandidates('/repo/packages/host/src');
 
-    expect(paths.some((p) => p.endsWith('packages/desktop/src-tauri/resources/git-qa-ocr'))).toBe(
-      true,
-    );
+    expect(
+      paths.some((p) =>
+        p.endsWith(join('packages', 'desktop', 'src-tauri', 'resources', 'git-qa-ocr')),
+      ),
+    ).toBe(true);
   });
 
   it('同じ場所を二度見に行かない', () => {
@@ -40,14 +51,16 @@ describe('ocrCandidates', () => {
  */
 describe('inputCandidates', () => {
   it('配布物の隣を先に見る', () => {
-    expect(inputCandidates('/app/resources')[0]).toBe('/app/resources/git-qa-input');
+    expect(inputCandidates(AT)[0]).toBe(join(AT, 'git-qa-input'));
   });
 
   it('手元で建てたときの置き場所も見る', () => {
     const paths = inputCandidates('/repo/packages/host/src');
 
     expect(
-      paths.some((p) => p.endsWith('adapter-desktop/tools/input/target/release/git-qa-input')),
+      paths.some((p) =>
+        p.endsWith(join('adapter-desktop', 'tools', 'input', 'target', 'release', 'git-qa-input')),
+      ),
     ).toBe(true);
   });
 
@@ -67,20 +80,20 @@ describe('inputCandidates', () => {
  */
 describe('recordCandidates', () => {
   it('配布物の隣を先に見る', () => {
-    expect(recordCandidates('/app/resources')[0]).toBe('/app/resources/git-qa-record');
+    expect(recordCandidates(AT)[0]).toBe(join(AT, 'git-qa-record'));
   });
 
   it('手元で建てたときの置き場所も見る', () => {
     expect(
       recordCandidates('/repo/packages/host/src').some((p) =>
-        p.endsWith('desktop/src-tauri/resources/git-qa-record'),
+        p.endsWith(join('desktop', 'src-tauri', 'resources', 'git-qa-record')),
       ),
     ).toBe(true);
   });
 
   /** **同じ場所を 2 回見に行かない。**（配布物では 2 つが同じ所を指す） */
   it('同じ場所は 1 度だけ', () => {
-    const paths = recordCandidates('/app/resources');
+    const paths = recordCandidates(AT);
 
     expect(new Set(paths).size).toBe(paths.length);
   });

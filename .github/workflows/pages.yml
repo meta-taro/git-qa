@@ -1,0 +1,62 @@
+name: pages
+
+# **配布ページ（`site/`）を GitHub Pages へ出す。**
+#
+# 「アルファ版として DL ページを置く」（オーナー・2026-09-11）。
+# 内々の試験導入から始めるので、**署名はまだ無い。**そのことはページに書いてある。
+#
+# **版と落とす先は、ページの JS が Releases から読む。**ここで埋め込まない ——
+# 埋め込むと、タグを打つたびにページを直す作業が増え、**忘れた分だけ古い物を配る。**
+#
+# 使う action は `actions/*`（GitHub 自身のもの）だけにする。
+# Pages は専用の口（`upload-pages-artifact` / `deploy-pages`）でしか出せないので、
+# **ここだけは足す**（product-baseline §12 —— 足す理由を書く）。
+#
+# ## 人の作業が 1 回だけ要る
+#
+# Settings → Pages → Source を **GitHub Actions** にすること。
+# そこまでは、この workflow が走っても配られない。
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  # タグを打った後に手で出せるようにしておく（配布物の名前が変わったときの確認用）。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 走っている途中のものは止めてよい（配るのは常に最新の 1 つ）。
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # **アイコンはここで写す。**`site/` に置いたものが古くならないように、
+      # 配るたびにアプリの実物から取り直す（DESIGN.md の「別の物？と思わせない」）。
+      - name: アイコンを写す
+        run: |
+          cp packages/desktop/src-tauri/icons/128x128@2x.png site/icon.png
+          ls -l site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
