@@ -30,7 +30,14 @@ export interface AdapterCapabilities {
    * ブラウザはそのまま入る（`'any'`）。
    * **省略できる形にしない。**既定を置くと、送れないのに送ったことになる相手が混ざる。
    */
-  readonly textInput: 'ascii-only' | 'any';
+  /**
+   * 文字を送れるか。
+   *
+   * `'none'` は**送る口を持たない**（2026-09-12・Windows のデスクトップ検証）。
+   * **`ascii-only` と名乗らせない** —— 送れないものを送ろうとして、実行時に落ちる。
+   * 持たないと言えば、**planning の段で「人が入力する」に倒せる。**
+   */
+  readonly textInput: 'none' | 'ascii-only' | 'any';
   /**
    * 行き先（`# 対象:`）の書き方。**相手によって違うので、アダプタが名乗る。**
    *

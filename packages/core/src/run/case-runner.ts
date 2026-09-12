@@ -32,7 +32,7 @@ export interface SheetCaseRunnerOptions {
    * 文字をそのまま送れるか。**アダプタが名乗ったものをそのまま渡す**
    * （`AdapterCapabilities.textInput`）。ここで推し量らない。
    */
-  readonly textInput?: 'ascii-only' | 'any';
+  readonly textInput?: 'none' | 'ascii-only' | 'any';
   /** 行き先の書き方。**アダプタが名乗ったものをそのまま渡す。** */
   readonly appId?: 'package-or-url' | 'name';
   readonly stepsColumn?: string;

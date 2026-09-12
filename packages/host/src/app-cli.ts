@@ -4,7 +4,12 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
+import {
+  createDesktopAdapter,
+  createWindowsDesktopAdapter,
+  readDesktopScreenText,
+  whyNoDesktop,
+} from '@git-qa/adapter-desktop';
 
 import {
   createFirefoxAdapter,
@@ -32,7 +37,7 @@ import type { Run } from '@git-qa/core';
 import { tauriDevArgs } from './app.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
-import { findInput, findOcr } from './ocr-path.js';
+import { findInput, findOcr, findWinTool } from './ocr-path.js';
 import { findUnfinishedRuns, readRun } from './resume.js';
 import { startRunSession } from './run-session.js';
 import { gitQaWindowRecording } from './window-recording.js';
@@ -73,6 +78,28 @@ const runIdFrom = (at: Date): string => {
   const pad = (n: number): string => String(n).padStart(2, '0');
   const date = `${String(at.getFullYear())}${pad(at.getMonth() + 1)}${pad(at.getDate())}`;
   return `${date}-${pad(at.getHours())}${pad(at.getMinutes())}${pad(at.getSeconds())}`;
+};
+
+const winToolPath = await findWinTool();
+
+/** デスクトップアプリを見るアダプタ。**OS ごとに別のもの。** */
+const desktopAdapterFor = (app: string) => {
+  const why = whyNoDesktop(process.platform, winToolPath);
+  if (why !== undefined) throw new Error(why);
+
+  const build = { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' };
+  if (process.platform === 'win32') {
+    // `whyNoDesktop` が通っているので、道具は在る。
+    return createWindowsDesktopAdapter({ app, build, toolPath: winToolPath as string });
+  }
+  return createDesktopAdapter({
+    app,
+    build,
+    // **同梱の OCR を既定で使う**（段 2・C55）。無ければ段 1 だけで動く。
+    ...(ocrPath === undefined ? {} : { ocrPath }),
+    // **前面に出さずに押す道具**（C57 追記）。無ければ前面へ出す道へ落ちる。
+    ...(inputPath === undefined ? {} : { inputPath }),
+  });
 };
 
 const workingDir = fromInvocationDir('.');
@@ -119,6 +146,13 @@ const setup = await startSetupServer({
       SHEET_LIMIT,
     ),
 
+  /**
+   * **OS でデスクトップの見方を振り分ける**（2026-09-12）。
+   *
+   * macOS と Windows は別のソース（2026-09-07 の人の指定）。
+   * **持っていない OS では、持っていないと言う** —— 「映らない」と
+   * 「そもそも見られない」は、人にとってまるで別のこと。
+   */
   start: async ({ serial, sheetPath, operator, browser, browserPath, watch, resume }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
@@ -195,14 +229,7 @@ const setup = await startSetupServer({
     session = await startRunSession({
       adapter:
         app !== undefined
-          ? createDesktopAdapter({
-              app,
-              build: { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-              // **同梱の OCR を既定で使う**（段 2・C55）。無ければ段 1 だけで動く。
-              ...(ocrPath === undefined ? {} : { ocrPath }),
-              // **前面に出さずに押す道具**（C57 追記）。無ければ前面へ出す道へ落ちる。
-              ...(inputPath === undefined ? {} : { inputPath }),
-            })
+          ? desktopAdapterFor(app)
           : web && url !== undefined && browser === 'firefox'
             ? createFirefoxAdapter({
                 build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },

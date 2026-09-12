@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { join } from 'node:path';
 
-import { inputCandidates, ocrCandidates, recordCandidates } from '../src/ocr-path.js';
+import {
+  inputCandidates,
+  ocrCandidates,
+  recordCandidates,
+  winToolCandidates,
+} from '../src/ocr-path.js';
 
 /**
  * **区切りは OS が決める。**`/app/resources/git-qa-ocr` と直書きすると Windows で落ちる
@@ -94,6 +99,33 @@ describe('recordCandidates', () => {
   /** **同じ場所を 2 回見に行かない。**（配布物では 2 つが同じ所を指す） */
   it('同じ場所は 1 度だけ', () => {
     const paths = recordCandidates(AT);
+
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+/**
+ * Windows で窓を見る道具（`git-qa-win.exe`）を探す（2026-09-12）。
+ *
+ * macOS 側の 3 本に当たるものが、Windows ではこれ 1 本。
+ * **無ければデスクトップ検証が丸ごとできない**ので、`git-qa-ocr` のような
+ * 「あると良い」ではなく「**無いと何もできない**」。
+ */
+describe('winToolCandidates', () => {
+  it('配布物の隣を先に見る', () => {
+    expect(winToolCandidates(AT)[0]).toBe(join(AT, 'git-qa-win.exe'));
+  });
+
+  it('手元で建てたときの置き場所も見る', () => {
+    expect(
+      winToolCandidates('/repo/packages/host/src').some((p) =>
+        p.endsWith(join('adapter-desktop', 'tools', 'win', 'target', 'release', 'git-qa-win.exe')),
+      ),
+    ).toBe(true);
+  });
+
+  it('同じ場所は 1 度だけ', () => {
+    const paths = winToolCandidates(AT);
 
     expect(new Set(paths).size).toBe(paths.length);
   });

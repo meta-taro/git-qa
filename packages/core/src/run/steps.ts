@@ -38,7 +38,7 @@ export interface PlanOptions {
    * Android の `input text` は IME を通らないので ASCII しか送れない（既定）。
    * ブラウザはそのまま入るので `'any'`。**Android の事情を全部の相手に押し付けない。**
    */
-  readonly textInput?: 'ascii-only' | 'any';
+  readonly textInput?: 'none' | 'ascii-only' | 'any';
   /**
    * 行き先の書き方。
    *
@@ -101,8 +101,16 @@ const ASCII_ONLY = /^[\x20-\x7e]*$/;
 function planType(
   text: string,
   target: string | undefined,
-  textInput: 'ascii-only' | 'any',
+  textInput: 'none' | 'ascii-only' | 'any',
 ): PlannedStep {
+  // **送る口を持たない相手。**送ろうとして実行時に落ちるより、人へ回すほうがよい。
+  if (textInput === 'none') {
+    return {
+      kind: 'hold',
+      text: target === undefined ? `「${text}」と入力する` : `${target}に「${text}」と入力する`,
+      reason: `この相手には文字を送れない。人が入力する必要がある`,
+    };
+  }
   if (textInput === 'ascii-only' && !ASCII_ONLY.test(text)) {
     // 黙って化けた文字を打つより、送れないと言うほうがよい（adapter-android と同じ判断）。
     return {
@@ -179,7 +187,7 @@ function planLaunch(
 function planOneStep(
   text: string,
   app: string | undefined,
-  textInput: 'ascii-only' | 'any',
+  textInput: 'none' | 'ascii-only' | 'any',
   appId: 'package-or-url' | 'name',
 ): PlannedStep {
   const into = TYPE_INTO.exec(text);

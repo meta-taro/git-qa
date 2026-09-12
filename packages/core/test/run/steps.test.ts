@@ -347,3 +347,26 @@ describe('ドラッグ（Issue 015）', () => {
     expect(planSteps('「A」を「B」へドラッグ＆ドロップする')[0]?.kind).toBe('action');
   });
 });
+
+/**
+ * **文字を送る口を持たない相手**（2026-09-12・Windows のデスクトップ検証）。
+ *
+ * Windows 版はまだ文字を送れない（UI Automation の `Invoke` しか実装していない）。
+ * `ascii-only` と名乗らせると、**送れないものを送ろうとして実行時に落ちる。**
+ * **planning の段で「人が入力する」に倒す**ほうが、証跡として正しい。
+ */
+describe('planType — 文字を送れない相手', () => {
+  it('送れないなら、人に回す', () => {
+    const planned = planSteps('1. 検索欄に「dbboard」と入力する', { textInput: 'none' });
+
+    expect(planned[0]?.kind).toBe('hold');
+    expect(planned[0]?.kind === 'hold' && planned[0].reason).toContain('人');
+  });
+
+  /** 送れる相手は、今までどおり。 */
+  it('送れる相手は、今までどおり打つ', () => {
+    const planned = planSteps('1. 検索欄に「dbboard」と入力する', { textInput: 'any' });
+
+    expect(planned[0]?.kind).toBe('action');
+  });
+});

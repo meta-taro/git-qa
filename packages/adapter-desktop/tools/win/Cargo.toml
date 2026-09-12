@@ -1,0 +1,27 @@
+[package]
+name = "git-qa-win"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# **依存は 2 つだけ。**`windows` は OS の口、`image` は PNG を書くため。
+# 増やすほど、受け取る側が確かめるものが増える（product-baseline §12）。
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[dependencies.windows]
+version = "0.58"
+features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_Xps",
+  "Win32_System_Com",
+  "Win32_System_Threading",
+  "Win32_UI_Accessibility",
+  "Win32_UI_WindowsAndMessaging",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true

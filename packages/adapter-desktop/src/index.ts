@@ -17,3 +17,8 @@ export { readDesktopScreenText } from './screen-text.js';
 export { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 export { explainToolFailure } from './permission.js';
 export { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
+export { createWindowsDesktopAdapter } from './win/adapter.js';
+export type { WindowsDesktopAdapterOptions } from './win/adapter.js';
+export { parseWinWindows, winArgs } from './win/tool.js';
+export type { WinWindow } from './win/tool.js';
+export { whyNoDesktop } from './win/pick.js';

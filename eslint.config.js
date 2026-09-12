@@ -45,7 +45,8 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    files: ['spikes/**/*.mjs'],
+    // 建てる手順に使う小さな script（Node で走る）。
+    files: ['spikes/**/*.mjs', 'packages/*/scripts/**/*.mjs'],
     languageOptions: {
       globals: { console: 'readonly', URL: 'readonly', process: 'readonly' },
     },

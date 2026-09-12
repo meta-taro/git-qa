@@ -34,3 +34,5 @@ packages/desktop/src-tauri/resources/git-qa-ocr
 packages/desktop/src-tauri/resources/git-qa-input
 packages/desktop/src-tauri/resources/git-qa-record
 packages/adapter-desktop/tools/input/target/
+packages/desktop/src-tauri/resources/git-qa-win.exe
+packages/adapter-desktop/tools/win/target/
