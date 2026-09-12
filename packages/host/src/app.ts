@@ -68,7 +68,24 @@ export function desktopLaunch(
 ): DesktopLaunch {
   // `packages/host/src` から見た画面のパッケージ。**`git-qa-ocr` を探す道と同じ数え方。**
   const cwd = resolve(fromDir, '..', '..', 'desktop');
-  const cli = createRequire(join(cwd, 'package.json')).resolve('@tauri-apps/cli/tauri.js');
+
+  let cli: string;
+  try {
+    cli = createRequire(join(cwd, 'package.json')).resolve('@tauri-apps/cli/tauri.js');
+  } catch {
+    // **ここは手元で走らせるときの道。**配布物（`.app` / `.exe`）の中では、画面は
+    // Tauri 側が既に出しており、実行器は `--serve` で呼ばれてこの道を通らない。
+    // 通ったなら、**前提が変わっている。**積み上がったスタックではなく、そう言う。
+    //
+    // **この断りは検査していない。**vitest は Vite の解決を通すので、
+    // でたらめなパスを渡しても `@tauri-apps/cli` が手元から解決されてしまい、
+    // **正しい理由で落ちるテストが書けない**（2026-09-12 に確かめた）。
+    throw new Error(
+      `画面（Tauri）の CLI が見つからない: ${cwd}。` +
+        '手元で走らせているなら `pnpm install` を、配布物から出ているなら ' +
+        '`--serve` で呼ばれていないこと自体がおかしい（画面は既に出ているはず）',
+    );
+  }
 
   return { command: process.execPath, args: [cli, ...args], cwd };
 }

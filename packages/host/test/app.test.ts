@@ -181,4 +181,19 @@ describe('desktopLaunch', () => {
   it('画面のパッケージで走らせる', () => {
     expect(desktopLaunch(['dev']).cwd).toMatch(/desktop$/);
   });
+
+  /**
+   * **「画面の CLI が見つからない」側は、ここでは検査できない**（2026-09-12・実測）。
+   *
+   * vitest は Vite の解決を通すので、**でたらめなパスを渡しても**
+   * `@tauri-apps/cli` が手元の node_modules から解決されてしまう。
+   *
+   * ```text
+   * desktopLaunch(['dev'], 'C:\どこでもない\packages\host\src')
+   *   → args[0] = C:\claude\git-qa\node_modules\…\tauri.js（解決されてしまう）
+   * ```
+   *
+   * **正しい理由で落ちないテストは、負債にしかならない**ので置かない。
+   * 断り方は `app.ts` 側にコメントで残してある。
+   */
 });
