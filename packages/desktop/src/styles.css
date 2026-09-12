@@ -413,13 +413,15 @@ body {
 }
 
 .setup-device-list,
-.setup-sheet-list {
+.setup-sheet-list,
+.setup-resume-list {
   display: grid;
   gap: 0.25rem;
 }
 
 .setup-device,
-.setup-sheet {
+.setup-sheet,
+.setup-resume {
   padding: 0.5rem 0.625rem;
   font: inherit;
   font-size: 0.8125rem;
@@ -434,7 +436,8 @@ body {
 }
 
 .setup-device[aria-pressed='true'],
-.setup-sheet[aria-pressed='true'] {
+.setup-sheet[aria-pressed='true'],
+.setup-resume[aria-pressed='true'] {
   background: color-mix(in srgb, currentColor 14%, transparent);
   border-color: color-mix(in srgb, currentColor 50%, transparent);
   font-weight: 600;
@@ -445,6 +448,13 @@ body {
  * 鑑賞で走らせるかの選択。**1 行を丸ごと使う**（2026-09-11・実物を見て直した）。
  * ボタンの間に挟むと、押す物の列に埋もれて**選択肢だと分からない。**
  */
+/* 続きからの案内。**見出しの下の 1 行**（2026-09-12）。 */
+.setup-note {
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
 .setup-watch-label {
   display: flex;
   align-items: center;

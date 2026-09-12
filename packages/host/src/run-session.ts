@@ -75,6 +75,13 @@ export interface StartRunSessionOptions {
     report: (at: { x: number; y: number; width?: number; height?: number; label?: string }) => void,
   ) => void;
   /**
+   * **続きから**（2026-09-12・人の指示）。
+   *
+   * 終わっていない証跡を渡すと、**そこに在るケースは走らせずに持ち越し、
+   * 残りだけを走らせて同じ 1 本に足す。**`runId` も前のものを渡すこと。
+   */
+  readonly previous?: Run;
+  /**
    * **鑑賞モード**（2026-09-11・人の指示）。
    *
    * > 人はぼーっとみながら AI のテストを鑑賞します。……途中で止められる配慮も必要です。
@@ -416,10 +423,6 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   });
 
   const runCase = async (ctx: CaseContext): Promise<CaseVerdict> => {
-    if (aborted !== undefined) {
-      // 走らせなかったことを「通った」にしない。
-      return { aiResult: 'BLOCKED', note: `実行を途中で終えた: ${aborted}` };
-    }
     phase = 'running';
     awaiting = undefined;
     // **前のケースの矢印を残さない。**残っていると、人が別の所を見る。
@@ -482,6 +485,14 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     sheetRef: options.sheetRef,
     session: live.session,
     operator: options.operator,
+    /**
+     * **止めたら、そこから先は証跡に書かない**（2026-09-12）。
+     *
+     * 前は「止めたので BLOCKED」と書いていた。**走らせた末に判断保留になったケースと
+     * 見分けが付かない**ので、続きから走らせるときに、どれをやり直すべきかが読めない。
+     */
+    stopped: () => aborted !== undefined,
+    ...(options.previous === undefined ? {} : { previous: options.previous }),
     /**
      * **鑑賞モードは `watched`。**`assisted`（押すまで待つ）でも `auto`（誰も見ていない）
      * でもない。**人は見ているが、押さなくても進む形**だったことを、そのまま残す。

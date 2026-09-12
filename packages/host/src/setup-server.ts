@@ -25,11 +25,26 @@ export interface SetupDevice {
 
 export type SetupPhase = 'idle' | 'starting' | 'running' | 'failed';
 
+/**
+ * 途中で止まった実行（2026-09-12・人の指示）。
+ *
+ * **どこまで人が見て置いたか**を添える。選ぶときに、いちばん知りたいのがそこ。
+ */
+export interface SetupResumable {
+  readonly runId: string;
+  readonly sheetPath: string;
+  readonly startedAt: string;
+  readonly cases: number;
+  readonly placed: number;
+}
+
 export interface SetupState {
   readonly phase: SetupPhase;
   readonly devices: readonly SetupDevice[];
   /** 見つかった検証シート。人はここから選ぶ。 */
   readonly sheets: readonly string[];
+  /** 途中で止まった実行。**続きから走らせられる。** */
+  readonly resumable?: readonly SetupResumable[];
   readonly liveUrl?: string;
   readonly controlUrl?: string;
   /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
@@ -71,11 +86,19 @@ export interface StartRequest {
    * 押さなくても 1 件ごとに間をおいて進む。**真のときだけ持つ。**
    */
   readonly watch?: true;
+  /**
+   * **続きから**（2026-09-12・人の指示）。止まった実行の ID。
+   *
+   * 渡すと、**その実行に足す。**新しい実行にすると証跡が 2 本に割れる。
+   */
+  readonly resume?: string;
 }
 
 export interface StartSetupServerOptions {
   readonly listDevices: () => Promise<readonly SetupDevice[]>;
   readonly findSheets: () => Promise<readonly string[]>;
+  /** 途中で止まった実行を探す。**渡さなければ「続きから」を出さない。** */
+  readonly findResumable?: () => Promise<readonly SetupResumable[]>;
   readonly start: (params: StartRequest) => Promise<StartedRun>;
   readonly port?: number;
 }
@@ -134,12 +157,17 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
    * 状態は毎秒取りに来るので、そのたびにディスクを掘ると重い（配布物では home の下を見る）。
    */
   let sheets: readonly string[] | undefined;
+  let resumable: readonly SetupResumable[] | undefined;
 
   const state = async (): Promise<SetupState> => ({
     phase,
     // **選ぶたびに取り直す。**繋ぎ替えた端末が出てこないと、人は待たされ続ける。
     devices: phase === 'idle' ? await options.listDevices() : [],
     sheets: phase === 'idle' ? (sheets ??= await options.findSheets()) : [],
+    // 途中で止まった実行。**シートと同じで、毎回は探し直さない。**
+    ...(phase === 'idle' && options.findResumable !== undefined
+      ? { resumable: (resumable ??= await options.findResumable()) }
+      : {}),
     ...(started === undefined ? {} : started),
     ...(failure === undefined ? {} : { error: failure }),
   });
@@ -240,6 +268,18 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
          */
         const watch = (body as { watch?: unknown }).watch === true;
 
+        /**
+         * **続きから**（2026-09-12）。止まった実行の ID。
+         *
+         * **形のおかしいものは捨てる。**この値はフォルダ名として使うので、
+         * `../` が混ざると別の場所を読みに行く（§21 —— 入力を信用しない）。
+         */
+        const wantedResume = (body as { resume?: unknown }).resume;
+        const resume =
+          typeof wantedResume === 'string' && /^[0-9]{8}-[0-9]{6}$/.test(wantedResume)
+            ? wantedResume
+            : undefined;
+
         begin({
           serial,
           sheetPath,
@@ -247,6 +287,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
           ...(browser === undefined ? {} : { browser }),
           ...(browserPath === undefined ? {} : { browserPath }),
           ...(watch ? { watch: true } : {}),
+          ...(resume === undefined ? {} : { resume }),
         });
         res.writeHead(202, cors).end();
       });

@@ -136,8 +136,15 @@ describe('startRunSession — 鑑賞モード', () => {
     expect(run.cases[0]?.verifiedBy).toBe('octocat');
   });
 
-  /** **止められる配慮。**残りは「やっていない」ではなく判断保留として残す。 */
-  it('止めたら、そこで終わる（残りは判断保留）', async () => {
+  /**
+   * **止められる配慮。**
+   *
+   * 止めた先のケースは**証跡に書かない**（2026-09-12 に変えた）。
+   * 前は「止めたので BLOCKED」と書いていたが、**走らせた末に判断保留になったケースと
+   * 見分けが付かない。**続きから走らせるときに、どれをやり直すべきかが読めなくなる。
+   * **終わりの時刻が無いこと**が「途中で止まった」の印になる。
+   */
+  it('止めたら、そこで終わる（走らせていないケースは書かない）', async () => {
     const bridge = fakeBridge();
     let release = (): void => undefined;
     const held = new Promise<void>((resolve) => (release = resolve));
@@ -158,9 +165,10 @@ describe('startRunSession — 鑑賞モード', () => {
     await session.close();
 
     expect(run.cases[0]?.result).toBe('AUTO_PASS');
-    // 2 件目から後は走っていない。**通ったことにしない。**
-    expect(run.cases.slice(1).map((c) => c.aiResult)).toEqual(['BLOCKED', 'BLOCKED']);
-    expect(run.cases[1]?.note).toContain('止め');
+    // 2 件目から後は走っていない。**通ったことにも、判断保留にもしない。**
+    expect(run.cases.map((c) => c.no)).toEqual([1]);
+    // **終わりの時刻が無い。**これが「途中で止まった」の印で、続きから走らせる目印になる。
+    expect(run.finishedAt).toBeUndefined();
   });
 
   /** **押さなくても進むことを、画面に出し続ける。** */

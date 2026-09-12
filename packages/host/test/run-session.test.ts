@@ -143,7 +143,16 @@ describe('startRunSession', () => {
     expect(run.cases[0]?.result).toBe('VERIFIED');
   });
 
-  it('途中で終えたら、残りは BLOCKED として残る（通ったことにしない）', async () => {
+  /**
+   * **途中で終えたら、走らせていないケースは証跡に書かない**（2026-09-12 に変えた）。
+   *
+   * 前は「止めたので BLOCKED」と書いていた。**走らせた末に判断保留になったケースと
+   * 見分けが付かない**ので、続きから走らせるときに、どれをやり直すべきかが読めなくなる。
+   *
+   * 通ったことにしないのは変わらない —— **そもそも無い。**
+   * **終わりの時刻が無いこと**が「途中で止まった」の印になる。
+   */
+  it('途中で終えたら、走らせていないケースは書かない（通ったことにしない）', async () => {
     const bridge = fakeBridge();
     const session = await start(bridge);
 
@@ -153,8 +162,9 @@ describe('startRunSession', () => {
     const run = await session.done;
     await session.close();
 
-    expect(run.cases.map((c) => c.result)).toEqual(['AUTO_PASS', 'BLOCKED', 'BLOCKED']);
-    expect(run.cases[1]?.note).toContain('画面が閉じられた');
+    expect(run.cases.map((c) => c.no)).toEqual([1]);
+    expect(run.cases[0]?.result).toBe('AUTO_PASS');
+    expect(run.finishedAt).toBeUndefined();
   });
 
   it('終わったら、終わったことを画面へ流す', async () => {

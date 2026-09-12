@@ -330,4 +330,90 @@ describe('担当者ハンドル', () => {
     }
     throw new Error('start が呼ばれなかった');
   });
+
+  /**
+   * **続きから**（2026-09-12・人の指示）。
+   *
+   * 途中で止まった実行を画面へ出し、選んだら**その実行に足す。**
+   * 新しい実行にすると証跡が 2 本に割れ、読む人が突き合わせることになる。
+   */
+  it('途中で止まった実行を、画面へ渡す', async () => {
+    server = await startSetupServer(
+      options({
+        findResumable: () =>
+          Promise.resolve([
+            {
+              runId: '20260911-090000',
+              sheetPath: '/w/検証.tsv',
+              startedAt: '2026-09-11T09:00:00.000Z',
+              cases: 4,
+              placed: 3,
+            },
+          ]),
+      }),
+    );
+
+    const state = (await (await fetch(`${server.url}/state`)).json()) as {
+      resumable?: { runId: string; placed: number }[];
+    };
+
+    expect(state.resumable).toEqual([
+      expect.objectContaining({ runId: '20260911-090000', placed: 3 }),
+    ]);
+  });
+
+  it('続きからの指定を、実行へ渡す', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serial: 'emulator-5554',
+        sheetPath: '/repo/a.tsv',
+        resume: '20260911-090000',
+      }),
+    });
+
+    for (let i = 0; i < 50; i += 1) {
+      if (start.mock.calls.length > 0) {
+        expect(start.mock.calls[0]?.[0]).toMatchObject({ resume: '20260911-090000' });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error('start が呼ばれなかった');
+  });
+
+  /** **形のおかしい指定は捨てる。**別の場所を読みに行かせない（`../` 等）。 */
+  it('実行 ID の形をしていないものは受け取らない', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serial: 'emulator-5554',
+        sheetPath: '/repo/a.tsv',
+        resume: '../../etc',
+      }),
+    });
+
+    for (let i = 0; i < 50; i += 1) {
+      if (start.mock.calls.length > 0) {
+        expect(start.mock.calls[0]?.[0]).not.toHaveProperty('resume');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error('start が呼ばれなかった');
+  });
 });

@@ -28,6 +28,13 @@ export interface RenderSetupOptions {
      * 「鑑賞ではないと指定した」が同じ形になる。
      */
     watch?: true;
+    /**
+     * **続きから**（2026-09-12・人の指示）。止まった実行の ID。
+     *
+     * 渡すと、**その実行に足す。**新しい実行にすると証跡が 2 本に割れ、
+     * 読む人が突き合わせることになる。
+     */
+    resume?: string;
   }) => void;
   /**
    * 自分で検証シートを選ぶ。
@@ -338,6 +345,33 @@ export function renderSetup(
   watchText.textContent = t('setup.watch');
   watchLabel.append(watch, watchText);
 
+  /**
+   * **途中で止まった検証**（2026-09-12・人の指示）。
+   *
+   * 選ぶと、**その実行に足す。**シートは実行が覚えているので、人は選び直さない。
+   * **どこまで人が見て置いたか**を添える —— 選ぶときに、いちばん知りたいのがそこ。
+   */
+  const resumableSheets = new Map((state.resumable ?? []).map((r) => [r.runId, r.sheetPath]));
+  const resumeList =
+    state.resumable === undefined || state.resumable.length === 0
+      ? undefined
+      : pickList(
+          doc,
+          state.resumable.map((r) => ({
+            value: r.runId,
+            label: t('setup.resume.item', {
+              runId: r.runId,
+              placed: String(r.placed),
+              cases: String(r.cases),
+              sheet: r.sheetPath,
+            }),
+          })),
+          'setup-resume',
+          'runId',
+          undefined,
+          () => reflect(operator.value.trim()),
+        );
+
   const start = doc.createElement('button');
   start.type = 'button';
   start.className = 'setup-start';
@@ -353,8 +387,12 @@ export function renderSetup(
 
   start.addEventListener('click', () => {
     const serial = lookingAt();
-    // 一覧から選ばれていなければ、人が自分で選んだものを使う。
-    const sheetPath = picked(column, 'setup-sheet', 'path') ?? options.pickedSheet;
+    // **続きからが選ばれていれば、シートはその実行のもの。**人に選び直させない。
+    const resume = picked(column, 'setup-resume', 'runId');
+    const sheetPath =
+      (resume === undefined ? undefined : resumableSheets.get(resume)) ??
+      picked(column, 'setup-sheet', 'path') ??
+      options.pickedSheet;
     const handle = operator.value.trim();
     if (serial === undefined || sheetPath === undefined || !isValidHandle(handle)) return;
     options.onStart({
@@ -366,6 +404,7 @@ export function renderSetup(
         ? { browserPath: browserPath.value.trim() }
         : {}),
       ...(watch.checked ? { watch: true as const } : {}),
+      ...(resume === undefined ? {} : { resume }),
     });
   });
 
@@ -436,6 +475,16 @@ export function renderSetup(
     pick.textContent = t('setup.pick');
     pick.addEventListener('click', () => options.onPickSheet?.());
     section.append(pick);
+  }
+
+  if (resumeList !== undefined) {
+    const heading = doc.createElement('p');
+    heading.className = 'setup-heading';
+    heading.textContent = t('setup.resume');
+    const note = doc.createElement('p');
+    note.className = 'setup-note';
+    note.textContent = t('setup.resume.note');
+    section.append(heading, note, resumeList);
   }
 
   section.append(watchLabel, start);

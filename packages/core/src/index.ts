@@ -104,4 +104,5 @@ export { webmCommand } from './adapter/to-webm.js';
 export { saveAsWebm } from './run/video-webm.js';
 export type { SaveAsWebmOptions, SavedVideo } from './run/video-webm.js';
 export { compareFingerprint } from './run/target-check.js';
+export { WORKSPACE_FILE, findWorkspace, runsRootIn, sheetPathIn } from './run/workspace.js';
 export type { TargetCheck } from './run/target-check.js';

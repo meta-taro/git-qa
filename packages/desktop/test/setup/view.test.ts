@@ -467,3 +467,69 @@ describe('renderSetup — 鑑賞モード', () => {
     expect(onStart.mock.calls[0]?.[0]).toMatchObject({ watch: true });
   });
 });
+
+/**
+ * **続きから**（2026-09-12・人の指示）。
+ *
+ * > それは途中までテストして、落として、次の日検証を再開しても大丈夫ですかね
+ *
+ * 途中で止まった実行を出し、選んだら**その実行に足す。**
+ * **どこまで人が見て置いたか**を添える —— 選ぶときに、いちばん知りたいのがそこ。
+ */
+describe('renderSetup — 続きから', () => {
+  const withResumable = (): SetupState => ({
+    ...idle,
+    resumable: [
+      {
+        runId: '20260911-090000',
+        sheetPath: '/repo/docs/b.tsv',
+        startedAt: '2026-09-11T09:00:00.000Z',
+        cases: 4,
+        placed: 3,
+      },
+    ],
+  });
+
+  it('止まった実行を、どこまで置いたか付きで出す', () => {
+    renderSetup(root, withResumable(), { onStart: vi.fn(), operator: 'octocat' });
+
+    const item = live().querySelector<HTMLElement>('.setup-resume');
+    expect(item?.textContent).toContain('20260911-090000');
+    expect(item?.textContent).toContain('3');
+  });
+
+  /** 選ぶと、**そのシートとその実行**で始める。人はシートを選び直さない。 */
+  it('選んで押すと、その実行の続きから始める', () => {
+    const onStart = vi.fn();
+    renderSetup(root, withResumable(), { onStart, operator: 'octocat' });
+
+    live().querySelector<HTMLElement>('.setup-resume')?.click();
+    live().querySelector<HTMLElement>('.setup-device[data-serial="R5CT1234"]')?.click();
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart.mock.calls[0]?.[0]).toMatchObject({
+      serial: 'R5CT1234',
+      sheetPath: '/repo/docs/b.tsv',
+      resume: '20260911-090000',
+    });
+  });
+
+  /** **止まった実行が無ければ、何も出さない。**要らない案内で画面を埋めない。 */
+  it('止まった実行が無ければ、出さない', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
+
+    expect(live().querySelector('.setup-resume')).toBeNull();
+  });
+
+  /** 選ばなければ、**今までどおり新しい実行。** */
+  it('選ばなければ、続きからにしない', () => {
+    const onStart = vi.fn();
+    renderSetup(root, withResumable(), { onStart, operator: 'octocat' });
+
+    live().querySelector<HTMLElement>('.setup-device[data-serial="R5CT1234"]')?.click();
+    live().querySelector<HTMLElement>('.setup-sheet[data-path="/repo/docs/b.tsv"]')?.click();
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart.mock.calls[0]?.[0]).not.toHaveProperty('resume');
+  });
+});

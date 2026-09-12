@@ -103,6 +103,25 @@ export interface ExecuteRunOptions {
    * **相手を録る口は消さない。**Android では相手を録るのが正しい。
    */
   recording?: RecordingControl;
+  /**
+   * **ここで止めてくれ**（2026-09-12）。次のケースへ行く前に聞く。
+   *
+   * 止めたケースを「走らせた末に判断保留」として書かない —— **走らせていないものは、
+   * 証跡に書かない。**書くと、続きから走らせるときに**どれをやり直すべきかが読めない。**
+   */
+  stopped?: () => boolean;
+  /**
+   * **続きから**（2026-09-12・人の指示）。
+   *
+   * > それは途中までテストして、落として、次の日検証を再開しても大丈夫ですかね
+   *
+   * 前の（終わっていない）証跡を渡すと、**そこに在るケースは走らせずに持ち越し、
+   * 残りだけを走らせて同じ 1 本に足す。**新しい実行にすると証跡が 2 本に割れ、
+   * 読む人が突き合わせることになる。
+   *
+   * **始めた時刻も前のもの。**続きだからといって、今日始めたことにしない。
+   */
+  previous?: Run;
   /** 途中経過を書けなかったときの理由。**黙らない**ためだけに使う。 */
   onProgressError?: (reason: string) => void;
   /** 時刻の出どころ。既定は実時計。 */
@@ -263,12 +282,17 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
   assertModeMatchesAskHuman(options.mode, options.askHuman !== undefined);
   const subjects = toCaseSubjects(options.sheet);
 
-  const startedAt = now().toISOString();
+  // **続きなら、始まりは前のまま。**今日始めたことにしない。
+  const startedAt = options.previous?.startedAt ?? now().toISOString();
   // 渡されたセッションは、ここで開け閉めしない。**持ち主が開けて、持ち主が閉じる。**
   const borrowed = options.session;
   const session = borrowed ?? (await (options.adapter as TargetAdapter).connect());
-  const cases: RunCase[] = [];
-  const findings: Finding[] = [];
+  // **昨日の分をそのまま持ち越す。**置き直させない。
+  const cases: RunCase[] = [...(options.previous?.cases ?? [])];
+  const alreadyRan = new Set(cases.map((one) => one.no));
+  const findings: Finding[] = [...(options.previous?.findings ?? [])];
+  /** 途中で止めたか。**止めた実行には終わりの時刻を押さない**（それが「途中」の印）。 */
+  let stopped = false;
 
   /** **いまの時点の証跡。**途中経過にも、最後にも、同じ形を使う。 */
   /**
@@ -318,6 +342,14 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     // 人が横で見られる状態にしてから走らせる（C4）。開けずに走ると、見る先が無い。
     if (borrowed === undefined) await session.liveView.open();
     for (const subject of subjects) {
+      // 昨日やった分は走らせない。
+      if (alreadyRan.has(subject.no)) continue;
+      // **止めてくれと言われたら、ここで終わる。**走らせていないものを証跡に書かない。
+      if (options.stopped?.() === true) {
+        stopped = true;
+        break;
+      }
+
       cases.push(await runOneCase(subject, session, options, now));
       after = await fingerprint();
 
@@ -341,7 +373,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     if (borrowed === undefined) await session.close();
   }
 
-  const run = assemble(true);
+  const run = assemble(!stopped);
   // **最後にもう一度書く。**途中経過の最後の 1 枚は「まだ終わっていない」形なので、
   // ここで押し直さないと、**走り切った実行がファイル上では途中に見える。**
   if (options.runsRoot !== undefined) {

@@ -40,6 +40,10 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   // **鑑賞モード**（2026-09-11）。押さなくても進むことを、出し続ける。
   'setup.watch': '鑑賞で走らせる（押さなくても進む。Esc で止められる）',
+  // **続きから**（2026-09-12）。どこまで人が見て置いたかを添える。
+  'setup.resume': '途中で止まった検証（続きから）',
+  'setup.resume.note': '選ぶと、その実行に足します。シートは選び直しません',
+  'setup.resume.item': '{runId} — 人が置いた {placed} / 走った {cases} 件 · {sheet}',
   'verdict.watching': '鑑賞中 — 押さなければ {seconds} 秒で次へ進みます',
   'verdict.stop': '鑑賞を止める',
   'verdict.finished': '検証は終了しました',
@@ -157,6 +161,9 @@ const en: Record<keyof typeof ja, string> = {
   'key.move.note': 'Moves what you are looking at; you can re-place on cases that ran',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'setup.watch': 'Run in watch mode (moves on without you; Esc stops it)',
+  'setup.resume': 'Interrupted runs (continue)',
+  'setup.resume.note': 'Picking one appends to that run. The sheet comes with it',
+  'setup.resume.item': '{runId} — placed {placed} of {cases} run · {sheet}',
   'verdict.watching': 'Watching — moves on in {seconds}s unless you place a verdict',
   'verdict.stop': 'Stop watching',
   'verdict.finished': 'This run has finished.',

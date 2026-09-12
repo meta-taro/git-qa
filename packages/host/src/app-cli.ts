@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
 
@@ -16,13 +18,22 @@ import {
   listAndroidDevices,
   readAndroidScreenText,
 } from '@git-qa/adapter-android';
-import { parseTestSpecTsv, sheetDigest, saveRunProgress } from '@git-qa/core';
+import {
+  compareSheet,
+  findWorkspace,
+  parseTestSpecTsv,
+  runsRootIn,
+  saveRunProgress,
+  sheetDigest,
+  sheetPathIn,
+} from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
 import { tauriDevArgs } from './app.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
 import { findInput, findOcr } from './ocr-path.js';
+import { findUnfinishedRuns, readRun } from './resume.js';
 import { startRunSession } from './run-session.js';
 import { gitQaWindowRecording } from './window-recording.js';
 import { imageTools } from './image-tools.js';
@@ -78,6 +89,28 @@ let finished: Promise<Run> | undefined;
 
 const setup = await startSetupServer({
   listDevices: async () => (await listAndroidDevices()).map((d) => ({ ...d })),
+
+  /**
+   * **途中で止まった実行を、画面へ出す**（2026-09-12・人の指示）。
+   *
+   * 探すのは 2 か所 —— **打った場所の `runs/`** と、**見つかったシートの家**。
+   * ワークスペースを作った人は家の中に、作っていない人は打った場所に積まれている。
+   */
+  findResumable: async () => {
+    const sheetPaths = await keepRunnableSheets(
+      (await Promise.all(sheetRoots.map((root) => findSheets(root)))).flat(),
+    );
+    const homes = new Set<string>([runsDir('runs')]);
+    for (const path of sheetPaths) {
+      const workspace = findWorkspace(path, existsSync);
+      if (workspace !== undefined) homes.add(runsRootIn(workspace));
+    }
+
+    const found = (await Promise.all([...homes].map((root) => findUnfinishedRuns(root)))).flat();
+    // **新しいものが先。**人が探すのは、だいたい直前に止めたもの。
+    return found.sort((a, b) => (a.runId < b.runId ? 1 : a.runId > b.runId ? -1 : 0));
+  },
+
   findSheets: async () =>
     newestFirst(
       await keepRunnableSheets(
@@ -86,7 +119,7 @@ const setup = await startSetupServer({
       SHEET_LIMIT,
     ),
 
-  start: async ({ serial, sheetPath, operator, browser, browserPath, watch }) => {
+  start: async ({ serial, sheetPath, operator, browser, browserPath, watch, resume }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -105,8 +138,41 @@ const setup = await startSetupServer({
     const chromium =
       browser === 'firefox' || browser === 'safari' || browser === undefined ? undefined : browser;
 
-    const runId = runIdFrom(new Date());
-    const runsRoot = runsDir('runs');
+    /**
+     * **試験 1 本を、1 つのフォルダにまとめる**（2026-09-12・人の指示）。
+     *
+     * > 試験 tsv 画像動画がひとつのワークスペースにまとまっているみたいな。
+     * > そっちの方が試験単位の git 管理も便利です
+     *
+     * シートの近くに `git-qa.json` があれば、**そこがその試験の家。**
+     * 証跡はその `runs/` へ置き、シートの場所は**家からの相対**で書く
+     * （絶対パスだと、証跡に個人名が混ざる・§25）。
+     *
+     * **印が無ければ、今までどおり**（打った場所の `runs/`）。
+     */
+    const workspace = findWorkspace(sheetPath, existsSync);
+    const runsRoot = workspace === undefined ? runsDir('runs') : runsRootIn(workspace);
+
+    /**
+     * **続きから**（2026-09-12・人の指示）。
+     *
+     * 止まった実行を読み、**同じ実行に足す。**新しい実行にすると証跡が 2 本に割れる。
+     * **シートが変わっていたら足さない** —— 昨日の判定は、いまの文面に対して
+     * 置かれたものではない。
+     */
+    const previous =
+      resume === undefined ? undefined : await readRun(join(runsRoot, resume, 'run.json'));
+    if (resume !== undefined && previous === undefined) {
+      throw new Error(`続きから走らせる証跡が読めない: ${join(runsRoot, resume, 'run.json')}`);
+    }
+    if (previous !== undefined) {
+      const check = compareSheet(previous.sheet, text);
+      if (check.kind !== 'same') {
+        throw new Error(`続きから走らせられない: ${check.reason}`);
+      }
+    }
+
+    const runId = previous?.runId ?? runIdFrom(new Date());
 
     /**
      * **鑑賞モードでは git-qa の窓を録る**（2026-09-11・人の判断）。
@@ -168,13 +234,15 @@ const setup = await startSetupServer({
                   }),
       sheet,
       sheetRef: {
-        path: sheetPath,
+        // **家からの相対。**絶対パスだと、証跡に個人名が混ざる（§25）。
+        path: workspace === undefined ? sheetPath : sheetPathIn(workspace, sheetPath),
         sha256: sheetDigest(text),
         ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
         ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
       },
       runId,
       sheetPath,
+      ...(previous === undefined ? {} : { previous }),
       // **鑑賞モード。**押さなくても 1 件ごとに間をおいて進む（止める口はある）。
       ...(watch === true ? { watch: {} } : {}),
       ...(recording === undefined ? {} : { recording }),

@@ -152,3 +152,70 @@ describe('resolveSetupUrl — 配布物では URL をアプリに聞く', () => 
     await expect(resolveSetupUrl('', { ask, waitMs: 0, tries: 2 })).resolves.toBeUndefined();
   });
 });
+
+/**
+ * **続きから**（2026-09-12・人の指示）。
+ *
+ * 途中で止まった実行を画面へ出す。**どこまで人が見て置いたか**を添える ——
+ * 選ぶときに、いちばん知りたいのがそこ。
+ */
+describe('fetchSetupState — 途中で止まった実行', () => {
+  const answer = (body: unknown): typeof fetch =>
+    (() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(body) })) as unknown as typeof fetch;
+
+  it('止まった実行を読む', async () => {
+    const state = await fetchSetupState(
+      'http://127.0.0.1:1/setup/x',
+      answer({
+        phase: 'idle',
+        devices: [],
+        sheets: [],
+        resumable: [
+          {
+            runId: '20260911-090000',
+            sheetPath: '/w/検証.tsv',
+            startedAt: '2026-09-11T09:00:00.000Z',
+            cases: 4,
+            placed: 3,
+          },
+        ],
+      }),
+    );
+
+    expect(state?.resumable).toEqual([
+      {
+        runId: '20260911-090000',
+        sheetPath: '/w/検証.tsv',
+        startedAt: '2026-09-11T09:00:00.000Z',
+        cases: 4,
+        placed: 3,
+      },
+    ]);
+  });
+
+  /** **形のおかしいものは捨てる。**当て推量で「4 件置いた」と出さない。 */
+  it('形のおかしいものは落とす', async () => {
+    const state = await fetchSetupState(
+      'http://127.0.0.1:1/setup/x',
+      answer({
+        phase: 'idle',
+        devices: [],
+        sheets: [],
+        resumable: [{ runId: '20260911-090000' }, 'これは実行ではない'],
+      }),
+    );
+
+    expect(state?.resumable).toEqual([]);
+  });
+
+  /** 無ければ持たない（古い実行器と繋いだときも落ちない）。 */
+  it('無ければ持たない', async () => {
+    const state = await fetchSetupState(
+      'http://127.0.0.1:1/setup/x',
+      answer({ phase: 'idle', devices: [], sheets: [] }),
+    );
+
+    expect(state?.resumable).toBeUndefined();
+  });
+});

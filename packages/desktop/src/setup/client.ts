@@ -14,10 +14,25 @@ export interface SetupDevice {
 
 export type SetupPhase = 'idle' | 'starting' | 'running' | 'failed';
 
+/**
+ * 途中で止まった実行（2026-09-12・人の指示）。
+ *
+ * **どこまで人が見て置いたか**を添える。選ぶときに、いちばん知りたいのがそこ。
+ */
+export interface SetupResumable {
+  readonly runId: string;
+  readonly sheetPath: string;
+  readonly startedAt: string;
+  readonly cases: number;
+  readonly placed: number;
+}
+
 export interface SetupState {
   readonly phase: SetupPhase;
   readonly devices: readonly SetupDevice[];
   readonly sheets: readonly string[];
+  /** 途中で止まった実行。**古い実行器と繋いだときは持たない。** */
+  readonly resumable?: readonly SetupResumable[];
   readonly liveUrl?: string;
   readonly controlUrl?: string;
   /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
@@ -53,6 +68,24 @@ function parseSetupState(raw: unknown): SetupState | undefined {
   const text = (key: string): string | undefined =>
     typeof raw[key] === 'string' ? raw[key] : undefined;
 
+  /**
+   * 途中で止まった実行。**形のおかしいものは落とす。**
+   * 当て推量で「4 件置いた」と出すと、人がそれを見て選ぶことになる。
+   */
+  const count = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isInteger(value) && value >= 0;
+  const resumable = Array.isArray(raw['resumable'])
+    ? raw['resumable'].filter(
+        (item): item is SetupResumable =>
+          isRecord(item) &&
+          typeof item['runId'] === 'string' &&
+          typeof item['sheetPath'] === 'string' &&
+          typeof item['startedAt'] === 'string' &&
+          count(item['cases']) &&
+          count(item['placed']),
+      )
+    : undefined;
+
   return {
     phase: phase as SetupPhase,
     devices,
@@ -60,6 +93,7 @@ function parseSetupState(raw: unknown): SetupState | undefined {
     ...(text('liveUrl') === undefined ? {} : { liveUrl: text('liveUrl') as string }),
     ...(text('controlUrl') === undefined ? {} : { controlUrl: text('controlUrl') as string }),
     ...(text('error') === undefined ? {} : { error: text('error') as string }),
+    ...(resumable === undefined ? {} : { resumable }),
   };
 }
 
@@ -95,6 +129,8 @@ export async function requestStart(
     browserPath?: string;
     /** **鑑賞モードで始める**（2026-09-11）。選ばれたときだけ持つ。 */
     watch?: true;
+    /** **続きから**（2026-09-12）。止まった実行の ID。 */
+    resume?: string;
   },
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
