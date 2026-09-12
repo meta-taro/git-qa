@@ -44,8 +44,21 @@ mask_email() {
   sed -E 's/([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.([A-Za-z]{2,})/\1***@***.\2/g'
 }
 
+# ファイル名を、メールアドレスと見なさない。
+#
+# macOS / Tauri の画像は `128x128@2x.png` のような名前を使う。これは
+# メールアドレスの形（`文字@文字.文字`）と一致するが、**`.png` は TLD ではない。**
+# 実在のアドレスがこの形で終わることは無いので、**検出力は落ちない。**
+#
+# 2026-09-12 に 2 回落ちた（workflow の 1 行と、commit message）。
+# **落ちるたびに書き方を避けて回るほうが、いずれ本物を見逃す。**
+is_filename() {
+  printf '%s' "$1" | grep -qiE '\.(png|jpe?g|gif|webp|svg|ico|icns|bmp|tiff?|avif|heic)$'
+}
+
 allowed_email() {
   local e="$1" d lower
+  is_filename "$e" && return 0
   lower="$(printf '%s' "$e" | tr 'A-Z' 'a-z')"
   # 完全一致で許可されたアドレス（AI の co-author など。個人ではない）
   for a in $ALLOWED_EMAILS; do
