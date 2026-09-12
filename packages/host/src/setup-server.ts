@@ -45,6 +45,13 @@ export interface SetupState {
   readonly sheets: readonly string[];
   /** 途中で止まった実行。**続きから走らせられる。** */
   readonly resumable?: readonly SetupResumable[];
+  /**
+   * 端末の一覧を取れなかった理由（2026-09-12）。
+   *
+   * **端末が見えないことと、画面が出ないことは別。**`adb` が入っていない機械は普通にある
+   * （ウェブだけ見る人・Windows）。**理由を出して、他の道は残す。**
+   */
+  readonly deviceError?: string;
   readonly liveUrl?: string;
   readonly controlUrl?: string;
   /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
@@ -159,18 +166,59 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
   let sheets: readonly string[] | undefined;
   let resumable: readonly SetupResumable[] | undefined;
 
-  const state = async (): Promise<SetupState> => ({
-    phase,
+  /**
+   * **1 つ数え損ねたくらいで、画面ごと出さないのはやりすぎ**（2026-09-12）。
+   *
+   * `adb` が入っていない機械では `listAndroidDevices` が `ENOENT` を投げる。
+   * それを `.catch` していなかったので、**`/state` が応答を返さないまま固まっていた** ——
+   * 画面は「読み込み中」のまま、理由も出ない。
+   * **Android を見ないならウェブの URL だけで始められるのに、入口で止まる。**
+   */
+  const orEmpty = async <T>(
+    work: () => Promise<readonly T[]>,
+    onError?: (reason: string) => void,
+  ): Promise<readonly T[]> => {
+    try {
+      return await work();
+    } catch (error: unknown) {
+      onError?.(error instanceof Error ? error.message : String(error));
+      return [];
+    }
+  };
+
+  const state = async (): Promise<SetupState> => {
+    if (phase !== 'idle') {
+      return {
+        phase,
+        devices: [],
+        sheets: [],
+        ...(started === undefined ? {} : started),
+        ...(failure === undefined ? {} : { error: failure }),
+      };
+    }
+
+    let deviceError: string | undefined;
     // **選ぶたびに取り直す。**繋ぎ替えた端末が出てこないと、人は待たされ続ける。
-    devices: phase === 'idle' ? await options.listDevices() : [],
-    sheets: phase === 'idle' ? (sheets ??= await options.findSheets()) : [],
-    // 途中で止まった実行。**シートと同じで、毎回は探し直さない。**
-    ...(phase === 'idle' && options.findResumable !== undefined
-      ? { resumable: (resumable ??= await options.findResumable()) }
-      : {}),
-    ...(started === undefined ? {} : started),
-    ...(failure === undefined ? {} : { error: failure }),
-  });
+    const devices = await orEmpty(
+      () => options.listDevices(),
+      (reason) => (deviceError = reason),
+    );
+    // シートと止まった実行は**毎回は探し直さない。**失敗しても画面は出す。
+    sheets ??= await orEmpty(() => options.findSheets());
+    if (options.findResumable !== undefined) {
+      resumable ??= await orEmpty(() => options.findResumable?.() ?? Promise.resolve([]));
+    }
+
+    return {
+      phase,
+      devices,
+      sheets,
+      ...(resumable === undefined ? {} : { resumable }),
+      ...(deviceError === undefined ? {} : { deviceError }),
+      ...(started === undefined ? {} : started),
+      ...(failure === undefined ? {} : { error: failure }),
+    };
+  };
 
   const begin = (request: StartRequest): void => {
     phase = 'starting';
@@ -192,15 +240,22 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     const cors = corsHeaders(req.headers.origin);
 
     if (req.url === `${base}/state`) {
-      void state().then((current) => {
-        res
-          .writeHead(200, {
-            'content-type': 'application/json',
-            'cache-control': 'no-store',
-            ...cors,
-          })
-          .end(JSON.stringify(current));
-      });
+      void state()
+        .then((current) => {
+          res
+            .writeHead(200, {
+              'content-type': 'application/json',
+              'cache-control': 'no-store',
+              ...cors,
+            })
+            .end(JSON.stringify(current));
+        })
+        // **何があっても応答は返す。**返さないと、画面は「読み込み中」のまま止まる。
+        .catch((error: unknown) => {
+          res
+            .writeHead(500, { 'content-type': 'text/plain; charset=utf-8', ...cors })
+            .end(error instanceof Error ? error.message : String(error));
+        });
       return;
     }
 

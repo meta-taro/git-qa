@@ -427,7 +427,17 @@ export function renderSetup(
   if (state.devices.length === 0) {
     const empty = doc.createElement('p');
     empty.className = 'setup-empty';
-    empty.textContent = t('setup.device.none');
+    /**
+     * **数えられなかったのか、1 つも繋がっていないのかを分ける**（2026-09-12）。
+     *
+     * `adb` が入っていない機械では、端末は 1 つも出ない。それ自体は普通のことで、
+     * **ウェブだけ見るなら URL を入れて進める。**ところが「USB で繋ぐか…」としか
+     * 出ないので、**入っていない道具を探しに行かせてしまう。**
+     */
+    empty.textContent =
+      state.deviceError === undefined
+        ? t('setup.device.none')
+        : t('setup.device.failed', { reason: state.deviceError });
     section.append(empty);
   } else {
     section.append(

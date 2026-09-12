@@ -416,4 +416,51 @@ describe('担当者ハンドル', () => {
     }
     throw new Error('start が呼ばれなかった');
   });
+
+  /**
+   * **端末が見えないことと、画面が出ないことは別**（2026-09-12・導入の直前に見つけた）。
+   *
+   * `adb` が入っていない機械では `listAndroidDevices` が `ENOENT` を投げる。
+   * `/state` はその約束を `.catch` していなかったので、**応答が返らないまま固まる。**
+   * 画面は「読み込み中」のまま、理由も出ない。
+   *
+   * **試験導入先の Windows は、まさに adb が入っていない機械。**
+   * Android を見ないならウェブの URL だけで始められるのに、**入口で止まる。**
+   */
+  it('adb が無くても、画面は出る（端末は空・理由つき）', async () => {
+    server = await startSetupServer(
+      options({
+        listDevices: () => Promise.reject(new Error('spawn adb ENOENT')),
+      }),
+    );
+
+    const res = await fetch(`${server.url}/state`);
+    const state = (await res.json()) as { devices: unknown[]; deviceError?: string };
+
+    expect(res.status).toBe(200);
+    expect(state.devices).toEqual([]);
+    expect(state.deviceError).toContain('adb');
+  });
+
+  /** シートを探せなくても同じ。**画面は出て、理由が出る。** */
+  it('シートを探せなくても、画面は出る', async () => {
+    server = await startSetupServer(
+      options({ findSheets: () => Promise.reject(new Error('読めない')) }),
+    );
+
+    const res = await fetch(`${server.url}/state`);
+    const state = (await res.json()) as { sheets: unknown[] };
+
+    expect(res.status).toBe(200);
+    expect(state.sheets).toEqual([]);
+  });
+
+  /** 途中で止まった実行を探せなくても、画面は出る。 */
+  it('止まった実行を探せなくても、画面は出る', async () => {
+    server = await startSetupServer(
+      options({ findResumable: () => Promise.reject(new Error('読めない')) }),
+    );
+
+    expect((await fetch(`${server.url}/state`)).status).toBe(200);
+  });
 });

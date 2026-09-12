@@ -41,6 +41,8 @@ const ja = {
   // **鑑賞モード**（2026-09-11）。押さなくても進むことを、出し続ける。
   'setup.watch': '鑑賞で走らせる（押さなくても進む。Esc で止められる）',
   // **続きから**（2026-09-12）。どこまで人が見て置いたかを添える。
+  'setup.device.failed':
+    '端末の一覧を取れなかった（{reason}）。Android を見ないなら、上の URL かアプリ名で進めます',
   'setup.resume': '途中で止まった検証（続きから）',
   'setup.resume.note': '選ぶと、その実行に足します。シートは選び直しません',
   'setup.resume.item': '{runId} — 人が置いた {placed} / 走った {cases} 件 · {sheet}',
@@ -161,6 +163,8 @@ const en: Record<keyof typeof ja, string> = {
   'key.move.note': 'Moves what you are looking at; you can re-place on cases that ran',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'setup.watch': 'Run in watch mode (moves on without you; Esc stops it)',
+  'setup.device.failed':
+    'Could not list devices ({reason}). If you are not testing Android, use the URL or app name above',
   'setup.resume': 'Interrupted runs (continue)',
   'setup.resume.note': 'Picking one appends to that run. The sheet comes with it',
   'setup.resume.item': '{runId} — placed {placed} of {cases} run · {sheet}',

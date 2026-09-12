@@ -533,3 +533,34 @@ describe('renderSetup — 続きから', () => {
     expect(onStart.mock.calls[0]?.[0]).not.toHaveProperty('resume');
   });
 });
+
+/**
+ * **端末が見えない理由を出す**（2026-09-12・導入の直前に見つけた）。
+ *
+ * `adb` が入っていない機械では、端末は 1 つも出ない。
+ * それ自体は普通のことで、**ウェブだけ見るなら URL を入れて進める。**
+ * ところが「端末が見えていない。USB で繋ぐか…」としか出ないので、
+ * **入っていない道具を探しに行かせてしまう。**
+ */
+describe('renderSetup — 端末を数えられなかったとき', () => {
+  it('理由を出す', () => {
+    renderSetup(
+      root,
+      { ...idle, devices: [], deviceError: 'spawn adb ENOENT' },
+      { onStart: vi.fn(), operator: 'octocat' },
+    );
+
+    expect(live().textContent).toContain('adb');
+  });
+
+  /** **他の道は残す。**ウェブの URL 欄は出ている。 */
+  it('ウェブの URL では進められる', () => {
+    renderSetup(
+      root,
+      { ...idle, devices: [], deviceError: 'spawn adb ENOENT' },
+      { onStart: vi.fn(), operator: 'octocat' },
+    );
+
+    expect(live().querySelector('.setup-web')).not.toBeNull();
+  });
+});

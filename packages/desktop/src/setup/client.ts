@@ -33,6 +33,8 @@ export interface SetupState {
   readonly sheets: readonly string[];
   /** 途中で止まった実行。**古い実行器と繋いだときは持たない。** */
   readonly resumable?: readonly SetupResumable[];
+  /** 端末の一覧を取れなかった理由（`adb` が入っていない機械では普通に起きる）。 */
+  readonly deviceError?: string;
   readonly liveUrl?: string;
   readonly controlUrl?: string;
   /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
@@ -93,6 +95,7 @@ function parseSetupState(raw: unknown): SetupState | undefined {
     ...(text('liveUrl') === undefined ? {} : { liveUrl: text('liveUrl') as string }),
     ...(text('controlUrl') === undefined ? {} : { controlUrl: text('controlUrl') as string }),
     ...(text('error') === undefined ? {} : { error: text('error') as string }),
+    ...(text('deviceError') === undefined ? {} : { deviceError: text('deviceError') as string }),
     ...(resumable === undefined ? {} : { resumable }),
   };
 }
