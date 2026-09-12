@@ -15,8 +15,32 @@
 
 **同じものを 2 人で書かないでください。**割れます。
 
-Windows 側の仕事は「**走らせて、壊れ方を報告する**」です。
-直せる所は直してもらって構いませんが、**設計を変える前に Issue で一言**ください。
+そこで、**ファイルの持ち主を分けます。**
+
+| 場所 | 持ち主 |
+|---|---|
+| `packages/adapter-desktop/tools/win/`（Rust） | **Windows 側** |
+| `packages/adapter-desktop/src/win/`（TypeScript） | **Windows 側** |
+| それ以外全部（core / 実行器 / 画面 / macOS 側） | **macOS 側** |
+
+**この 2 つのフォルダの中は、自由に直してください。**当てて見ないと分からない所
+（`PrintWindow` のフラグ・高 DPI・UI Automation の癖）は、**そこに閉じています。**
+
+**境界を越えるときは、先に Issue で一言。**
+
+- `@git-qa/core` の型を変えたい（`AdapterCapabilities` に何か足したい等）
+- 共通の実行器（`packages/core/src/run/`）や画面（`packages/desktop/src/`）を直したい
+- macOS 側（`packages/adapter-desktop/src/*.ts` の `win/` 以外）を直したい
+
+**そこが割れ始めの入口**なので、そちらは macOS 側でやります。
+
+**共有しているファイルが 1 つも無い**のは、最初からそう作ってあるからです
+（上から見た口は macOS と同じ `TargetSession`）。**その形は崩さないでください。**
+
+### 触らないでほしいもの
+
+`CHANGELOG.md` と `.claude/project-status.md` は、**macOS 側がまとめて書きます。**
+両方から書くと、ここだけ毎回ぶつかります。**何が起きたかは Issue に書いてください。**
 
 **この分け方は、一度うまくいっています。**別プロダクトの試験導入で、
 使った人が実物を触って 3 件の指摘をくれました（#1 / #2 / #3）。3 件とも本物でした。
