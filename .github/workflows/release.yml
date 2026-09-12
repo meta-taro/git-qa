@@ -1,0 +1,239 @@
+name: release
+
+# 配布物を建てて、Release に載せる。
+#
+# 署名と公証には秘密情報が要る。**AI は作らない・置かない・貼らない**（baseline §14）。
+# 人が GitHub の Secrets に入れる（名前は `docs/signing.md`）。
+#
+#   APPLE_SIGNING_IDENTITY      … "Developer ID Application: …" の文字列
+#   APPLE_CERTIFICATE           … .p12 を base64 にしたもの
+#   APPLE_CERTIFICATE_PASSWORD  … その .p12 のパスワード
+#   APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID … 公証に使う（App 用パスワード）
+#
+# **揃っていなければ、署名せずに作る。**ただし**黙って作らない** ——
+# 出来たものが「配れないもの」だと分かる形で警告を出す。
+# 署名なしの `.dmg` は、受け取った人の Mac で「壊れているため開けません」になる。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # タグを打つ前に試せるようにしておく（Release は作らない）。
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: packages/desktop/src-tauri
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      # **建てる前に門を通す。**落ちるものを配らない（§5）。
+      - name: format / lint / typecheck / test
+        run: pnpm verify
+
+      # **配る前に数える**（§23）。参照されているのに無いものがあれば、ここで止める。
+      - name: 配布物が参照しているものが在るか数える
+        run: pnpm check:assets
+
+      # **揃っているかを先に言う。**後で「なぜ署名されていないのか」を探さずに済む。
+      - name: 署名の材料が揃っているか
+        id: creds
+        env:
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          if [ -n "$IDENTITY" ] && [ -n "$APPLE_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "署名と公証を行います"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::署名の材料が無いので、**配れない .dmg** ができます（人の Mac では開けません）"
+          fi
+
+      # **同梱する道具にも署名する。**
+      #
+      # `.app` の中には、建てて作った実行ファイルが 3 つ入っている
+      # （`git-qa-ocr` / `git-qa-input` / `git-qa-record`）。
+      # **公証は、中の実行ファイルが 1 つでも未署名なら通らない。**
+      # Tauri が署名するのは `.app` 本体なので、**ここで先に署名しておく。**
+      - name: 同梱する道具に署名する
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          # 道具を建てる（この後の tauri build でも建つが、署名を先に済ませる）。
+          pnpm --filter @git-qa/desktop bundle:host
+
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          pass="$(uuidgen)"
+          security create-keychain -p "$pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$pass" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$keychain" >/dev/null
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          for tool in git-qa-ocr git-qa-input git-qa-record; do
+            path="packages/desktop/src-tauri/resources/$tool"
+            [ -f "$path" ] || { echo "::warning::$tool が無い（署名も同梱もされない）"; continue; }
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$path"
+            # **署名されたことを確かめる。**握り潰さない（adhoc なら落とす）。
+            if codesign -dv "$path" 2>&1 | grep -q 'Signature=adhoc'; then
+              echo "::error::$tool が adhoc のままです（署名できていません）"
+              exit 1
+            fi
+            echo "── $tool ── $(lipo -info "$path" | sed 's/.*are: //;s/.*is architecture: //')"
+          done
+
+      # **署名するときだけ APPLE_* を渡す。**
+      #
+      # 未設定の secret は「空文字で設定済み」になる。Tauri はそれを証明書として
+      # 読み込もうとして落ちる。**渡さなければ adhoc で建つ。**
+      - name: 配布物を作る（署名あり）
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @git-qa/desktop exec tauri build
+
+      - name: 配布物を作る（署名なし）
+        if: steps.creds.outputs.ready != 'true'
+        run: pnpm --filter @git-qa/desktop exec tauri build
+
+      # **署名されたかを実物で確かめる。**「署名したつもり」で配らない。
+      #
+      # **`.dmg` を開いて、中の `.app` を検める。**
+      # `bundle/macos/git-qa.app` を見てはいけない —— **Tauri は .dmg を作り終えると
+      # そこを片付ける。**
+      #
+      # **署名なしのときも必ず何かを主張する**（検めているつもりで空振りしないため）。
+      - name: 署名を検める
+        run: |
+          set -euo pipefail
+          dmg=$(find packages/desktop/src-tauri/target/release/bundle/dmg -name '*.dmg' | head -1)
+          test -n "$dmg"
+          echo "── 配布物 ── $dmg"
+
+          hdiutil attach "$dmg" -nobrowse -quiet -mountpoint /tmp/verify
+          app=$(find /tmp/verify -maxdepth 1 -name '*.app' | head -1)
+          test -n "$app"
+
+          echo "── 中の .app ──"
+          codesign -dv "$app" 2>&1 | grep -E 'Identifier|Signature|TeamIdentifier|Authority' || true
+          echo "── 同梱の道具 ──"
+          for tool in "$app"/Contents/Resources/resources/git-qa-*; do
+            [ -f "$tool" ] || continue
+            echo "$(basename "$tool"): $(lipo -info "$tool" | sed 's/.*are: //;s/.*is architecture: //')"
+          done
+
+          if [ "${{ steps.creds.outputs.ready }}" = "true" ]; then
+            if codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'; then
+              echo "::error::署名したはずが adhoc のままです"
+              hdiutil detach /tmp/verify -quiet
+              exit 1
+            fi
+            # `--deep` は中の実行ファイルまで見る（同梱の道具が未署名ならここで落ちる）。
+            codesign --verify --deep --strict "$app"
+            # 公証が貼られていること。貼られていないと、落とした人の Mac で開けない。
+            xcrun stapler validate "$app"
+            # **受け取る人と同じ目で見る。**Gatekeeper が通すかどうか。
+            spctl -a -vv -t exec "$app"
+            echo "署名・公証・Gatekeeper、すべて通りました"
+          else
+            echo "::warning::署名していません。受け取った人の Mac では「壊れているため開けません」になります"
+          fi
+          hdiutil detach /tmp/verify -quiet
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: git-qa-macos
+          path: packages/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: packages/desktop/src-tauri
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      - name: format / lint / typecheck / test
+        run: pnpm verify
+
+      - name: 配布物が参照しているものが在るか数える
+        run: pnpm check:assets
+
+      # 署名はしていない。**受け取る側が「発行元を確認できません」を踏む。**
+      - name: Windows 版を建てる
+        run: pnpm --filter @git-qa/desktop exec tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: git-qa-windows
+          path: |
+            packages/desktop/src-tauri/target/release/bundle/msi/*.msi
+            packages/desktop/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  publish:
+    # **タグを打ったときだけ配る。**手で走らせたときは、建つかどうかを見るだけ。
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: 何を配るのかを出す
+        run: find dist -type f -exec ls -lh {} \;
+
+      # **アルファのうちは prerelease。**受け取る人が、出来上がったものだと思わないように。
+      - name: Release に載せる
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --prerelease \
+            --notes-file .github/release-notes.md \
+            $(find dist -type f)
