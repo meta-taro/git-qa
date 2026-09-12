@@ -1,5 +1,3 @@
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
 import { describeAdapterContract } from '@git-qa/core/testing';
@@ -398,8 +396,14 @@ describe('録画', () => {
     const result = await session.recording.stop();
     expect(result).toEqual({
       state: 'recorded',
-      // **区切りは OS が決める。**ここで `/` を直書きすると Windows で落ちる（2026-09-11）。
-      file: join('runs', '20260902-000000', 'case-003', 'screen.mp4'),
+      /**
+       * **証跡は、別の機械でも開ける形で書く**（2026-09-12）。
+       *
+       * ここは長いあいだ**その機械の絶対パス**を書いていた。ワークスペースごと
+       * 人へ渡す前提になったので、**置き場からの相対**にする（画面・動画と同じ形）。
+       * 区切りも `/` に揃える —— Windows で録った証跡を macOS で開くため。
+       */
+      file: 'case-003/screen.mp4',
       durationMs: 5000,
     });
     expect(runner.started.at(-1)?.some((a) => a.startsWith('--record='))).toBe(true);

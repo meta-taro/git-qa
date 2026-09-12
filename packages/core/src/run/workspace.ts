@@ -58,6 +58,19 @@ export function runsRootIn(workspace: string): string {
 }
 
 /**
+ * **証跡に書く形に直す。**区切りは必ず `/`。
+ *
+ * `sheet.path` は `run.json` に入って**人の手を渡る。**Windows で走らせた証跡に
+ * `docs\\検証.tsv` と書くと、**macOS では開けない。**
+ * ケースのフォルダ（`case-001/screen.webp`）と同じで、**区切りは `/` に揃える。**
+ *
+ * **その機械の事情を、証跡へ持ち込まない。**
+ */
+export function toEvidencePath(path: string): string {
+  return path.split('\\').join('/');
+}
+
+/**
  * 証跡に書くシートの場所。**ワークスペースからの相対にする。**
  *
  * いままでは選んだままの絶対パスが入っていた。実物がこれ ——
@@ -74,5 +87,5 @@ export function runsRootIn(workspace: string): string {
 export function sheetPathIn(workspace: string, sheetPath: string): string {
   const rel = relative(workspace, sheetPath);
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return sheetPath;
-  return rel;
+  return toEvidencePath(rel);
 }

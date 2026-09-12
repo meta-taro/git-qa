@@ -349,6 +349,8 @@ function createSession(deps: SessionDeps): TargetSession {
 
   let recProcess: RunningProcess | undefined;
   let recFile: string | undefined;
+  /** 証跡に書く形（置き場からの相対）。 */
+  let recPath: string | undefined;
   let recStartedAt: number | undefined;
   const requested = options.recording?.requested ?? false;
 
@@ -357,6 +359,7 @@ function createSession(deps: SessionDeps): TargetSession {
     start(caseNo): Promise<void> {
       ensureOpen();
       if (!requested || options.recording === undefined) return Promise.resolve();
+      // 録る先はこの機械の場所。**証跡に書くのは、置き場からの相対**（下の `recPath`）。
       const file = join(options.recording.runsDir, caseDirName(caseNo), 'screen.mp4');
       // ライブビューとは別プロセスにする。人が窓を閉じても録画は続くべきで、逆も同じ。
       recProcess = runner.start(scrcpy, [
@@ -367,6 +370,15 @@ function createSession(deps: SessionDeps): TargetSession {
         '--no-control',
         `--record=${file}`,
       ]);
+      /**
+       * **証跡は、別の機械でも開ける形で書く**（2026-09-12）。
+       *
+       * ここは長いあいだ**その機械の絶対パス**を書いていた
+       * （`/Users/<個人名>/…/runs/…`）。ワークスペースごと人へ渡す前提になったので、
+       * **置き場からの相対**にする（画面・動画と同じ形）。
+       * 区切りも `/` —— Windows で録った証跡を macOS で開くため。
+       */
+      recPath = `${caseDirName(caseNo)}/screen.mp4`;
       recFile = file;
       recStartedAt = now().getTime();
       return Promise.resolve();
@@ -375,17 +387,24 @@ function createSession(deps: SessionDeps): TargetSession {
       if (!requested) return { state: 'not_requested' };
       const process = recProcess;
       const file = recFile;
+      const path = recPath;
       const startedAt = recStartedAt;
       recProcess = undefined;
       recFile = undefined;
+      recPath = undefined;
       recStartedAt = undefined;
-      if (process === undefined || file === undefined || startedAt === undefined) {
+      if (
+        process === undefined ||
+        file === undefined ||
+        path === undefined ||
+        startedAt === undefined
+      ) {
         // 録画すると言われたのに始まっていない。黙って not_requested にすると、
         // 「録画オフで走らせた」と区別が付かなくなる（C20）。
         return { state: 'failed', reason: '録画が開始されていない' };
       }
       await process.stop();
-      return { state: 'recorded', file, durationMs: now().getTime() - startedAt };
+      return { state: 'recorded', file: path, durationMs: now().getTime() - startedAt };
     },
   };
 
