@@ -69,23 +69,24 @@ jobs:
             echo "::warning::署名の材料が無いので、**配れない .dmg** ができます（人の Mac では開けません）"
           fi
 
-      # **同梱する道具にも署名する。**
+      # **証明書を、この機械の鍵束へ入れる。**
       #
-      # `.app` の中には、建てて作った実行ファイルが 3 つ入っている
-      # （`git-qa-ocr` / `git-qa-input` / `git-qa-record`）。
-      # **公証は、中の実行ファイルが 1 つでも未署名なら通らない。**
-      # Tauri が署名するのは `.app` 本体なので、**ここで先に署名しておく。**
-      - name: 同梱する道具に署名する
+      # ここでは署名しない。**署名は、道具を建てた直後に行う**
+      # （`scripts/sign-tool.sh`）—— まとめて先に署名すると、
+      # `tauri build` が `bundle:host` を走らせて**建て直し、署名を消す。**
+      # 2026-09-12 に公証で弾かれて分かった。
+      #
+      #   The signature does not include a secure timestamp.
+      #   The executable does not have the hardened runtime enabled.
+      #
+      # 鍵束はこの段で作れば、後の段からも見える（`list-keychains` は利用者ごとに残る）。
+      - name: 署名の下ごしらえ（証明書を鍵束へ）
         if: steps.creds.outputs.ready == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          # 道具を建てる（この後の tauri build でも建つが、署名を先に済ませる）。
-          pnpm --filter @git-qa/desktop bundle:host
-
           keychain="$RUNNER_TEMP/signing.keychain-db"
           pass="$(uuidgen)"
           security create-keychain -p "$pass" "$keychain"
@@ -96,18 +97,7 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$keychain" >/dev/null
           rm -f "$RUNNER_TEMP/cert.p12"
-
-          for tool in git-qa-ocr git-qa-input git-qa-record; do
-            path="packages/desktop/src-tauri/resources/$tool"
-            [ -f "$path" ] || { echo "::warning::$tool が無い（署名も同梱もされない）"; continue; }
-            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$path"
-            # **署名されたことを確かめる。**握り潰さない（adhoc なら落とす）。
-            if codesign -dv "$path" 2>&1 | grep -q 'Signature=adhoc'; then
-              echo "::error::$tool が adhoc のままです（署名できていません）"
-              exit 1
-            fi
-            echo "── $tool ── $(lipo -info "$path" | sed 's/.*are: //;s/.*is architecture: //')"
-          done
+          echo "鍵束に入れました（署名は道具を建てた直後に行います）"
 
       # **署名するときだけ APPLE_* を渡す。**
       #

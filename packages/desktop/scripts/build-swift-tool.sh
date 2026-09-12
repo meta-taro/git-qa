@@ -44,3 +44,6 @@ fi
 
 lipo -create "${built[@]}" -output "$out"
 echo "[git-qa] $(basename "$out"): $(lipo -info "$out" | sed 's/.*are: //;s/.*is architecture: //')"
+
+# **建てた直後に署名する。**別の段でまとめて署名すると、建て直しで署名が消える。
+bash "$(dirname "$0")/sign-tool.sh" "$out"
