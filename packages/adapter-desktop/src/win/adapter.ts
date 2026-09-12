@@ -18,7 +18,7 @@ import type {
 import { fingerprintOf } from '../fingerprint.js';
 import { findInOcr, parseOcr } from '../ocr.js';
 import type { OcrLine } from '../ocr.js';
-import { parseWinWindows, winArgs } from './tool.js';
+import { parseWinWindows, pickWindow, whyUnusable, winArgs } from './tool.js';
 import type { WinWindow } from './tool.js';
 import type { DesktopAdapterOptions } from '../adapter.js';
 
@@ -103,13 +103,22 @@ async function look(
   app: string,
 ): Promise<WinWindow> {
   const found = parseWinWindows(await tool(winArgs.windows(app)));
-  const first = found[0];
+  // **見つかった順の 1 つ目を使わない**（2026-09-12・Windows 機で実測）。
+  // 題にパスが入っている explorer や、16x16 の隠れ窓が先に出る。
+  const first = pickWindow(found, app);
   if (first === undefined) {
     throw new AdapterError(
       KIND,
       `「${app}」の窓が見つからない。起動しているか、名前が合っているかを見てください` +
         '（実行ファイルの名前か、窓の題の一部で探しています）',
     );
+  }
+
+  // **選べたことと、検証に使えることは別**（2026-09-12・実測）。
+  // 16x16 の道具窓を掴んだまま進むと、**その絵が証跡に残る。**
+  const why = whyUnusable(first);
+  if (why !== undefined) {
+    throw new AdapterError(KIND, `「${app}」の${why}`);
   }
   return first;
 }

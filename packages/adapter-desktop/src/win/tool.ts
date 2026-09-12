@@ -81,3 +81,73 @@ export function parseWinWindows(stdout: string): WinWindow[] {
   }
   return found;
 }
+
+/**
+ * 相手にする窓を 1 つ決める（2026-09-12・Windows 機で実測して足した）。
+ *
+ * それまでは**見つかった順の 1 つ目**を使っていた。実機で 2 種類の外し方をした。
+ *
+ * - `sshboard` を探すと、**窓の題にパスが入っている explorer** が先に出る
+ * - 当の `sshboard` 自身も、**16x16 の隠れ窓**（Tauri の道具窓）を持っていて、それが先に出る
+ *
+ * どちらも「見つからない」ではなく「**別のものを相手にして、静かに間違える**」。
+ * 16x16 の絵を証跡に残したまま、人は検証したつもりになる。
+ *
+ * **題は、相手が何を開いているかで変わる。**実行ファイルの名前は変わらないので、そちらを先に見る。
+ */
+export function pickWindow(found: readonly WinWindow[], app: string): WinWindow | undefined {
+  const want = app.toLowerCase();
+  const byExe = found.filter((one) => exeStem(one.exe).includes(want));
+
+  // 実行ファイル名で当たらなければ、題で当たったものの中から選ぶ
+  // （道具の側で、題か実行ファイル名のどちらかに当たったものだけが来ている）。
+  return biggest(byExe.length > 0 ? byExe : found);
+}
+
+/**
+ * 拡張子を除いた実行ファイル名（小文字）。
+ *
+ * **区切りは `\` も `/` も見る。**`/` だけで切ると `C:\tools\sshboard\viewer.exe` が
+ * まるごと名前として残り、**途中のフォルダ名で当たってしまう**（2026-09-12・テストで捕まえた）。
+ */
+function exeStem(path: string): string {
+  const name = path.split(/[\\/]/).pop() ?? '';
+  return name.replace(/\.[^.]*$/, '').toLowerCase();
+}
+
+/**
+ * **人が見ている窓の、いちばん小さい側の目安**（px）。
+ *
+ * 実測で残った道具窓は 16x16。検証の相手になる画面がこれより小さいことは無い。
+ * **境目は目安であって、厳密な線ではない** —— 小さすぎる窓を黙って相手にしないための堰。
+ */
+const MIN_HUMAN_SIZE = 120;
+
+/**
+ * その窓が検証に使えない理由。**使えるなら `undefined`。**
+ *
+ * **選べたことと、使えることは別**（2026-09-12・実測）。本体を最小化したまま探すと、
+ * `sshboard` では **16x16 の道具窓だけが残った。**そのまま進むと 16x16 の絵が証跡に残り、
+ * **人は検証したつもりになる。**「見つからない」ではなく「**人が見ている窓ではない**」と言う。
+ */
+export function whyUnusable(window: WinWindow): string | undefined {
+  if (window.width >= MIN_HUMAN_SIZE && window.height >= MIN_HUMAN_SIZE) return undefined;
+
+  return (
+    `見つかった窓が小さすぎる（${String(window.width)}x${String(window.height)}）。` +
+    'アプリが最小化されていないか、人が見ている窓が開いているかを確かめてください' +
+    '（アプリが持つ目に見えない道具窓を掴んでいる可能性があります）'
+  );
+}
+
+/**
+ * いちばん大きい窓。**並んだら先に出た方**（同じ入力で選ぶ窓が毎回変われば、
+ * 証跡の読み手はどちらを見たのか分からなくなる）。
+ */
+function biggest(found: readonly WinWindow[]): WinWindow | undefined {
+  let best: WinWindow | undefined;
+  for (const one of found) {
+    if (best === undefined || one.width * one.height > best.width * best.height) best = one;
+  }
+  return best;
+}

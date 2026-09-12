@@ -13,6 +13,7 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
+    IsIconic,
     IsWindowVisible,
 };
 
@@ -77,6 +78,13 @@ unsafe extern "system" fn visit(hwnd: HWND, param: LPARAM) -> BOOL {
 
     // 見えていない窓は数えない（人が見ているものだけを相手にする）。
     if !IsWindowVisible(hwnd).as_bool() {
+        return TRUE;
+    }
+    // **最小化された窓も数えない**（2026-09-12・Windows 機で実測して足した）。
+    // `IsWindowVisible` は最小化でも `TRUE` を返す。そのまま数えると
+    // `GetWindowRect` が `-32000, -32000 / 199x34` を返し、**それが 1 つ目に並ぶ。**
+    // 撮っても写らず、押す場所も決まらない。**人が見ている窓ではない。**
+    if IsIconic(hwnd).as_bool() {
         return TRUE;
     }
     let length = GetWindowTextLengthW(hwnd);

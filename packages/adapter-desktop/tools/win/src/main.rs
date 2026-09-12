@@ -20,6 +20,7 @@ use std::process::ExitCode;
 mod input;
 mod shot;
 mod text;
+mod wake;
 mod window;
 
 fn main() -> ExitCode {
