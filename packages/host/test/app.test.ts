@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runWithLiveView, tauriDevArgs } from '../src/index.js';
+import { desktopLaunch, runWithLiveView, tauriDevArgs } from '../src/index.js';
 import { stubAdapter } from './stub-adapter.js';
 
 describe('tauriDevArgs', () => {
@@ -135,5 +135,50 @@ describe('tauriDevArgs — アプリを入口にする（Issue 011 段階 3）',
 
     expect(url.searchParams.get('setup')).toBe('http://127.0.0.1:7/setup/abc');
     expect(url.searchParams.has('live')).toBe(false);
+  });
+});
+
+/**
+ * **画面の起こし方**（2026-09-12・Windows 機で実測して足した）。
+ *
+ * それまでは `spawn('pnpm', ['--filter', …, 'exec', 'tauri', …])` だった。
+ * **Windows では 1 度も起きない。**
+ *
+ * ```text
+ * Error: spawn pnpm ENOENT
+ *   spawnargs: [ '--filter', '@git-qa/desktop', 'exec', 'tauri', 'dev', '--config', '{"build":…}' ]
+ * ```
+ *
+ * Windows の `pnpm` は `pnpm.cmd` で、Node は拡張子を補わない。
+ * **shell を噛ませて直すのは採らない** —— `--config` に渡す JSON には `"` が入っていて、
+ * cmd.exe の引用で壊れる。Tauri の CLI は素の JS なので、**node で直に起こせば
+ * 引数は配列のまま渡り、OS ごとの引用の話が消える。**
+ */
+describe('desktopLaunch', () => {
+  it('いま走っている node で起こす（pnpm を探しに行かない）', () => {
+    expect(desktopLaunch(['dev']).command).toBe(process.execPath);
+  });
+
+  /** **pnpm を経由しない。**経由しないことが、この関数の要点。 */
+  it('起こすのは Tauri の CLI そのもの', () => {
+    const launch = desktopLaunch(['dev']);
+
+    expect(launch.args[0]).toMatch(/tauri\.js$/);
+    expect(launch.args).not.toContain('--filter');
+  });
+
+  /**
+   * **渡した引数は、そのままの形で後ろに付く。**
+   * `--config` の JSON を、途中で文字列に潰さない（潰すと引用で壊れる）。
+   */
+  it('渡した引数を、形を変えずに後ろへ付ける', () => {
+    const args = tauriDevArgs('http://127.0.0.1:9000/live/abc.h264');
+
+    expect(desktopLaunch(args).args.slice(1)).toEqual(args);
+  });
+
+  /** Tauri は `tauri.conf.json` のある所から走る。**どこから呼んでも同じ場所を見る。** */
+  it('画面のパッケージで走らせる', () => {
+    expect(desktopLaunch(['dev']).cwd).toMatch(/desktop$/);
   });
 });

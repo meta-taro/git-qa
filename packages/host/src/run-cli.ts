@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-android';
@@ -7,7 +6,7 @@ import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
-import { tauriDevArgs } from './app.js';
+import { spawnDesktop, tauriDevArgs } from './app.js';
 
 /**
  * 検証シートを 1 本走らせる。**一本道**（Issue 004）。
@@ -74,17 +73,7 @@ const session = await startRunSession({
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
 console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
-const child = spawn(
-  'pnpm',
-  [
-    '--filter',
-    '@git-qa/desktop',
-    'exec',
-    'tauri',
-    ...tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl }),
-  ],
-  { stdio: 'inherit' },
-);
+const child = spawnDesktop(tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl }));
 
 /**
  * 画面が終わったら、残りを「やっていない」ではなく判断保留として残して終える。

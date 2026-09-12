@@ -1,8 +1,6 @@
-import { spawn } from 'node:child_process';
-
 import { createWebAdapter } from '@git-qa/adapter-web';
 
-import { runWithLiveView, tauriDevArgs } from './app.js';
+import { runWithLiveView, spawnDesktop, tauriDevArgs } from './app.js';
 
 /**
  * ウェブページに繋いで、画面を起こす（Issue 015 / C54）。
@@ -41,18 +39,8 @@ await runWithLiveView({
     new Promise<void>((resolve, reject) => {
       // 映らないときに、繋がっていないのか描けていないのかを切り分ける最初の手がかり。
       console.log(`[git-qa] ライブ映像の橋: ${liveUrl}`);
-      const child = spawn(
-        'pnpm',
-        [
-          '--filter',
-          '@git-qa/desktop',
-          'exec',
-          'tauri',
-          // **画面側では映像の種類を決められない。**ブラウザの絵だと知らせる（C54）。
-          ...tauriDevArgs(liveUrl, { liveKind: 'images' }),
-        ],
-        { stdio: 'inherit' },
-      );
+      // **画面側では映像の種類を決められない。**ブラウザの絵だと知らせる（C54）。
+      const child = spawnDesktop(tauriDevArgs(liveUrl, { liveKind: 'images' }));
       child.on('close', () => resolve());
       child.on('error', reject);
     }),

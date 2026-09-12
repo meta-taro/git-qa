@@ -1,8 +1,6 @@
-import { spawn } from 'node:child_process';
-
 import { createAndroidAdapter } from '@git-qa/adapter-android';
 
-import { runWithLiveView, tauriDevArgs } from './app.js';
+import { runWithLiveView, spawnDesktop, tauriDevArgs } from './app.js';
 
 /**
  * 端末に繋いで、画面を起こす。
@@ -32,11 +30,7 @@ await runWithLiveView({
       // 起動できたかを人が確かめられるようにする。映らないときに、繋がっていないのか
       // 描けていないのかを切り分ける最初の手がかりになる。
       console.log(`[git-qa] ライブ映像の橋: ${liveUrl}`);
-      const child = spawn(
-        'pnpm',
-        ['--filter', '@git-qa/desktop', 'exec', 'tauri', ...tauriDevArgs(liveUrl)],
-        { stdio: 'inherit' },
-      );
+      const child = spawnDesktop(tauriDevArgs(liveUrl));
       child.on('close', () => resolve());
       child.on('error', reject);
     }),

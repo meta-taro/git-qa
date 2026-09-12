@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -34,7 +33,7 @@ import {
 } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
-import { tauriDevArgs } from './app.js';
+import { spawnDesktop, tauriDevArgs } from './app.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
 import { findInput, findOcr, findWinTool } from './ocr-path.js';
@@ -319,17 +318,7 @@ if (serveOnly) {
   process.stdin.resume();
   watchParent({ onOrphan: stop });
 } else {
-  const child = spawn(
-    'pnpm',
-    [
-      '--filter',
-      '@git-qa/desktop',
-      'exec',
-      'tauri',
-      ...tauriDevArgs(undefined, { setupUrl: setup.url }),
-    ],
-    { stdio: 'inherit' },
-  );
+  const child = spawnDesktop(tauriDevArgs(undefined, { setupUrl: setup.url }));
 
   // 画面が閉じられたら、残りを「やっていない」ではなく判断保留として残して終える。
   child.on('close', () => session?.abort('画面が閉じられた'));

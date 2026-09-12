@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
@@ -8,7 +7,7 @@ import { findInput, findOcr } from './ocr-path.js';
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
-import { tauriDevArgs } from './app.js';
+import { spawnDesktop, tauriDevArgs } from './app.js';
 
 /**
  * 手元のデスクトップアプリで検証シートを 1 本走らせる（Issue 016 / C55）。
@@ -94,20 +93,12 @@ console.log(`[git-qa] 見るアプリ: ${app}${ocrPath === undefined ? '（段 1
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
 console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
-const child = spawn(
-  'pnpm',
-  [
-    '--filter',
-    '@git-qa/desktop',
-    'exec',
-    'tauri',
-    ...tauriDevArgs(session.liveUrl, {
-      controlUrl: session.controlUrl,
-      liveKind: 'images',
-      targetKind: 'desktop',
-    }),
-  ],
-  { stdio: 'inherit' },
+const child = spawnDesktop(
+  tauriDevArgs(session.liveUrl, {
+    controlUrl: session.controlUrl,
+    liveKind: 'images',
+    targetKind: 'desktop',
+  }),
 );
 
 /** **開けなかったのと、閉じられたのは別**（2026-09-06 に踏んだ）。 */

@@ -1,3 +1,9 @@
+import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import type { TargetAdapter } from '@git-qa/core';
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
@@ -28,6 +34,49 @@ export async function runWithLiveView(options: RunWithLiveViewOptions): Promise<
     // 人が窓を閉じたのに端末を掴んだままにしない。落ちた場合も同じ。
     await live.close();
   }
+}
+
+/** 画面（Tauri）の起こし方。**どう起こすかを 1 箇所に持つ。** */
+export interface DesktopLaunch {
+  /** 起こす実行ファイル。**いま走っている node。** */
+  readonly command: string;
+  /** Tauri の CLI と、そこへ渡す引数。 */
+  readonly args: readonly string[];
+  /** `tauri.conf.json` のある場所。 */
+  readonly cwd: string;
+}
+
+/**
+ * 画面（Tauri）を起こすための一式を組み立てる（2026-09-12・Windows 機で実測して足した）。
+ *
+ * それまでは `spawn('pnpm', ['--filter', …, 'exec', 'tauri', …])` だった。
+ * **Windows では 1 度も起きない。**
+ *
+ * ```text
+ * Error: spawn pnpm ENOENT
+ * ```
+ *
+ * Windows の `pnpm` の実体は `pnpm.cmd` で、**Node は拡張子を補わない。**
+ *
+ * **shell を噛ませて直すのは採らない。**`--config` へ渡す JSON には `"` が入っていて、
+ * cmd.exe の引用で壊れる。Tauri の CLI は素の JS なので、**node で直に起こせば
+ * 引数は配列のまま渡り、OS ごとの引用の話が消える。**pnpm を 1 つ挟まない分、速くもなる。
+ */
+export function desktopLaunch(
+  args: readonly string[],
+  fromDir = dirname(fileURLToPath(import.meta.url)),
+): DesktopLaunch {
+  // `packages/host/src` から見た画面のパッケージ。**`git-qa-ocr` を探す道と同じ数え方。**
+  const cwd = resolve(fromDir, '..', '..', 'desktop');
+  const cli = createRequire(join(cwd, 'package.json')).resolve('@tauri-apps/cli/tauri.js');
+
+  return { command: process.execPath, args: [cli, ...args], cwd };
+}
+
+/** 画面を起こす。**閉じられるまでは、呼んだ側が見張る。** */
+export function spawnDesktop(args: readonly string[]): ChildProcess {
+  const launch = desktopLaunch(args);
+  return spawn(launch.command, [...launch.args], { cwd: launch.cwd, stdio: 'inherit' });
 }
 
 /** Tauri の既定の開発サーバ。`packages/desktop/vite.config.ts` と揃えている。 */

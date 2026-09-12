@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 import {
@@ -12,7 +11,7 @@ import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
-import { tauriDevArgs } from './app.js';
+import { spawnDesktop, tauriDevArgs } from './app.js';
 
 /**
  * ウェブページで検証シートを 1 本走らせる（Issue 015 / C54）。
@@ -119,17 +118,9 @@ console.log(`[git-qa] 見る場所: ${target}`);
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
 console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
-const child = spawn(
-  'pnpm',
-  [
-    '--filter',
-    '@git-qa/desktop',
-    'exec',
-    'tauri',
-    // **画面側では映像の種類を決められない。**ブラウザの絵だと知らせる（C54）。
-    ...tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl, liveKind: 'images' }),
-  ],
-  { stdio: 'inherit' },
+// **画面側では映像の種類を決められない。**ブラウザの絵だと知らせる（C54）。
+const child = spawnDesktop(
+  tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl, liveKind: 'images' }),
 );
 
 /**

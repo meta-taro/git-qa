@@ -16,9 +16,9 @@
     "dev": "vite",
     "tauri": "tauri",
     "bundle:host": "esbuild ../host/src/app-cli.ts --bundle --platform=node --target=node22 --format=esm --outfile=src-tauri/resources/host-bundle.mjs && pnpm bundle:ocr && pnpm bundle:input && pnpm bundle:record && pnpm bundle:win",
-    "bundle:ocr": "bash scripts/build-swift-tool.sh ../adapter-desktop/tools/ocr.swift src-tauri/resources/git-qa-ocr",
+    "bundle:ocr": "node scripts/mac-only.mjs bash scripts/build-swift-tool.sh ../adapter-desktop/tools/ocr.swift src-tauri/resources/git-qa-ocr",
     "bundle:input": "cargo build --release --manifest-path ../adapter-desktop/tools/input/Cargo.toml && cp ../adapter-desktop/tools/input/target/release/git-qa-input src-tauri/resources/git-qa-input && bash scripts/sign-tool.sh src-tauri/resources/git-qa-input || echo '[git-qa] 触る道具を建てられない（前面へ出す道で進む）'",
-    "bundle:record": "bash scripts/build-swift-tool.sh ../adapter-desktop/tools/record.swift src-tauri/resources/git-qa-record",
+    "bundle:record": "node scripts/mac-only.mjs bash scripts/build-swift-tool.sh ../adapter-desktop/tools/record.swift src-tauri/resources/git-qa-record",
     "bundle:win": "node scripts/bundle-win.mjs"
   },
   "devDependencies": {
