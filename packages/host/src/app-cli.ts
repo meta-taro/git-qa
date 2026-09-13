@@ -297,6 +297,15 @@ const setup = await startSetupServer({
       liveUrl: session.liveUrl,
       controlUrl: session.controlUrl,
       liveKind: web || app !== undefined ? ('images' as const) : ('h264' as const),
+      /**
+       * **終わったことを入口へ知らせる**（外部レビュー meta-taro/git-qa#5）。
+       *
+       * これが無いと、入口は `running` のまま戻らず、
+       * **1 本走らせたあとは立て直すまで次を受け取れなかった。**
+       *
+       * 落ちて終わった場合も「終わった」。次を受け取れる形へ戻す。
+       */
+      done: finished.catch(() => undefined),
     };
   },
 });

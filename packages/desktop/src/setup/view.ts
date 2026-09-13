@@ -372,6 +372,22 @@ export function renderSetup(
           () => reflect(operator.value.trim()),
         );
 
+  /**
+   * **1 本走らせたあと、入口へ戻れる**（外部レビュー meta-taro/git-qa#5）。
+   *
+   * それまで入口は `running` のまま戻らず、**立て直すまで次を受け取れなかった。**
+   * 終わったことを出して、そのまま次を選べるようにする。
+   */
+  const finished =
+    state.phase === 'done'
+      ? (() => {
+          const note = doc.createElement('p');
+          note.className = 'setup-finished';
+          note.textContent = t('setup.finished');
+          return note;
+        })()
+      : undefined;
+
   const start = doc.createElement('button');
   start.type = 'button';
   start.className = 'setup-start';
@@ -410,6 +426,8 @@ export function renderSetup(
 
   section.append(
     title,
+    // **終わったことを、いちばん上に出す。**次を選ぶ前に目に入る所。
+    ...(finished === undefined ? [] : [finished]),
     operatorHeading,
     operator,
     operatorRule,

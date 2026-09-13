@@ -43,6 +43,8 @@ const ja = {
   // **続きから**（2026-09-12）。どこまで人が見て置いたかを添える。
   'setup.device.failed':
     '端末の一覧を取れなかった（{reason}）。Android を見ないなら、上の URL かアプリ名で進めます',
+  'setup.finished':
+    '検証が 1 本終わりました。証跡は runs/ に残っています。続けて次を走らせられます',
   'setup.resume': '途中で止まった検証（続きから）',
   'setup.resume.note': '選ぶと、その実行に足します。シートは選び直しません',
   'setup.resume.item': '{runId} — 人が置いた {placed} / 走った {cases} 件 · {sheet}',
@@ -165,6 +167,8 @@ const en: Record<keyof typeof ja, string> = {
   'setup.watch': 'Run in watch mode (moves on without you; Esc stops it)',
   'setup.device.failed':
     'Could not list devices ({reason}). If you are not testing Android, use the URL or app name above',
+  'setup.finished':
+    'One run finished. The evidence is under runs/. You can start the next one right away',
   'setup.resume': 'Interrupted runs (continue)',
   'setup.resume.note': 'Picking one appends to that run. The sheet comes with it',
   'setup.resume.item': '{runId} — placed {placed} of {cases} run · {sheet}',

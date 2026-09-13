@@ -23,7 +23,14 @@ export interface SetupDevice {
   readonly state: string;
 }
 
-export type SetupPhase = 'idle' | 'starting' | 'running' | 'failed';
+/**
+ * `'done'` は**走り終えた**（外部レビュー meta-taro/git-qa#5）。
+ *
+ * それまで `idle → starting → running` と進んだきり、**戻る道も先へ進む道も無かった。**
+ * 「走っている最中」と「走り終えた」が同じ値だったので、
+ * **1 本走らせると、その入口は二度と使えなかった。**
+ */
+export type SetupPhase = 'idle' | 'starting' | 'running' | 'done' | 'failed';
 
 /**
  * 途中で止まった実行（2026-09-12・人の指示）。
@@ -63,6 +70,15 @@ export interface SetupState {
 export interface StartedRun {
   readonly liveUrl: string;
   readonly controlUrl: string;
+  /**
+   * 実行が終わったら解決する約束（外部レビュー meta-taro/git-qa#5）。
+   *
+   * `start` が解決するのは**始まった**時点なので、これが無いと
+   * **終わったことを入口が知れない。****渡さなければ今までどおり**（`running` のまま）。
+   *
+   * **画面へは出さない**（約束は JSON にできない。`{}` になって人を惑わせる）。
+   */
+  readonly done?: Promise<unknown>;
   /**
    * 流れてくる映像の種類。**画面側では決められない。**
    * Android は H.264、ウェブはブラウザの画像 1 枚ずつ（C54）。
@@ -187,7 +203,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
   };
 
   const state = async (): Promise<SetupState> => {
-    if (phase !== 'idle') {
+    if (phase !== 'idle' && phase !== 'done') {
       return {
         phase,
         devices: [],
@@ -225,9 +241,15 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     failure = undefined;
     void options
       .start(request)
-      .then((run) => {
+      .then(({ done, ...run }) => {
         started = run;
         phase = 'running';
+        // **終わったら、次を受け取れるようにする。**
+        // 渡されなければ `running` のまま（古い呼び側を壊さない）。
+        void done?.finally(() => {
+          // 既に次が始まっていれば、そちらを上書きしない。
+          if (phase === 'running') phase = 'done';
+        });
       })
       .catch((error: unknown) => {
         // 黙って idle へ戻さない。**なぜ始まらなかったのかが人に見えなくなる。**
@@ -276,8 +298,17 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
         return;
       }
       // 走っている最中に始め直さない。**端末を二重に掴む。**
-      if (phase !== 'idle' && phase !== 'failed') {
-        res.writeHead(409, cors).end();
+      // **走っている最中は断る。**端末を二重に掴む。
+      // 走り終えた（`done`）なら受け取る —— そこが `running` と同じ値だったのが #5。
+      if (phase !== 'idle' && phase !== 'failed' && phase !== 'done') {
+        // **断るなら理由を出す。**本文が無いと、画面に出せるものが無い。
+        res
+          .writeHead(409, { ...cors, 'content-type': 'text/plain; charset=utf-8' })
+          .end(
+            phase === 'starting'
+              ? 'いま始めているところ。少し待ってからもう一度'
+              : 'いま検証が走っている。終わるか、画面を閉じてからもう一度',
+          );
         return;
       }
 

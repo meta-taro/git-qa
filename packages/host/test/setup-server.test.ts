@@ -32,6 +32,19 @@ const options = (overrides: Partial<Parameters<typeof startSetupServer>[0]> = {}
 const json = async (url: string): Promise<Record<string, unknown>> =>
   (await (await fetch(url)).json()) as Record<string, unknown>;
 
+/** いまの段を読む。 */
+const phaseOf = async (server: { url: string }): Promise<string> =>
+  ((await (await fetch(`${server.url}/state`)).json()) as { phase: string }).phase;
+
+/** 条件が満たされるまで待つ。満たされなければ、何を待っていたかを言って落ちる。 */
+const waitFor = async (predicate: () => Promise<boolean>): Promise<void> => {
+  for (let i = 0; i < 100; i += 1) {
+    if (await predicate()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error('待っても起きなかった');
+};
+
 describe('startSetupServer', () => {
   it('127.0.0.1 でだけ待ち受け、URL に無作為の文字列を入れる', async () => {
     server = await startSetupServer(options());
@@ -462,5 +475,91 @@ describe('担当者ハンドル', () => {
     );
 
     expect((await fetch(`${server.url}/state`)).status).toBe(200);
+  });
+
+  /**
+   * **1 本走らせたら、次が走らせられる**（外部レビュー meta-taro/git-qa#5）。
+   *
+   * > シートを 1 本走らせ終えると、その入口の画面は二度と使えません。
+   *
+   * `phase` は `idle → starting → running` と進んだきり、**戻る道も先へ進む道も無かった。**
+   * `options.start` が解決するのは**実行が始まった**時点なので、
+   * そのあと `phase` を書き換えるものが居ない。
+   *
+   * **「走っている最中」と「走り終えた」を、同じ値にしない。**
+   */
+  it('走り終えたら、次を受け取れる', async () => {
+    // 立ち上げ直後に必ず入るので、ここでは在るものとして読む。
+    let finish = (): void => undefined;
+    const done = new Promise<void>((resolve) => (finish = resolve));
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+      done,
+    });
+    server = await startSetupServer(options({ start }));
+
+    const begin = async (): Promise<number> =>
+      (
+        await fetch(`${server!.url}/start`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv' }),
+        })
+      ).status;
+
+    expect(await begin()).toBe(202);
+    await waitFor(async () => (await phaseOf(server!)) === 'running');
+
+    // **走っている最中は断る。**端末を二重に掴む。
+    expect(await begin()).toBe(409);
+
+    finish();
+    await waitFor(async () => (await phaseOf(server!)) === 'done');
+
+    expect(await begin()).toBe(202);
+  });
+
+  /** **断るなら、理由を出す。**本文が無いと、画面に出せるものが無い。 */
+  it('断るときは理由を返す', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+      done: new Promise<void>(() => undefined),
+    });
+    server = await startSetupServer(options({ start }));
+
+    const body = JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv' });
+    const send = (): Promise<Response> =>
+      fetch(`${server!.url}/start`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+
+    await send();
+    await waitFor(async () => (await phaseOf(server!)) === 'running');
+    const refused = await send();
+
+    expect(refused.status).toBe(409);
+    expect(await refused.text()).toContain('走っている');
+  });
+
+  /** 完了の約束を持たない相手（古い呼び側）は、**今までどおり**。 */
+  it('完了の約束が無ければ、running のまま', async () => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv' }),
+    });
+    await waitFor(async () => (await phaseOf(server!)) === 'running');
+
+    expect(await phaseOf(server)).toBe('running');
   });
 });

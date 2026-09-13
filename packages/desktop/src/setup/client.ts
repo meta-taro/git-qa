@@ -12,7 +12,8 @@ export interface SetupDevice {
   readonly state: string;
 }
 
-export type SetupPhase = 'idle' | 'starting' | 'running' | 'failed';
+/** `'done'` は**走り終えた**（外部レビュー meta-taro/git-qa#5）。次を始められる。 */
+export type SetupPhase = 'idle' | 'starting' | 'running' | 'done' | 'failed';
 
 /**
  * 途中で止まった実行（2026-09-12・人の指示）。
@@ -42,7 +43,7 @@ export interface SetupState {
   readonly error?: string;
 }
 
-const PHASES: readonly SetupPhase[] = ['idle', 'starting', 'running', 'failed'];
+const PHASES: readonly SetupPhase[] = ['idle', 'starting', 'running', 'done', 'failed'];
 
 /** `?setup=<url>` から読む。規則は映像・制御と同じ。 */
 export function setupUrlFromLocation(search: string): string | undefined {

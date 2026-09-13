@@ -564,3 +564,33 @@ describe('renderSetup — 端末を数えられなかったとき', () => {
     expect(live().querySelector('.setup-web')).not.toBeNull();
   });
 });
+
+/**
+ * **1 本走らせたあと、入口へ戻れる**（外部レビュー meta-taro/git-qa#5）。
+ *
+ * > シートを 1 本走らせ終えると、その入口の画面は二度と使えません。
+ *
+ * 実行器は `done` を知るようになったので、画面も**終わったことを出して、
+ * 次を始められる**形にする。
+ */
+describe('renderSetup — 走り終えたあと', () => {
+  const finished = (): SetupState => ({ ...idle, phase: 'done' });
+
+  it('終わったことを出す', () => {
+    renderSetup(root, finished(), { onStart: vi.fn(), operator: 'octocat' });
+
+    expect(live().textContent).toContain('終わ');
+  });
+
+  /** **次を選べる。**端末もシートも出ている。 */
+  it('次のシートを選んで始められる', () => {
+    const onStart = vi.fn();
+    renderSetup(root, finished(), { onStart, operator: 'octocat' });
+
+    live().querySelector<HTMLElement>('.setup-device[data-serial="R5CT1234"]')?.click();
+    live().querySelector<HTMLElement>('.setup-sheet[data-path="/repo/docs/b.tsv"]')?.click();
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+});
