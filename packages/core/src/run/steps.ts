@@ -40,6 +40,11 @@ export interface PlanOptions {
    */
   readonly textInput?: 'none' | 'ascii-only' | 'any';
   /**
+   * キーを送れるか（`AdapterCapabilities.keyInput`・外部レビュー #6）。
+   * **送れない相手には回さない** —— 走らせて落ちるより、人へ回すほうが読める。
+   */
+  readonly keyInput?: boolean;
+  /**
    * 行き先の書き方。
    *
    * Android はパッケージ名、ウェブは URL（既定の `'package-or-url'`）。
@@ -71,6 +76,21 @@ const TAP = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:タップ|クリッ
  * 「押す」は決まらない。**決まらないものを当てにいかない。**
  */
 const PRESS = /^「(?<target>[^」]+)」を押(?:す|下する)$/;
+
+/**
+ * `Enter キーを押す` / `Ctrl+Enter キーを押す`（外部レビュー meta-taro/git-qa#6）。
+ *
+ * > 同じクエリがキーボードでは通り、ボタンでは通らないなら、不具合はボタンの配線にある。
+ * > No.5 は飾りではなく、どちらが壊れているかを分ける 1 行。
+ *
+ * **鉤括弧＝画面の要素、という決まりは崩さない。****「キー」の 1 語で決める。**
+ * 括弧なしの「Enter を押す」は、いまも決められない —— ただし
+ * **決められないと言うだけでなく、どう書けばよいかを言う**（下の `HOLD_PRESS`）。
+ */
+const KEY_PRESS = /^(?<key>[^\s「」]+)\s*キーを押(?:す|下する)$/;
+
+/** 括弧なしで「押す」と書かれたもの。**書き方を教えるためだけに見る。** */
+const BARE_PRESS = /^(?<what>[^「」]+?)を押(?:す|下する)$/;
 
 /** `「X」を起動する` / `X を起動する` */
 const LAUNCH = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))\s*を(?:(?:起動|開始)する|開く)$/;
@@ -189,6 +209,7 @@ function planOneStep(
   app: string | undefined,
   textInput: 'none' | 'ascii-only' | 'any',
   appId: 'package-or-url' | 'name',
+  keyInput: boolean,
 ): PlannedStep {
   const into = TYPE_INTO.exec(text);
   if (into?.groups) {
@@ -234,6 +255,33 @@ function planOneStep(
     return { kind: 'action', text, action: { kind: 'tap', target: { at: 'element', ref } } };
   }
 
+  const key = KEY_PRESS.exec(text);
+  if (key?.groups) {
+    const named = key.groups['key'] ?? '';
+    // **送れない相手には回さない**（C20）。走らせて落ちるより、人へ回すほうが読める。
+    if (!keyInput) {
+      return {
+        kind: 'hold',
+        text,
+        reason: `この相手にはキー（${named}）を送れない。人が押す必要がある`,
+      };
+    }
+    return { kind: 'action', text, action: { kind: 'key', key: named } };
+  }
+
+  const bare = BARE_PRESS.exec(text);
+  if (bare?.groups) {
+    // **決められないと言うだけで終わらせない。**どう書けば動くかを、その場で言う。
+    const what = (bare.groups['what'] ?? '').trim();
+    return {
+      kind: 'hold',
+      text,
+      reason:
+        `「${what}」が画面の文字なのかキーなのか決められない。` +
+        `画面の要素なら「${what}」を押す、キーなら ${what} キーを押す、と書いてください`,
+    };
+  }
+
   return {
     kind: 'hold',
     text,
@@ -259,7 +307,9 @@ export function planSteps(stepsText: string, options: PlanOptions = {}): Planned
   }
   const textInput = options.textInput ?? 'ascii-only';
   const appId = options.appId ?? 'package-or-url';
-  return lines.map((line) => planOneStep(line, options.app, textInput, appId));
+  // **キーを送れるかは相手が名乗る**（外部レビュー #6）。ここで推し量らない。
+  const keyInput = options.keyInput ?? true;
+  return lines.map((line) => planOneStep(line, options.app, textInput, appId, keyInput));
 }
 
 /** 画面に在るかどうかで決まる期待結果。 */

@@ -57,6 +57,8 @@ const capabilities: AdapterCapabilities = {
   recording: false,
   // まだ文字を送れない。**確かめていないものを「できる」と言わない。**
   textInput: 'none',
+  // `act` は tap だけ。**キーはそもそも届かない。**
+  keyInput: false,
   // 窓の持ち主の名前そのもの。**パッケージ名は無い。**
   appId: 'name',
 };

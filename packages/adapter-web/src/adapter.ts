@@ -1,3 +1,4 @@
+import { keyEvents } from './keys.js';
 import { AdapterError } from '@git-qa/core';
 import type {
   Action,
@@ -71,6 +72,8 @@ const capabilities: AdapterCapabilities = {
   recording: false,
   // ブラウザは IME を通さずそのまま入る。**日本語も送れる。**
   textInput: 'any',
+  // 番号まで載せるようにして、実物で効くことを確かめた（外部レビュー #6・2026-09-13）。
+  keyInput: true,
   // 行き先は URL。
   appId: 'package-or-url',
 };
@@ -344,8 +347,11 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   }
 
   if (action.kind === 'key') {
-    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: action.key });
-    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: action.key });
+    // **番号まで載せる。**`key` だけでは、Chrome は既定の動作（送信・改行）を起こさない
+    // （2026-09-13 に実物で確かめた・外部レビュー #6）。
+    for (const event of keyEvents(action.key)) {
+      await cdp.send('Input.dispatchKeyEvent', { ...event });
+    }
     return;
   }
 

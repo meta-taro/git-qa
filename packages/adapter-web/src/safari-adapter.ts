@@ -40,6 +40,12 @@ const capabilities: AdapterCapabilities = {
   observation: 'dom',
   recording: false,
   textInput: 'any',
+  /**
+   * **まだ名乗らない**（外部レビュー #6・2026-09-13）。
+   * `key` だけを送っており、`keyCode` が無いと既定の動作（送信・改行）が
+   * 起きないことが多い。**「送った」と「効いた」は別。**確かめてから真にする。
+   */
+  keyInput: false,
   appId: 'package-or-url',
 };
 

@@ -101,6 +101,8 @@ export function createAndroidAdapter(options: AndroidAdapterOptions): TargetAdap
     recording: true,
     // `input text` は IME を通らない。日本語は送れない（C34）。
     textInput: 'ascii-only',
+    // `input keyevent KEYCODE_*` で実際に押せる（3 つの相手の中で、ここだけが元から効いていた）。
+    keyInput: true,
     // どのパッケージかは端末と地域で変わる。**表示名からの推測はしない**（C40）。
     appId: 'package-or-url',
   };

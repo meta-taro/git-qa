@@ -22,3 +22,4 @@ export type { WindowsDesktopAdapterOptions } from './win/adapter.js';
 export { parseWinWindows, winArgs } from './win/tool.js';
 export type { WinWindow } from './win/tool.js';
 export { whyNoDesktop } from './win/pick.js';
+export { keyScript } from './keys.js';

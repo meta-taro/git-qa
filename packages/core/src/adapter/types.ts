@@ -39,6 +39,15 @@ export interface AdapterCapabilities {
    */
   readonly textInput: 'none' | 'ascii-only' | 'any';
   /**
+   * キーを送れるか（外部レビュー meta-taro/git-qa#6）。
+   *
+   * **「口がある」と「押せる」は別。**`Action` に `key` はずっと在ったが、
+   * 実際に押せるのは Android だけだった（macOS は文字を打ち、
+   * ウェブは既定の動作が起きず、Windows はそもそも届かない・2026-09-13 に数えた）。
+   * **押せない相手に回さない**ために、相手に名乗らせる。
+   */
+  readonly keyInput: boolean;
+  /**
    * 行き先（`# 対象:`）の書き方。**相手によって違うので、アダプタが名乗る。**
    *
    * Android はパッケージ名、ウェブは URL（`'package-or-url'`）。

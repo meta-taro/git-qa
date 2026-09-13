@@ -370,3 +370,61 @@ describe('planType — 文字を送れない相手', () => {
     expect(planned[0]?.kind).toBe('action');
   });
 });
+
+/**
+ * **キーの手順**（外部レビュー meta-taro/git-qa#6）。
+ *
+ * > キーを押す操作が無いので、キーボードの手順は必ず判断保留になる
+ *
+ * 鉤括弧＝画面の要素、という決まりは崩さない。**「キー」の 1 語で決める。**
+ *
+ * > 同じクエリがキーボードでは通り、ボタンでは通らないなら、不具合はボタンの配線にある。
+ * > No.5 は飾りではなく、どちらが壊れているかを分ける 1 行。
+ */
+describe('planSteps — キーを押す', () => {
+  it('「キーを押す」はキーとして読む', () => {
+    const [planned] = planSteps('1. Enter キーを押す', { keyInput: true });
+
+    expect(planned?.kind).toBe('action');
+    expect(planned?.kind === 'action' && planned.action).toEqual({ kind: 'key', key: 'Enter' });
+  });
+
+  it('修飾キーつきも読む', () => {
+    const [planned] = planSteps('1. Ctrl+Enter キーを押す', { keyInput: true });
+
+    expect(planned?.kind === 'action' && planned.action).toEqual({
+      kind: 'key',
+      key: 'Ctrl+Enter',
+    });
+  });
+
+  /** **鉤括弧は今までどおり画面の要素。**キーに取られない。 */
+  it('鉤括弧は画面の要素のまま', () => {
+    const [planned] = planSteps('1. 「保存」を押す', { keyInput: true });
+
+    expect(planned?.kind === 'action' && planned.action.kind).toBe('tap');
+  });
+
+  /**
+   * **送れない相手には回さない**（C20）。
+   * Windows のデスクトップはまだキーを送れない。**FAIL ではなく判断保留。**
+   */
+  it('キーを送れない相手なら、人に回す', () => {
+    const [planned] = planSteps('1. Enter キーを押す', { keyInput: false });
+
+    expect(planned?.kind).toBe('hold');
+    expect(planned?.kind === 'hold' && planned.reason).toContain('キー');
+  });
+
+  /**
+   * **書き方が分からないまま止まらせない。**
+   * 括弧なしの「Enter を押す」は、いまも決められない。
+   * **決められないと言うだけでなく、どう書けばよいかを言う。**
+   */
+  it('括弧なしで押すと、書き方を教える', () => {
+    const [planned] = planSteps('1. Enter を押す', { keyInput: true });
+
+    expect(planned?.kind).toBe('hold');
+    expect(planned?.kind === 'hold' && planned.reason).toContain('キーを押す');
+  });
+});

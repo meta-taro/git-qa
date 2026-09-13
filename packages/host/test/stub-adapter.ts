@@ -124,6 +124,7 @@ export function stubAdapter(options: {
       observation: 'accessibility-tree',
       recording: true,
       textInput: 'ascii-only',
+      keyInput: true,
       appId: 'package-or-url',
     },
     connect: () => {

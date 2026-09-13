@@ -33,6 +33,8 @@ export interface SheetCaseRunnerOptions {
    * （`AdapterCapabilities.textInput`）。ここで推し量らない。
    */
   readonly textInput?: 'none' | 'ascii-only' | 'any';
+  /** キーを送れるか（`AdapterCapabilities.keyInput`）。ここで推し量らない。 */
+  readonly keyInput?: boolean;
   /** 行き先の書き方。**アダプタが名乗ったものをそのまま渡す。** */
   readonly appId?: 'package-or-url' | 'name';
   readonly stepsColumn?: string;
@@ -100,6 +102,7 @@ export function createSheetCaseRunner(
       ...(options.app === undefined ? {} : { app: options.app }),
       // **相手が名乗った能力をそのまま使う。**ここで推し量らない。
       ...(options.textInput === undefined ? {} : { textInput: options.textInput }),
+      ...(options.keyInput === undefined ? {} : { keyInput: options.keyInput }),
       ...(options.appId === undefined ? {} : { appId: options.appId }),
     });
     const held = holdBeforeTouching(planned);

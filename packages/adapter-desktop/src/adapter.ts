@@ -21,6 +21,7 @@ import { axScript, findInElements, manualAccessibilityScript, parseElements } fr
 import { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 import type { AxElement } from './ax.js';
 import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
+import { keyScript } from './keys.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
@@ -60,6 +61,9 @@ const capabilities: AdapterCapabilities = {
   recording: false,
   // `keystroke` は IME を通すので、日本語もそのまま送れる。
   textInput: 'any',
+  // `key code` で送るようにした（外部レビュー #6・2026-09-13）。
+  // **知らないキーは断る**ので、押したつもりで文字が入ることは無い。
+  keyInput: true,
   // 窓の持ち主の名前そのもの。**パッケージ名は無い。**
   appId: 'name',
 };
@@ -486,10 +490,9 @@ async function dispatch(
   }
 
   if (action.kind === 'key') {
-    await run('osascript', [
-      '-e',
-      `tell application "System Events" to keystroke ${JSON.stringify(action.key)}`,
-    ]);
+    // **`keystroke "Enter"` は「Enter」という 5 文字を打つ。**特殊キーには `key code` が要る
+    // （外部レビュー #6・2026-09-13）。押したつもりで文字が入るほうが、押せないより悪い。
+    await run('osascript', ['-e', keyScript(action.key)]);
     return;
   }
 
