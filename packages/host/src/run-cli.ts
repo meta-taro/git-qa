@@ -6,7 +6,7 @@ import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
-import { spawnDesktop, tauriDevArgs } from './app.js';
+import { spawnDesktop, tauriDevArgs, assertDesktopPortFree } from './app.js';
 
 /**
  * 検証シートを 1 本走らせる。**一本道**（Issue 004）。
@@ -73,6 +73,13 @@ const session = await startRunSession({
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
 console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
+/**
+ * **起こす前に、口が空いているかを見る**（外部レビュー meta-taro/git-qa#7）。
+ *
+ * 掴まれたまま起こすと、vite の「Port 1420 is already in use」で死ぬ。
+ * **その文言からは、掴んでいるのが誰か分からない。**
+ */
+await assertDesktopPortFree();
 const child = spawnDesktop(tauriDevArgs(session.liveUrl, { controlUrl: session.controlUrl }));
 
 /**

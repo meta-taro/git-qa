@@ -8,6 +8,7 @@ import type { TargetAdapter } from '@git-qa/core';
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
 import { startLiveSession } from './live-session.js';
+import { explainBusyPort, isPortBusy } from './port.js';
 
 /**
  * 端末に繋いでから画面を起こし、画面が閉じたら端末を離す。**最後の 1 本。**
@@ -88,6 +89,37 @@ export function desktopLaunch(
   }
 
   return { command: process.execPath, args: [cli, ...args], cwd };
+}
+
+/**
+ * 画面の開発サーバが使う口。`packages/desktop/vite.config.ts` と揃えている。
+ */
+export const DESKTOP_DEV_PORT = 1420;
+
+export interface DesktopPortCheck {
+  readonly busy: (port: number) => Promise<boolean>;
+  readonly explain: (port: number) => Promise<string>;
+}
+
+/**
+ * **画面を起こす前に、口が空いているかを見る**（外部レビュー meta-taro/git-qa#7）。
+ *
+ * > 実行を止めても vite が残り、次の実行が「Port 1420 is already in use」で死ぬ
+ *
+ * 掴まれたまま起こすと、vite がそう言って死ぬ。**その文言からは、
+ * 掴んでいるのが誰か分からない** —— 別の git-qa かもしれないし、
+ * 自分が置き去りにしたものかもしれない。**どちらかで、やることが変わる。**
+ *
+ * **後始末そのものは、これでは直らない。**手元の CLI は `vite-node` の下で走り、
+ * signal がスクリプトまで来ないので、「止めたときに子を片付ける」道が開いていない。
+ * ここでやるのは、**次に始めるとき、何が起きているかを人に見せる**こと。
+ */
+export async function assertDesktopPortFree(
+  check: DesktopPortCheck = { busy: isPortBusy, explain: explainBusyPort },
+  port = DESKTOP_DEV_PORT,
+): Promise<void> {
+  if (!(await check.busy(port))) return;
+  throw new Error(await check.explain(port));
 }
 
 /** 画面を起こす。**閉じられるまでは、呼んだ側が見張る。** */

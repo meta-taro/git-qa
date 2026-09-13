@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { desktopLaunch, runWithLiveView, tauriDevArgs } from '../src/index.js';
+import {
+  assertDesktopPortFree,
+  desktopLaunch,
+  runWithLiveView,
+  tauriDevArgs,
+} from '../src/index.js';
 import { stubAdapter } from './stub-adapter.js';
 
 describe('tauriDevArgs', () => {
@@ -196,4 +201,30 @@ describe('desktopLaunch', () => {
    * **正しい理由で落ちないテストは、負債にしかならない**ので置かない。
    * 断り方は `app.ts` 側にコメントで残してある。
    */
+});
+
+/**
+ * **画面を起こす前に、口が空いているかを見る**（外部レビュー meta-taro/git-qa#7）。
+ *
+ * 掴まれたまま起こすと、vite の「Port 1420 is already in use」で死ぬ。
+ * **その文言からは、掴んでいるのが誰か分からない。**
+ */
+describe('assertDesktopPortFree', () => {
+  it('空いていれば、何も言わずに通す', async () => {
+    await expect(
+      assertDesktopPortFree({
+        busy: () => Promise.resolve(false),
+        explain: () => Promise.resolve(''),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('掴まれていれば、誰が掴んでいるかごと止める', async () => {
+    await expect(
+      assertDesktopPortFree({
+        busy: () => Promise.resolve(true),
+        explain: () => Promise.resolve('掴んでいるのは 72394'),
+      }),
+    ).rejects.toThrow('72394');
+  });
 });

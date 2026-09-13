@@ -33,7 +33,7 @@ import {
 } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
-import { spawnDesktop, tauriDevArgs } from './app.js';
+import { spawnDesktop, tauriDevArgs, assertDesktopPortFree } from './app.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
 import { findInput, findOcr, findWinTool } from './ocr-path.js';
@@ -327,6 +327,13 @@ if (serveOnly) {
   process.stdin.resume();
   watchParent({ onOrphan: stop });
 } else {
+  /**
+   * **起こす前に、口が空いているかを見る**（外部レビュー meta-taro/git-qa#7）。
+   *
+   * 掴まれたまま起こすと、vite の「Port 1420 is already in use」で死ぬ。
+   * **その文言からは、掴んでいるのが誰か分からない。**
+   */
+  await assertDesktopPortFree();
   const child = spawnDesktop(tauriDevArgs(undefined, { setupUrl: setup.url }));
 
   // 画面が閉じられたら、残りを「やっていない」ではなく判断保留として残して終える。

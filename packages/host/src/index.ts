@@ -1,6 +1,13 @@
 export { startLiveSession } from './live-session.js';
 export type { LiveSession, StartLiveSessionOptions } from './live-session.js';
-export { desktopLaunch, runWithLiveView, spawnDesktop, tauriDevArgs } from './app.js';
+export {
+  DESKTOP_DEV_PORT,
+  assertDesktopPortFree,
+  desktopLaunch,
+  runWithLiveView,
+  spawnDesktop,
+  tauriDevArgs,
+} from './app.js';
 export type { DesktopLaunch, RunWithLiveViewOptions } from './app.js';
 export { startRunSession } from './run-session.js';
 export type { RunSession, StartRunSessionOptions } from './run-session.js';

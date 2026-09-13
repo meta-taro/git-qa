@@ -1,6 +1,6 @@
 import { createAndroidAdapter } from '@git-qa/adapter-android';
 
-import { runWithLiveView, spawnDesktop, tauriDevArgs } from './app.js';
+import { runWithLiveView, spawnDesktop, tauriDevArgs, assertDesktopPortFree } from './app.js';
 
 /**
  * 端末に繋いで、画面を起こす。
@@ -27,11 +27,20 @@ await runWithLiveView({
   }),
   launch: (liveUrl) =>
     new Promise<void>((resolve, reject) => {
-      // 起動できたかを人が確かめられるようにする。映らないときに、繋がっていないのか
-      // 描けていないのかを切り分ける最初の手がかりになる。
-      console.log(`[git-qa] ライブ映像の橋: ${liveUrl}`);
-      const child = spawnDesktop(tauriDevArgs(liveUrl));
-      child.on('close', () => resolve());
-      child.on('error', reject);
+      void (async () => {
+        // 起動できたかを人が確かめられるようにする。映らないときに、繋がっていないのか
+        // 描けていないのかを切り分ける最初の手がかりになる。
+        console.log(`[git-qa] ライブ映像の橋: ${liveUrl}`);
+        /**
+         * **起こす前に、口が空いているかを見る**（外部レビュー meta-taro/git-qa#7）。
+         *
+         * 掴まれたまま起こすと、vite の「Port 1420 is already in use」で死ぬ。
+         * **その文言からは、掴んでいるのが誰か分からない。**
+         */
+        await assertDesktopPortFree();
+        const child = spawnDesktop(tauriDevArgs(liveUrl));
+        child.on('close', () => resolve());
+        child.on('error', reject);
+      })().catch(reject);
     }),
 });
