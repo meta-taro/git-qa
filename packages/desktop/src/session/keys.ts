@@ -32,6 +32,14 @@ export type KeyCommand =
    * 判定のキーは奪わない —— 止めるのは判定とは別の行い。
    */
   | { readonly kind: 'stop' }
+  /**
+   * **映像を拡大する**（外部レビュー meta-taro/git-qa#13）。
+   *
+   * > 見えない画面で押す `D` は、**AI の判定を追認しただけ**になりかねません。
+   *
+   * `by` は段の上げ下げ（`0` は等倍へ戻す）。**判定のキーは奪わない。**
+   */
+  | { readonly kind: 'zoom'; readonly by: 1 | -1 | 0 }
   /** 見ているケースを前後に動かす。**実行の進行とは別のカーソル**（Issue 013）。 */
   | { readonly kind: 'prev' }
   | { readonly kind: 'next' };
@@ -68,6 +76,10 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { key: ' ', labelKey: 'key.advance', noteKey: 'key.advance.note' },
   { key: 'ArrowUp', labelKey: 'key.prev', noteKey: 'key.move.note' },
   { key: 'ArrowDown', labelKey: 'key.next', noteKey: 'key.move.note' },
+  // **見えないものに判定は置けない**（外部レビュー #13）。打鍵だけにしない。
+  { key: '+', labelKey: 'key.zoomIn', noteKey: 'key.zoom.note' },
+  { key: '-', labelKey: 'key.zoomOut', noteKey: 'key.zoom.note' },
+  { key: '0', labelKey: 'key.zoomReset', noteKey: 'key.zoom.note' },
 ];
 
 const VERDICTS = VERDICT_KEYS;
@@ -82,6 +94,10 @@ export function commandForKey(press: KeyPress): KeyCommand | undefined {
   if (humanResult !== undefined) return { kind: 'verdict', humanResult };
   if (key === ' ') return { kind: 'advance' };
   if (key === 'Escape') return { kind: 'stop' };
+  // 映像の拡大。**判定のキー（d/f/a/s）とスペースは奪っていない。**
+  if (key === '+' || key === '=') return { kind: 'zoom', by: 1 };
+  if (key === '-') return { kind: 'zoom', by: -1 };
+  if (key === '0') return { kind: 'zoom', by: 0 };
   // 一覧は縦に並んでいるので、左右でも上下でも動かせるようにする。
   if (key === 'ArrowLeft' || key === 'ArrowUp') return { kind: 'prev' };
   if (key === 'ArrowRight' || key === 'ArrowDown') return { kind: 'next' };
@@ -117,6 +133,8 @@ const CAPS: Readonly<Record<string, string>> = {
   ArrowRight: '→',
   ' ': 'スペース',
   Escape: 'Esc',
+  '+': '＋',
+  '-': '−',
 };
 
 export function keyCap(key: string): string {

@@ -15,6 +15,8 @@ import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { humanInputFor, nextCursor, whyCannotPlace } from './session/cursor.js';
+import { applyZoom } from './live/apply-zoom.js';
+import { nextZoom } from './live/zoom.js';
 import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
@@ -455,6 +457,8 @@ function startControl(controlUrl: string): void {
       if (cursor === undefined || cursor === previousAwaiting) cursor = state.awaiting;
       // **「ここ」と指す**（要望シート No.1）。AI が触った場所を、映像の上に出す。
       showPointer(app, state.pointing);
+      // **指す場所が変わったら、寄る先も変わる。**拡大しているときだけ当て直す。
+      if (zoom > 1) applyZoom(app, zoom, state.pointing);
       previousAwaiting = state.awaiting;
       renderSession(app, state, { ...(cursor === undefined ? {} : { cursor }) });
     },
@@ -470,10 +474,26 @@ function startControl(controlUrl: string): void {
     renderSession(app, state, { cursor });
   };
 
+  /** いまの拡大の段。**等倍から始める。** */
+  let zoom = 1;
+
   /** 打鍵とクリックで、まったく同じ道を通す。 */
   const place = (command: KeyCommand): void => {
     if (command.kind === 'prev' || command.kind === 'next') {
       move(command.kind === 'prev' ? -1 : 1);
+      return;
+    }
+
+    /**
+     * **映像を拡大する**（外部レビュー meta-taro/git-qa#13）。
+     *
+     * > 見えない画面で押す `D` は、**AI の判定を追認しただけ**になりかねません。
+     *
+     * 寄る先は**AI が最後に指した場所**。人が探して動かす手間を作らない。
+     */
+    if (command.kind === 'zoom') {
+      zoom = command.by === 0 ? 1 : nextZoom(zoom, command.by);
+      applyZoom(app, zoom, latest?.pointing);
       return;
     }
 

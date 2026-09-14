@@ -115,12 +115,30 @@ describe('左手ホーム段への割り当て', () => {
     expect(commandForKey({ key: 'b' })).toBeUndefined();
   });
 
-  it('割り当ては A S D F と Space だけ（右手を要求しない）', () => {
-    const typed = KEY_BINDINGS.map((binding) => binding.key).filter(
-      (key) => !key.startsWith('Arrow'),
-    );
+  /**
+   * **判定の割り当ては A S D F と Space だけ**（右手を要求しない）。
+   *
+   * 2026-09-14 に言い方を直した。前は「すべての割り当て」を数えていたが、
+   * **矢印（見る場所を動かす）と拡大（映像を寄せる）は判定ではない。**
+   * 右手で押しても、**左手をホーム段に置いたまま判定できる**ことは変わらない。
+   *
+   * **緩めたのではなく、何を守っているのかを言い直した。**
+   * 判定のキーが増えたり右手へ移ったりしたら、ここで落ちる。
+   */
+  it('判定の割り当ては A S D F と Space だけ（右手を要求しない）', () => {
+    const verdictKeys = KEY_BINDINGS.map((binding) => binding.key).filter((key) => {
+      const command = commandForKey({ key });
+      return command?.kind === 'verdict' || command?.kind === 'advance';
+    });
 
-    expect(new Set(typed)).toEqual(new Set(['a', 's', 'd', 'f', ' ']));
+    expect(new Set(verdictKeys)).toEqual(new Set(['a', 's', 'd', 'f', ' ']));
+  });
+
+  /** **拡大は判定ではない。**押しても証跡は変わらない。 */
+  it('拡大のキーは判定にならない', () => {
+    for (const key of ['+', '-', '0']) {
+      expect(commandForKey({ key })?.kind).toBe('zoom');
+    }
   });
 });
 
@@ -145,5 +163,34 @@ describe('commandForKey — 止める', () => {
   /** 修飾キー付きは受け取らない（ほかと同じ）。**⌘Esc を奪わない。** */
   it('修飾キー付きの Esc は受け取らない', () => {
     expect(commandForKey({ key: 'Escape', metaKey: true })).toBeUndefined();
+  });
+});
+
+/**
+ * **見えない画面で判定させない**（外部レビュー meta-taro/git-qa#13）。
+ *
+ * > 相手の状態表示は 12〜13px で描かれているので、59% では **7px 前後**になります。
+ *
+ * 拡大の割り当ては、**判定のキー（D/F/A/S）を奪わない**こと。
+ */
+describe('commandForKey — 拡大', () => {
+  it('+ で寄る', () => {
+    expect(commandForKey({ key: '+' })).toEqual({ kind: 'zoom', by: 1 });
+    // テンキーでない `+` は Shift を伴う。**押し直させない。**
+    expect(commandForKey({ key: ';' })).toBeUndefined();
+  });
+
+  it('- で引く', () => {
+    expect(commandForKey({ key: '-' })).toEqual({ kind: 'zoom', by: -1 });
+  });
+
+  it('0 で戻す', () => {
+    expect(commandForKey({ key: '0' })).toEqual({ kind: 'zoom', by: 0 });
+  });
+
+  /** **判定のキーは奪わない。** */
+  it('判定のキーは今までどおり', () => {
+    expect(commandForKey({ key: 'd' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
+    expect(commandForKey({ key: 'f' })).toEqual({ kind: 'verdict', humanResult: 'FAIL' });
   });
 });
