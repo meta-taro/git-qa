@@ -1,5 +1,6 @@
 import type { TargetSession } from '../adapter/types.js';
 import type { TestSpecSheet } from '../tsv/types.js';
+import type { AiResult } from './types.js';
 import type { CaseContext, CaseVerdict } from './execute.js';
 import type { PlannedAction, PlannedStep } from './steps.js';
 import { judgeExpectation, planExpectation, planSteps } from './steps.js';
@@ -15,6 +16,19 @@ import { judgeExpectation, planExpectation, planSteps } from './steps.js';
 
 /** 検証シートの列名。テンプレートは全リポ共通なので、ここに固定で持つ。 */
 export const STEPS_COLUMN = '手順';
+/**
+ * 期待結果が出るまで待つ長さ（外部レビュー meta-taro/git-qa#12）。
+ *
+ * **短すぎると、動いているものに `FAIL` が付く。**実例は 518 ms だった。
+ * **長すぎると、落ちる実行が遅くなる** —— 通る場合は待たないので、ここは落ちる側の費用。
+ */
+const DEFAULT_EXPECTATION_WAIT_MS = 2000;
+/** 読み直す間隔。 */
+const DEFAULT_EXPECTATION_STEP_MS = 200;
+
+/** 少し待つ。**検査では `stepMs` を小さくして待たせない。** */
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const EXPECTATION_COLUMN = '期待結果';
 
 export interface SheetCaseRunnerOptions {
@@ -35,6 +49,17 @@ export interface SheetCaseRunnerOptions {
   readonly textInput?: 'none' | 'ascii-only' | 'any';
   /** キーを送れるか（`AdapterCapabilities.keyInput`）。ここで推し量らない。 */
   readonly keyInput?: boolean;
+  /**
+   * **期待結果が出るまで、少し読み直す**（外部レビュー meta-taro/git-qa#12）。
+   *
+   * **クリックは「押した」時点で返る。**相手はそこから仕事を始めるので、
+   * 結果が出るのはそのあと。押した直後に 1 回だけ読んで無ければ `FAIL`、では
+   * **動いているものが「壊れている」と記録される。**
+   *
+   * **出たら即座に進む**ので、通る場合は今までと同じ速さで終わる。
+   * 落ちる場合だけ、ここに書いた分だけ余計にかかる。
+   */
+  readonly expectation?: { readonly waitMs?: number; readonly stepMs?: number };
   /** 行き先の書き方。**アダプタが名乗ったものをそのまま渡す。** */
   readonly appId?: 'package-or-url' | 'name';
   readonly stepsColumn?: string;
@@ -121,19 +146,46 @@ export function createSheetCaseRunner(
       return { aiResult: 'BLOCKED', note: expectation.reason };
     }
 
+    /**
+     * **出るまで少し読み直す**（外部レビュー meta-taro/git-qa#12）。
+     *
+     * 実例では**クエリの実行に 518 ms** かかっていて、押した直後の 1 回では
+     * 間に合っていなかった。**出たら即座に抜ける**ので、通る場合は今までと同じ速さ。
+     */
+    const waitMs = options.expectation?.waitMs ?? DEFAULT_EXPECTATION_WAIT_MS;
+    const stepMs = options.expectation?.stepMs ?? DEFAULT_EXPECTATION_STEP_MS;
+    const until = Date.now() + waitMs;
+
     let screenText: string;
-    try {
-      screenText = await options.readScreenText(ctx.session);
-    } catch (error: unknown) {
-      // 画面が読めないまま通さない。**読めなかったことは「通った」ではない。**
-      return { aiResult: 'BLOCKED', note: `画面の文字を読めない: ${errorMessage(error)}` };
+    let aiResult: AiResult;
+    let tries = 0;
+    for (;;) {
+      try {
+        screenText = await options.readScreenText(ctx.session);
+      } catch (error: unknown) {
+        // 画面が読めないまま通さない。**読めなかったことは「通った」ではない。**
+        return { aiResult: 'BLOCKED', note: `画面の文字を読めない: ${errorMessage(error)}` };
+      }
+      tries += 1;
+      aiResult = judgeExpectation(expectation, screenText);
+      if (aiResult === 'PASS' || Date.now() >= until) break;
+      await sleep(stepMs);
     }
 
-    const aiResult = judgeExpectation(expectation, screenText);
-    const note =
-      aiResult === 'PASS'
-        ? `画面の文字に「${expectation.text}」が在ることだけを見た`
-        : `画面の文字に「${expectation.text}」が無い`;
-    return { aiResult, note };
+    if (aiResult === 'PASS') {
+      return { aiResult, note: `画面の文字に「${expectation.text}」が在ることだけを見た` };
+    }
+    /**
+     * **待ち切ったことを書く。**
+     *
+     * > 一度も見なかったのか、待ったのに来なかったのかを区別しません。
+     *
+     * 分けて書けば、読んだ人は「まだ出ていないだけでは？」を自分で確かめられる。
+     */
+    const waited = tries > 1 ? `${String(Math.round(waitMs / 100) / 10)} 秒待っても` : '';
+    return {
+      aiResult,
+      note: `画面の文字に${waited}「${expectation.text}」が現れなかった`,
+    };
   };
 }

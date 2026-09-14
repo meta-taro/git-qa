@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { TargetSession } from '../../src/adapter/types.js';
 import { createFakeAdapter, type FakeAdapter } from '../../src/adapter/fake.js';
-import type { CaseContext } from '../../src/run/execute.js';
+import type { CaseContext, CaseVerdict } from '../../src/run/execute.js';
+import type { TsvRow } from '../../src/tsv/types.js';
 import {
   EXPECTATION_COLUMN,
   STEPS_COLUMN,
@@ -252,5 +253,81 @@ describe('createSheetCaseRunner — 起動', () => {
 
     expect(acted).toEqual([{ kind: 'launch', app: 'com.android.settings' }]);
     expect(verdict.aiResult).toBe('PASS');
+  });
+});
+
+/**
+ * **動いているものに `FAIL` を付けない**（外部レビュー meta-taro/git-qa#12）。
+ *
+ * > 判定が出たあと同じ画面を読むと、**在ります。**
+ * > この件では**クエリの実行に 518 ms** かかっていました。読んだのはその前でした。
+ *
+ * **クリックは「押した」時点で返る。**相手はそこから仕事を始める。
+ *
+ * > 空振りではなく、嘘が記録に残ります。……**動いているものが、壊れていると記録される。**
+ *
+ * 手順を落とせないときは `BLOCKED` で人へ渡る（控えめに倒す）のに、
+ * **ここだけ `FAIL` を出していた。**しかもそれは、人が判定を置く前の既定値として画面に出る。
+ */
+describe('createSheetCaseRunner — 出るまで少し待つ', () => {
+  const sheetRow = (steps: string, expectation: string): TsvRow => ({
+    index: 0,
+    line: 2,
+    raw: '',
+    rawCells: {},
+    cells: { 'No.': '1', 項目: 'あ', 手順: steps, 期待結果: expectation },
+  });
+
+  const runOnce = async (
+    texts: readonly string[],
+    waitMs = 2000,
+  ): Promise<{ verdict: CaseVerdict; reads: number }> => {
+    let reads = 0;
+    const runner = createSheetCaseRunner({
+      readScreenText: () => {
+        const said = texts[Math.min(reads, texts.length - 1)] ?? '';
+        reads += 1;
+        return Promise.resolve(said);
+      },
+      expectation: { waitMs, stepMs: 10 },
+    });
+    const session = await createFakeAdapter({}).connect();
+    const verdict = await runner({
+      subject: {
+        no: 1,
+        title: 'あ',
+        row: sheetRow('1. 「実行」を押す', '「直前のクエリ」と表示される'),
+      },
+      session,
+      step: () => undefined,
+    });
+    return { verdict, reads };
+  };
+
+  it('あとから出てきたら、通す', async () => {
+    const { verdict } = await runOnce(['まだ', 'まだ', '直前のクエリ']);
+
+    expect(verdict.aiResult).toBe('PASS');
+  });
+
+  /** **出たら即座に進む。**通る場合に余計な時間をかけない。 */
+  it('出たら、それ以上読まない', async () => {
+    const { reads } = await runOnce(['直前のクエリ']);
+
+    expect(reads).toBe(1);
+  });
+
+  /**
+   * **待ち切ったことを、判定文に書く。**
+   *
+   * > いまの「画面の文字に『直前のクエリ』が無い」は、**一度も見なかったのか、
+   * > 待ったのに来なかったのか**を区別しません。
+   */
+  it('待っても出なければ、待ったことを書く', async () => {
+    const { verdict } = await runOnce(['まだ'], 50);
+
+    expect(verdict.aiResult).toBe('FAIL');
+    expect(verdict.note).toContain('待っ');
+    expect(verdict.note).toContain('直前のクエリ');
   });
 });
