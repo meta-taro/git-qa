@@ -6,7 +6,7 @@
     <title>git-qa — AI が操作し、人が判定を置く</title>
     <meta
       name="description"
-      content="検証シートに沿って AI が端末・ブラウザ・デスクトップアプリを操作し、人は見て 1 打鍵で判定を置く。誰が見て保証したかが証跡に残ります（アルファ版）。"
+      content="検証シートに沿って AI が端末・ブラウザ・デスクトップアプリを操作し、人は見て 1 打鍵で判定を置く。誰が見て保証したかが証跡に残ります（ベータ版）。"
     />
     <link rel="icon" href="./icon.png" />
     <meta property="og:title" content="git-qa" />
@@ -301,7 +301,7 @@
         </p>
         <div class="state">
           <span class="tag ver" id="ver">版を読み込み中…</span>
-          <span class="tag">アルファ版</span>
+          <span class="tag">ベータ版</span>
           <span class="tag">MIT / OSS</span>
         </div>
       </header>
@@ -561,7 +561,7 @@ pnpm app</code></pre>
           if (所) 所.textContent = 文;
         };
         try {
-          // **`releases/latest` は先出し版を返さない。**いまアルファなので一覧から取る。
+          // **`releases/latest` は先出し版を返さない。**ベータのうちは先出しで配るので、一覧から取る。
           const 返り = await fetch(
             'https://api.github.com/repos/meta-taro/git-qa/releases?per_page=10',
           );
