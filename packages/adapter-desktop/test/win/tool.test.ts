@@ -66,6 +66,21 @@ describe('winArgs', () => {
   it('回す量も丸めて渡す', () => {
     expect(winArgs.scroll(1234, 10.6, 20.2, 2.7)).toEqual(['scroll', '1234', '11', '20', '3']);
   });
+
+  /**
+   * キーを押す（meta-taro/git-qa#10）。**書かれたとおりに渡す。**
+   * 名前を解釈するのは道具の側で、**知らない名前はそこで断る**
+   * （当てずっぽうで打つと、押したつもりで別の文字が入る）。
+   */
+  it('キーの名前は、書かれたとおりに渡す', () => {
+    expect(winArgs.key(1234, 'Ctrl+Enter')).toEqual(['key', '1234', 'Ctrl+Enter']);
+    expect(winArgs.key(1234, 'Esc')).toEqual(['key', '1234', 'Esc']);
+  });
+
+  /** **座標を取らない。**キーは、その窓で焦点のある所へ行く。 */
+  it('キーは場所を取らない', () => {
+    expect(winArgs.key(1234, 'Tab')).toHaveLength(3);
+  });
 });
 
 describe('parseWinWindows', () => {

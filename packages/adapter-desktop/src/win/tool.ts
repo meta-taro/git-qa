@@ -42,6 +42,11 @@ export const winArgs = {
     String(Math.round(y)),
     String(Math.round(notches)),
   ],
+  /**
+   * キーを押す。**ここだけ、相手が前面に一瞬出る**（2026-09-14・実測）。
+   * UI Automation にキーを送る口が無く、`SendInput` は焦点のある窓へ届く仕組みのため。
+   */
+  key: (hwnd: number, key: string): string[] => ['key', String(hwnd), key],
   exe: (pid: number): string[] => ['exe', String(pid)],
 } as const;
 

@@ -58,8 +58,8 @@ const capabilities: AdapterCapabilities = {
   recording: false,
   // **日本語もそのまま入る**（2026-09-14・実測）。`SetValue` は IME を通らない。
   textInput: 'any',
-  // `act` は tap だけ。**キーはそもそも届かない。**
-  keyInput: false,
+  // **前面に一瞬出るが、届く**（2026-09-14・実測。#10）。
+  keyInput: true,
   // 窓の持ち主の名前そのもの。**パッケージ名は無い。**
   appId: 'name',
 };
@@ -319,6 +319,21 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
     const notches = Math.round((from.point.y - to.point.y) / SCROLL_STEP_PX);
     if (notches === 0) return;
     await deps.tool(winArgs.scroll(from.window.hwnd, from.point.x, from.point.y, notches));
+    return;
+  }
+
+  /**
+   * キーを押す（meta-taro/git-qa#10 / #6 の残り）。
+   *
+   * **ここだけ、相手が前面に一瞬出る。**UI Automation にキーを送る口が無く、
+   * `SendInput` は**焦点のある窓へ届く**仕組みなので、出すしかない（2026-09-14・実測）。
+   * 送り終えたら**前面は元へ返す。**
+   *
+   * **キーは、その窓で焦点のある所へ行く。**`type` は焦点を動かさないので、
+   * 「入力してから Enter」と書いても、**その欄に焦点があるとは限らない。**
+   */
+  if (action.kind === 'key') {
+    await deps.tool(winArgs.key(deps.window().hwnd, action.key));
     return;
   }
 
