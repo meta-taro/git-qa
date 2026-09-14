@@ -7,7 +7,16 @@ export {
   windowScript,
 } from './window.js';
 export type { WindowRef } from './window.js';
-export { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
+export {
+  DEPTH_CUT,
+  axDepth,
+  axScript,
+  findInElements,
+  manualAccessibilityScript,
+  missingElementMessage,
+  parseElements,
+  wasCutOff,
+} from './ax.js';
 export type { AxElement } from './ax.js';
 export { findInOcr, parseOcr } from './ocr.js';
 export type { OcrLine } from './ocr.js';

@@ -17,7 +17,14 @@ import type {
   TargetSession,
 } from '@git-qa/core';
 
-import { axScript, findInElements, manualAccessibilityScript, parseElements } from './ax.js';
+import {
+  axScript,
+  findInElements,
+  manualAccessibilityScript,
+  missingElementMessage,
+  parseElements,
+  wasCutOff,
+} from './ax.js';
 import { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 import type { AxElement } from './ax.js';
 import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
@@ -161,6 +168,8 @@ interface SessionDeps extends DesktopAdapterOptions {
 interface Seen {
   readonly elements: readonly AxElement[];
   readonly ocr: readonly OcrLine[];
+  /** 深さで打ち切ったか。**「無い」と「届かなかった」を分けるため**（外部レビュー #11）。 */
+  readonly cutOff: boolean;
   /** 絵の画素と、画面の座標の比。**Retina では 2 になる。** */
   readonly scale: number;
   readonly window: WindowRef;
@@ -231,6 +240,7 @@ function createSession(deps: SessionDeps): TargetSession {
     return {
       elements: parseElements(axOut),
       ocr: parseOcr(ocrOut),
+      cutOff: wasCutOff(axOut),
       scale: shot.scale,
       window: shot.window,
     };
@@ -429,7 +439,8 @@ async function resolvePoint(
     return { x: seen.window.x + inWindow.x, y: seen.window.y + inWindow.y };
   }
 
-  throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
+  // **「無い」と「届かなかった」を分ける**（外部レビュー #11）。
+  throw new AdapterError(KIND, missingElementMessage(ref.ref, seen.cutOff));
 }
 
 async function dispatch(

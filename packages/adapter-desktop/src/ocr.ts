@@ -67,7 +67,13 @@ export interface Point {
  */
 const squeeze = (value: string): string => value.replace(/\s+/g, '');
 
-/** 読めた文字から触る場所を決める。完全一致を先に見て、無ければ含むもの。 */
+/** 読めた行の大きさ。**分からないものは、いちばん後ろへ回す。** */
+const sizeOf = (line: OcrLine): number =>
+  line.width === undefined || line.height === undefined
+    ? Number.POSITIVE_INFINITY
+    : line.width * line.height;
+
+/** 読めた文字から触る場所を決める。完全一致を先に見て、無ければ**含むもののうち最小**。 */
 export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undefined {
   const want = squeeze(ref);
 
@@ -81,6 +87,17 @@ export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undef
   const exact = lines.find((line) => squeeze(line.text) === want);
   if (exact !== undefined) return of(exact);
 
-  const partial = lines.find((line) => squeeze(line.text).includes(want));
-  return partial === undefined ? undefined : of(partial);
+  /**
+   * **いちばん小さいものを採る**（外部レビュー meta-taro/git-qa#11）。
+   *
+   * 前は**最初に一致した行**だった。段 1（`findInElements`）は最小を選ぶのに、
+   * ここだけ違っていた。実例では「実行」が状態表示の「クエリ未実行」に当たり得て、
+   * **どちらが先に来るかは運**だった。
+   *
+   * **長い行にたまたま含まれる短い語を掴むのは、たいてい間違い。**
+   */
+  const partial = lines
+    .filter((line) => squeeze(line.text).includes(want))
+    .sort((a, b) => sizeOf(a) - sizeOf(b));
+  return partial[0] === undefined ? undefined : of(partial[0]);
 }

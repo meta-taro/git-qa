@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { findInOcr, parseOcr } from '../src/ocr.js';
+import type { OcrLine } from '../src/ocr.js';
 
 /**
  * 触れ方の**段 2** —— 絵から文字を読む（C55）。
@@ -53,5 +54,43 @@ describe('findInOcr', () => {
    */
   it('空白の違いは気にしない', () => {
     expect(findInOcr([{ text: ' 保 存 ', x: 10, y: 20 }], '保存')).toEqual({ x: 10, y: 20 });
+  });
+});
+
+/**
+ * **部分一致は、いちばん小さいものを採る**（外部レビュー meta-taro/git-qa#11）。
+ *
+ * > `findInOcr` は最初に一致した行を採ります（`findInElements` は最小の要素を選ぶのに、
+ * > ここは違う）。この画面では `実行` が状態表示の `クエリ未実行` に当たり得て、
+ * > どちらが先に来るかは運です。
+ *
+ * **長い行にたまたま含まれる短い語を掴むのは、たいてい間違い。**
+ * 段 1（AX）と段 2（OCR）で選び方が違うのも、そもそもおかしい。
+ */
+describe('findInOcr — 部分一致の選び方', () => {
+  const at = (text: string, x: number, width: number): OcrLine => ({
+    text,
+    x,
+    y: 10,
+    width,
+    height: 20,
+  });
+
+  /** ぴったり一致は無く、含むものが 2 つ。**小さいほうを採る。** */
+  it('小さいほうを採る（先に並んでいる長い行を掴まない）', () => {
+    const found = findInOcr([at('クエリ未実行', 0, 200), at('実行ボタン', 300, 60)], '実行');
+
+    expect(found?.x).toBe(300);
+  });
+
+  /** **ぴったり一致が在れば、そちらが勝つ**（今までどおり）。 */
+  it('ぴったり一致が優先', () => {
+    const found = findInOcr([at('クエリ未実行', 0, 200), at('実行', 300, 40)], '実行');
+
+    expect(found?.x).toBe(300);
+  });
+
+  it('どこにも無ければ、無いと言う', () => {
+    expect(findInOcr([at('クエリ未実行', 0, 200)], '保存')).toBeUndefined();
   });
 });

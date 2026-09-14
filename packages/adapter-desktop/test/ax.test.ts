@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { axScript, findInElements, parseElements } from '../src/ax.js';
+import {
+  DEPTH_CUT,
+  axScript,
+  findInElements,
+  missingElementMessage,
+  parseElements,
+  wasCutOff,
+} from '../src/ax.js';
 
 /**
  * 触れ方の**段 1** —— アクセシビリティ（C55）。
@@ -81,5 +88,83 @@ describe('findInElements', () => {
   it('見つからなければ undefined（次の段へ降りるため）', () => {
     expect(findInElements(elements, '削除')).toBeUndefined();
     expect(findInElements([], '保存')).toBeUndefined();
+  });
+});
+
+/**
+ * **WebView を使うアプリは、素の AppKit より 2〜3 段深い**（外部レビュー meta-taro/git-qa#11）。
+ *
+ * > このアプリの操作できる部品は、全部 深さ 7 にあります。
+ * > 窓 → AXGroup → AXScrollArea → AXWebArea → … と潜るので、
+ * > 6 は AppKit のアプリなら妥当でも、Tauri / Electron には届きません。
+ *
+ * 実際、**押したいものが軒並み 1 段外**だった。届いていたのは一覧だけ。
+ */
+describe('axScript — どこまで潜るか', () => {
+  it('WebView のアプリに届く深さまで潜る', () => {
+    const depth = Number(/depth > (\d+)/.exec(axScript('x'))?.[1] ?? 0);
+
+    // 深さ 7 に操作できる部品が並ぶ実例があった。**そこへ届くこと。**
+    expect(depth).toBeGreaterThanOrEqual(8);
+  });
+
+  /**
+   * **打ち切ったことを、読む側へ伝える。**
+   *
+   * > いまの「画面に見つからない要素」は、*無い*のか*届かなかった*のかを区別しません。
+   * > 私はこれを「名前が違うのだろう」と読んで、しばらく別の名前を試しました。
+   */
+  it('打ち切ったら、そう分かる印を出す', () => {
+    expect(axScript('x')).toContain(DEPTH_CUT);
+  });
+});
+
+describe('parseElements — 打ち切りの印', () => {
+  it('印があれば、打ち切られたと分かる', () => {
+    const said = ['AXButton\t保存\t10\t20\t30\t40', DEPTH_CUT].join('\n');
+
+    expect(wasCutOff(said)).toBe(true);
+  });
+
+  it('印が無ければ、最後まで見ている', () => {
+    expect(wasCutOff('AXButton\t保存\t10\t20\t30\t40')).toBe(false);
+  });
+
+  /** **印そのものは部品ではない。**一覧に混ぜない。 */
+  it('印を部品として数えない', () => {
+    const said = ['AXButton\t保存\t10\t20\t30\t40', DEPTH_CUT].join('\n');
+
+    expect(parseElements(said)).toHaveLength(1);
+  });
+});
+
+/**
+ * **「無い」と「届かなかった」を分けて言う**（外部レビュー meta-taro/git-qa#11）。
+ *
+ * > 私はこれを「名前が違うのだろう」と読んで、しばらく別の名前を試しました。
+ * > 「深さ 6 まで見て見つからなかった」と出ていれば、すぐ分かりました。
+ */
+describe('missingElementMessage', () => {
+  it('最後まで見て無かったなら、そう言う', () => {
+    const said = missingElementMessage('保存', false);
+
+    expect(said).toContain('保存');
+    expect(said).not.toContain('深さ');
+  });
+
+  it('打ち切っていたら、そう言う', () => {
+    const said = missingElementMessage('保存', true);
+
+    expect(said).toContain('深さ');
+    // **次に何をすればよいかまで言う。**
+    expect(said).toContain('GIT_QA_AX_DEPTH');
+  });
+
+  /**
+   * **実際に打ち切った深さを言う。**既定値を出すと、環境変数で下げているときに
+   * **食い違った数字を人へ見せる**ことになる（2026-09-14・実物で気づいた）。
+   */
+  it('実際に打ち切った深さを言う', () => {
+    expect(missingElementMessage('保存', true, { GIT_QA_AX_DEPTH: '3' })).toContain('深さ 3');
   });
 });
