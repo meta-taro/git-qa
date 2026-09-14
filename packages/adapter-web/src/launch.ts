@@ -15,22 +15,45 @@
  */
 export type BrowserKind = 'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'chromium';
 
-/** どこを探すか。**先に見つかったものを使う。**無ければ、無いと言って止まる。 */
-const CANDIDATES: Record<BrowserKind, readonly string[]> = {
+/**
+ * Windows で、ユーザ単位に入ったブラウザの場所（2026-09-14・試験導入の前に数えた）。
+ *
+ * Chrome / Edge は、管理者権限が無いと **`%LOCALAPPDATA%` の下**へ入る。
+ * 会社支給の端末では**そちらが既定**になることが多い。
+ * `Program Files` しか見ていないと、**入っているのに「見つからない」**になり、
+ * **ウェブ検証が丸ごと始まらない。**
+ *
+ * **環境変数が空なら、その候補は出さない** —— `undefined\Google\…` を探しに行かない。
+ */
+function inUserHome(tail: string, env: NodeJS.ProcessEnv): readonly string[] {
+  const base = env['LOCALAPPDATA'];
+  return base === undefined || base === '' ? [] : [`${base}\\${tail}`];
+}
+
+/**
+ * どこを探すか。**先に見つかったものを使う。**無ければ、無いと言って止まる。
+ *
+ * **呼ぶたびに数える。**読み込んだ時点で決めてしまうと、環境変数を差し替えて
+ * 確かめられない（＝**Windows の道を macOS から検査できない**）。
+ */
+const candidatesFor = (env: NodeJS.ProcessEnv): Record<BrowserKind, readonly string[]> => ({
   chrome: [
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    ...inUserHome('Google\\Chrome\\Application\\chrome.exe', env),
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     '/usr/bin/google-chrome',
   ],
   edge: [
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    ...inUserHome('Microsoft\\Edge\\Application\\msedge.exe', env),
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     '/usr/bin/microsoft-edge',
   ],
   brave: [
     '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+    ...inUserHome('BraveSoftware\\Brave-Browser\\Application\\brave.exe', env),
     'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
     '/usr/bin/brave-browser',
   ],
@@ -41,11 +64,12 @@ const CANDIDATES: Record<BrowserKind, readonly string[]> = {
   ],
   vivaldi: [
     '/Applications/Vivaldi.app/Contents/MacOS/Vivaldi',
+    ...inUserHome('Vivaldi\\Application\\vivaldi.exe', env),
     'C:\\Program Files\\Vivaldi\\Application\\vivaldi.exe',
     '/usr/bin/vivaldi',
   ],
   chromium: ['/Applications/Chromium.app/Contents/MacOS/Chromium', '/usr/bin/chromium'],
-};
+});
 
 /**
  * 探す場所を並べる。
@@ -53,7 +77,11 @@ const CANDIDATES: Record<BrowserKind, readonly string[]> = {
  * **選ばれていれば、そのブラウザだけ。**「Chrome で見る」と言われたのに Edge が起きたら、
  * 証跡に書いてあるものと、実際に見たものが食い違う。
  */
-export function browserCandidates(kind?: BrowserKind): readonly string[] {
+export function browserCandidates(
+  kind?: BrowserKind,
+  env: NodeJS.ProcessEnv = process.env,
+): readonly string[] {
+  const CANDIDATES = candidatesFor(env);
   if (kind !== undefined) return CANDIDATES[kind];
   return [
     ...CANDIDATES.chrome,

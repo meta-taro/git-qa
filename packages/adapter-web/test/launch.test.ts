@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { browserArgs, parseDevToolsUrl } from '../src/launch.js';
+import { browserArgs, browserCandidates, parseDevToolsUrl } from '../src/launch.js';
 
 /**
  * ブラウザを起こす。**人が持っているものを使う**（C54）。
@@ -61,5 +61,45 @@ describe('parseDevToolsUrl', () => {
   it('まだ出ていなければ undefined（当て推量で繋がない）', () => {
     expect(parseDevToolsUrl('')).toBeUndefined();
     expect(parseDevToolsUrl('起動中...')).toBeUndefined();
+  });
+});
+
+/**
+ * **Windows は、ユーザ単位で入っているほうが普通**（2026-09-14・試験導入の前に数えた）。
+ *
+ * Chrome の Windows 版は、管理者権限が無いと `%LOCALAPPDATA%` の下へ入る。
+ * 会社支給の端末では**そちらが既定**になることが多い。
+ * `Program Files` しか見ていないと、**入っているのに「見つからない」**になる。
+ *
+ * **ウェブ検証が丸ごと始まらない**ので、ここは踏むと重い。
+ */
+describe('browserCandidates — Windows のユーザ単位の場所', () => {
+  /** Windows の端末のつもりで数える。**macOS から Windows の道を確かめる。** */
+  const onWindows = { LOCALAPPDATA: 'C:\\Users\\x\\AppData\\Local' };
+
+  it('Chrome はユーザの下も見る', () => {
+    const paths = browserCandidates('chrome', onWindows);
+
+    expect(paths.some((p) => p.includes('AppData') && p.endsWith('chrome.exe'))).toBe(true);
+  });
+
+  it('Edge もユーザの下を見る', () => {
+    expect(browserCandidates('edge', onWindows).some((p) => p.includes('AppData'))).toBe(true);
+  });
+
+  /** **`Program Files` を外さない。**管理者権限で入れた人はそちらに在る。 */
+  it('今までの場所も残っている', () => {
+    const paths = browserCandidates('chrome', onWindows);
+
+    expect(paths).toContain('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+    expect(paths).toContain('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+  });
+
+  /** **中身が空の環境変数で、変な場所を探しに行かない。** */
+  it('環境変数が無ければ、その候補は出さない', () => {
+    const paths = browserCandidates('chrome', {});
+
+    expect(paths.every((p) => !p.includes('undefined') && p !== '')).toBe(true);
+    expect(paths.some((p) => p.includes('AppData'))).toBe(false);
   });
 });
