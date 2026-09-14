@@ -104,8 +104,8 @@ describe('axScript — どこまで潜るか', () => {
   it('WebView のアプリに届く深さまで潜る', () => {
     const depth = Number(/depth > (\d+)/.exec(axScript('x'))?.[1] ?? 0);
 
-    // 深さ 7 に操作できる部品が並ぶ実例があった。**そこへ届くこと。**
-    expect(depth).toBeGreaterThanOrEqual(8);
+    // 実物で測った結果、WebView のアプリは 12 まで要った（素の作りは 9 で足りる）。
+    expect(depth).toBeGreaterThanOrEqual(12);
   });
 
   /**
@@ -166,5 +166,33 @@ describe('missingElementMessage', () => {
    */
   it('実際に打ち切った深さを言う', () => {
     expect(missingElementMessage('保存', true, { GIT_QA_AX_DEPTH: '3' })).toContain('深さ 3');
+  });
+});
+
+/**
+ * **部品 1 つずつ聞かない**（2026-09-14・実物で測った）。
+ *
+ * 1 つの部品につき `name` `description` `value` `position` `size` `role` を
+ * 別々に聞いていた。**部品の数だけ 6 往復する。**実物（Tauri アプリ・部品 74 個）で
+ * **11.6 秒**かかっていた。コメントには「4 段で 793 ms」と書いてあったが、
+ * **深く潜るようにした時点で、そこは当てはまらなくなっていた。**
+ *
+ * 親ごとにまとめて取ると **7.1 秒**（同じ 76 個）。**往復の数が減る。**
+ */
+describe('axScript — まとめて取る', () => {
+  it('属性を 1 つずつ聞かない', () => {
+    const said = axScript('x');
+
+    // まとめ取りの形（`uiElements.name()` など）で聞いていること。
+    expect(said).toContain('uiElements.name()');
+    expect(said).toContain('uiElements.position()');
+  });
+
+  /** **名前が無いものは、説明 → 値の順に見る**（テキスト欄の中身はここに入る）。 */
+  it('名前が無ければ、説明と値まで見る', () => {
+    const said = axScript('x');
+
+    expect(said).toContain('uiElements.description()');
+    expect(said).toContain('uiElements.value()');
   });
 });

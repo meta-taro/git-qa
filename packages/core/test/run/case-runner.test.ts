@@ -331,7 +331,57 @@ describe('createSheetCaseRunner — 出るまで少し待つ', () => {
     const { verdict } = await runOnce(['まだ'], 50);
 
     expect(verdict.aiResult).toBe('FAIL');
-    expect(verdict.note).toContain('待っ');
+    // **どれだけ待って、何回見たか**を両方出す（片方だけでは人が判断できない）。
+    expect(verdict.note).toContain('秒のあいだに');
+    expect(verdict.note).toContain('回見ても');
     expect(verdict.note).toContain('直前のクエリ');
+  });
+});
+
+/**
+ * **1 回読むのに時間がかかる相手でも、もう一度見る**（2026-09-14・実物で測って気づいた）。
+ *
+ * デスクトップの画面読みは**実物で 7 秒**かかる。締切（既定 2 秒）だけで切ると、
+ * **1 回目を読み終えた時点で既に過ぎている** —— #12 で入れた読み直しが、
+ * **いちばん要る相手に効かない。**
+ *
+ * **落ちると言う前に、必ずもう一度見る。**
+ */
+describe('createSheetCaseRunner — 遅い相手でも、もう一度見る', () => {
+  it('1 回目で締切を過ぎていても、2 回は読む', async () => {
+    let reads = 0;
+    const runner = createSheetCaseRunner({
+      readScreenText: async () => {
+        reads += 1;
+        // 1 回読むのに、締切より長くかかる相手。
+        await new Promise((r) => setTimeout(r, 30));
+        return reads >= 2 ? '直前のクエリ' : 'クエリ未実行';
+      },
+      expectation: { waitMs: 10, stepMs: 1 },
+    });
+    const session = await createFakeAdapter({}).connect();
+    const verdict = await runner({
+      subject: {
+        no: 1,
+        title: 'あ',
+        row: {
+          index: 0,
+          line: 2,
+          raw: '',
+          rawCells: {},
+          cells: {
+            'No.': '1',
+            項目: 'あ',
+            手順: '1. 「実行」を押す',
+            期待結果: '「直前のクエリ」と表示される',
+          },
+        },
+      },
+      session,
+      step: () => undefined,
+    });
+
+    expect(reads).toBe(2);
+    expect(verdict.aiResult).toBe('PASS');
   });
 });

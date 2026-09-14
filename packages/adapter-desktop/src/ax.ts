@@ -45,8 +45,17 @@ export interface AxElement {
  *
  * 実例では**操作できる部品が全部 深さ 7** に並び、6 で届いていたのは一覧だけだった。
  * **押したいものが軒並み 1 段外**という、いちばん気づきにくい外し方。
+ *
+ * **12 にしたのは測った結果**（2026-09-14・実物 2 つ）。
+ *
+ * ```
+ * 素の作りのアプリ  深さ 9 で足りる 3.3 秒 → 12 でも 3.35 秒（木が浅いので変わらない）
+ * WebView のアプリ  深さ 9 では足りない   → 12 で全部見える（+1.5 秒）
+ * ```
+ *
+ * **木が浅い相手では、上げても費用がかからない。**深い相手でだけ払う。
  */
-const DEFAULT_DEPTH = 9;
+const DEFAULT_DEPTH = 12;
 
 /**
  * どこまで潜るか。**環境変数で上げられる。**
@@ -111,21 +120,27 @@ export function axScript(app: string, env: NodeJS.ProcessEnv = process.env): str
     '  var out = [];',
     '  var cut = false;',
     '  function walk(el, depth) {',
-    // **打ち切ったことを言う。**黙って浅く返すと、「無い」と読まれる。
-    `    if (depth > ${String(maxDepth)}) { cut = true; return; }`,
+    // **親ごとにまとめて取る。**1 つずつ聞くと、部品の数だけ往復する
+    // （実物で 11.6 秒 → 7.1 秒・2026-09-14）。
     '    var kids;',
     '    try { kids = el.uiElements(); } catch (e) { return; }',
+    '    if (kids.length === 0) return;',
+    `    if (depth > ${String(maxDepth)}) { cut = true; return; }`,
+    '    var names = [], roles = [], poss = [], sizes = [], descs = [], vals = [];',
+    '    try { names = el.uiElements.name(); } catch (e) { }',
+    '    try { roles = el.uiElements.role(); } catch (e) { }',
+    '    try { poss  = el.uiElements.position(); } catch (e) { }',
+    '    try { sizes = el.uiElements.size(); } catch (e) { }',
+    '    try { descs = el.uiElements.description(); } catch (e) { }',
+    // 名前も説明も無い部品は、値を見る（テキスト欄の中身はここに入る）。
+    '    try { vals  = el.uiElements.value(); } catch (e) { }',
     '    for (var i = 0; i < kids.length; i++) {',
-    '      var k = kids[i];',
-    '      try {',
-    '        var name = k.name() || k.description() || k.value();',
-    '        if (typeof name === "string" && name !== "") {',
-    '          var p = k.position();',
-    '          var s = k.size();',
-    '          out.push([k.role(), name, p[0], p[1], s[0], s[1]].join("\\t"));',
-    '        }',
-    '      } catch (e) { /* 読めない部品は飛ばす。1 つで一覧ごと落とさない */ }',
-    '      walk(k, depth + 1);',
+    '      var name = names[i] || descs[i] || vals[i];',
+    '      var p = poss[i], s = sizes[i];',
+    '      if (typeof name === "string" && name !== "" && p && s) {',
+    '        out.push([roles[i], name, p[0], p[1], s[0], s[1]].join("\\t"));',
+    '      }',
+    '      walk(kids[i], depth + 1);',
     '    }',
     '  }',
     '  try { walk(win, 0); } catch (e) { /* 窓が閉じられた等。取れた分を返す */ }',

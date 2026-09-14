@@ -25,6 +25,13 @@ export const STEPS_COLUMN = '手順';
 const DEFAULT_EXPECTATION_WAIT_MS = 2000;
 /** 読み直す間隔。 */
 const DEFAULT_EXPECTATION_STEP_MS = 200;
+/**
+ * **最低でもこの回数は読む。**
+ *
+ * 1 回読むのに締切より長くかかる相手（デスクトップは実物で 7 秒）がいる。
+ * 締切だけで切ると、**読み直しがいちばん要る相手に効かない。**
+ */
+const MIN_EXPECTATION_TRIES = 2;
 
 /** 少し待つ。**検査では `stepMs` を小さくして待たせない。** */
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -154,7 +161,8 @@ export function createSheetCaseRunner(
      */
     const waitMs = options.expectation?.waitMs ?? DEFAULT_EXPECTATION_WAIT_MS;
     const stepMs = options.expectation?.stepMs ?? DEFAULT_EXPECTATION_STEP_MS;
-    const until = Date.now() + waitMs;
+    const began = Date.now();
+    const until = began + waitMs;
 
     let screenText: string;
     let aiResult: AiResult;
@@ -168,7 +176,15 @@ export function createSheetCaseRunner(
       }
       tries += 1;
       aiResult = judgeExpectation(expectation, screenText);
-      if (aiResult === 'PASS' || Date.now() >= until) break;
+      if (aiResult === 'PASS') break;
+      /**
+       * **落ちると言う前に、必ずもう一度見る**（2026-09-14）。
+       *
+       * デスクトップの画面読みは**実物で 7 秒**かかる。締切だけで切ると、
+       * **1 回目を読み終えた時点で既に過ぎていて**、読み直しが
+       * **いちばん要る相手に効かない。**
+       */
+      if (tries >= MIN_EXPECTATION_TRIES && Date.now() >= until) break;
       await sleep(stepMs);
     }
 
@@ -182,7 +198,15 @@ export function createSheetCaseRunner(
      *
      * 分けて書けば、読んだ人は「まだ出ていないだけでは？」を自分で確かめられる。
      */
-    const waited = tries > 1 ? `${String(Math.round(waitMs / 100) / 10)} 秒待っても` : '';
+    /**
+     * **どれだけ待って、何回見たかを出す。**
+     *
+     * 時間だけだと「何回見たか」が分からず、回数だけだと
+     * 「まだ出ていないだけでは？」を人が判断できない。**両方要る。**
+     * 時間は**実際にかかった分**（相手が遅ければ、決めた締切より長くなる）。
+     */
+    const spent = Math.round((Date.now() - began) / 100) / 10;
+    const waited = tries > 1 ? `${String(spent)} 秒のあいだに ${String(tries)} 回見ても` : '';
     return {
       aiResult,
       note: `画面の文字に${waited}「${expectation.text}」が現れなかった`,
