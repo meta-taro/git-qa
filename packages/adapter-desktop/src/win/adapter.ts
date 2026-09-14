@@ -9,6 +9,7 @@ import type {
   AdapterCapabilities,
   LiveView,
   Observation,
+  PointerRef,
   RecordingControl,
   Screenshot,
   TargetAdapter,
@@ -55,8 +56,8 @@ const capabilities: AdapterCapabilities = {
   observation: 'ui-automation',
   // **録画はまだ持たない。**「できない」を黙って `failed` にしない（C20）。
   recording: false,
-  // まだ文字を送れない。**確かめていないものを「できる」と言わない。**
-  textInput: 'none',
+  // **日本語もそのまま入る**（2026-09-14・実測）。`SetValue` は IME を通らない。
+  textInput: 'any',
   // `act` は tap だけ。**キーはそもそも届かない。**
   keyInput: false,
   // 窓の持ち主の名前そのもの。**パッケージ名は無い。**
@@ -279,23 +280,74 @@ interface DispatchDeps {
  * **確かめていないものを「できる」と言わない。**
  */
 async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
-  if (action.kind !== 'tap') {
-    throw new AdapterError(KIND, `Windows ではまだ「${action.kind}」を送れない`);
+  if (action.kind === 'tap') {
+    const { window, point } = await aim(action.target, deps);
+    await deps.tool(winArgs.press(window.hwnd, point.x, point.y));
+    return;
   }
 
+  /**
+   * 文字を入れる（meta-taro/git-qa#9）。
+   *
+   * **`SetValue` は欄の中身を置き換える。**1 文字ずつ打つのではないので、
+   * **焦点も要らず、相手も前面に出ない。**IME を通らないので日本語もそのまま入る
+   * （2026-09-14・実測。検索欄に日本語を入れたら候補が反応した ＝
+   * 値を置いただけでなく、アプリ側にイベントが届いている）。
+   *
+   * **どこへ入れるかが要る。**欄を指していない手順は受けない ——
+   * 焦点のある所へ黙って入れると、**人が見ていない欄が書き変わる。**
+   */
+  if (action.kind === 'type') {
+    if (action.target === undefined) {
+      throw new AdapterError(
+        KIND,
+        'どの欄へ入れるかが分からない（Windows では、入れる欄を指してください）',
+      );
+    }
+    const { window, point } = await aim(action.target, deps);
+    await deps.tool(winArgs.type(window.hwnd, point.x, point.y, action.text));
+    return;
+  }
+
+  /**
+   * 回す（meta-taro/git-qa#9）。**デスクトップでは、なぞる＝スクロール**
+   * （指でなぞる相手ではない）。1 段への換算は macOS 側と揃えてある。
+   */
+  if (action.kind === 'swipe') {
+    const from = await aim(action.from, deps);
+    const to = await aim(action.to, deps);
+    const notches = Math.round((from.point.y - to.point.y) / SCROLL_STEP_PX);
+    if (notches === 0) return;
+    await deps.tool(winArgs.scroll(from.window.hwnd, from.point.x, from.point.y, notches));
+    return;
+  }
+
+  throw new AdapterError(KIND, `Windows ではまだ「${action.kind}」を送れない`);
+}
+
+/**
+ * 1 段をどれだけと見るか。**macOS 側と同じ**にしてある（`(from.y - to.y) / 10`）。
+ * 実際に何画素動くかは相手が決めるので、**こちらは回数に直すだけ。**
+ */
+const SCROLL_STEP_PX = 10;
+
+/** 指す先を画面の座標に直し、**触った場所を画面へ知らせる**（要望シート No.1）。 */
+async function aim(
+  at: PointerRef,
+  deps: DispatchDeps,
+): Promise<{ window: WinWindow; point: { x: number; y: number } }> {
   const window = deps.window();
-  const at = action.target;
   const point =
     at.at === 'point' ? { x: window.x + at.x, y: window.y + at.y } : await byText(at.ref, deps);
 
-  // **AI がどこを触ったかを知らせる**（要望シート No.1）。座標は窓の中のもの。
+  // 座標は窓の中のもの。
   deps.onPointed?.({
     x: point.x - window.x,
     y: point.y - window.y,
     ...(at.at === 'element' ? { label: at.ref } : {}),
   });
 
-  await deps.tool(winArgs.press(window.hwnd, point.x, point.y));
+  return { window, point };
 }
 
 /** 文字で指された所を探す。**見つからないものを、当てずっぽうで押さない。** */

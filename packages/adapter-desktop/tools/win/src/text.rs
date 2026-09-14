@@ -19,10 +19,10 @@ use windows::Win32::System::Com::{
 };
 use windows::Win32::UI::Accessibility::{
     CUIAutomation, IUIAutomation, IUIAutomationCondition, IUIAutomationElement,
-    TreeScope_Descendants, UIA_NamePropertyId,
+    TreeScope_Descendants,
 };
 
-use crate::wake::{WAKE_STEP, WAKE_TRIES, chromium_widgets, wake};
+use crate::wake::{ensure_awake, named_condition};
 
 pub fn read(hwnd: &str) -> Result<String, String> {
     let hwnd = crate::parse_hwnd(hwnd)?;
@@ -38,59 +38,15 @@ pub fn read(hwnd: &str) -> Result<String, String> {
     }
 }
 
-/// Chromium なら起こしてから読む。**ネイティブの窓では、何も足さない。**
+/// Chromium なら起こしてから読む。**ネイティブの窓では、何も足さない**（`wake` が判断する）。
 unsafe fn read_awake(hwnd: HWND) -> Result<String, String> {
     let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)
         .map_err(|e| format!("UI Automation を始められない: {e}"))?;
+
+    ensure_awake(&automation, hwnd);
+
     let named = named_condition(&automation)?;
-
-    let widgets = chromium_widgets(hwnd);
-    if !widgets.is_empty() {
-        wake(&widgets);
-
-        // **起きたかどうかは、描画側に中身が載ったかで見る。**
-        //
-        // 読めた量が動かなくなったかで当てにいくと、**「まだ始まっていない」と
-        // 「終わった」を取り違える** —— どちらも「前と同じ」に見えるので、
-        // 起きるのに 100 ms 以上かかる機械では、**枠だけ読んで成功したことになる。**
-        // それはこの道具でいちばん避けたい壊れ方（静かに間違える）。
-        for _ in 0..WAKE_TRIES {
-            if has_content(&automation, &named, &widgets) {
-                break;
-            }
-            std::thread::sleep(WAKE_STEP);
-        }
-    }
-
     walk(&automation, &named, hwnd)
-}
-
-/// **名前を持つものだけ**を選ぶ条件。空の入れ物まで出すと、読む側で捨てることになる。
-unsafe fn named_condition(automation: &IUIAutomation) -> Result<IUIAutomationCondition, String> {
-    automation
-        .CreatePropertyCondition(UIA_NamePropertyId, &windows::core::VARIANT::from(""))
-        .and_then(|empty| automation.CreateNotCondition(&empty))
-        .map_err(|e| format!("探す条件を作れない: {e}"))
-}
-
-/// 描画側に、名前を持つものが 1 つでも載ったか。**載っていれば、起き切っている。**
-///
-/// 起きていない間、描画の子窓は**空の器として在る**（掴めるが、中に何も無い）。
-/// **「掴めた」を「読める」と混同しない。**
-unsafe fn has_content(
-    automation: &IUIAutomation,
-    named: &IUIAutomationCondition,
-    widgets: &[HWND],
-) -> bool {
-    widgets.iter().any(|widget| {
-        let Ok(root) = automation.ElementFromHandle(*widget) else {
-            return false;
-        };
-        let Ok(found) = root.FindAll(TreeScope_Descendants, named) else {
-            return false;
-        };
-        found.Length().unwrap_or(0) > 0
-    })
 }
 
 unsafe fn walk(

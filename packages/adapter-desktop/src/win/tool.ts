@@ -23,6 +23,25 @@ export const winArgs = {
     String(Math.round(x)),
     String(Math.round(y)),
   ],
+  /**
+   * その欄の中身を、渡した文字に**置き換える**（追記ではない）。
+   * **日本語もそのまま入る**（2026-09-14・実測。IME を通らない）。
+   */
+  type: (hwnd: number, x: number, y: number, text: string): string[] => [
+    'type',
+    String(hwnd),
+    String(Math.round(x)),
+    String(Math.round(y)),
+    text,
+  ],
+  /** 回す。**正で下、負で上。**画素ではなく回数（1 段の大きさは相手が決める）。 */
+  scroll: (hwnd: number, x: number, y: number, notches: number): string[] => [
+    'scroll',
+    String(hwnd),
+    String(Math.round(x)),
+    String(Math.round(y)),
+    String(Math.round(notches)),
+  ],
   exe: (pid: number): string[] => ['exe', String(pid)],
 } as const;
 

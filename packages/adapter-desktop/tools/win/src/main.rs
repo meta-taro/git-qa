@@ -38,6 +38,8 @@ fn main() -> ExitCode {
         ["shot", hwnd, out] => shot::capture(hwnd, out),
         ["text", hwnd] => text::read(hwnd),
         ["press", hwnd, x, y] => input::press(hwnd, x, y),
+        ["type", hwnd, x, y, text] => input::type_text(hwnd, x, y, text),
+        ["scroll", hwnd, x, y, notches] => input::scroll(hwnd, x, y, notches),
         ["exe", pid] => window::exe_path(pid),
         _ => {
             eprintln!("{}", USAGE);
@@ -97,4 +99,6 @@ const USAGE: &str = "\
   git-qa-win shot <窓> <出力.png>    その窓だけを撮る
   git-qa-win text <窓>               読める文字と、その位置
   git-qa-win press <窓> <x> <y>      前面に出さずに押す
+  git-qa-win type <窓> <x> <y> <文字>  その欄の中身を置き換える
+  git-qa-win scroll <窓> <x> <y> <回数>  回す（正で下・負で上）
   git-qa-win exe <プロセス番号>      実行ファイルの場所";
