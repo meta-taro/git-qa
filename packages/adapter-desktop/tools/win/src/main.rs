@@ -17,6 +17,10 @@
 use std::env;
 use std::process::ExitCode;
 
+use windows::Win32::UI::HiDpi::{
+    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+};
+
 mod input;
 mod shot;
 mod text;
@@ -24,6 +28,8 @@ mod wake;
 mod window;
 
 fn main() -> ExitCode {
+    see_real_pixels();
+
     let args: Vec<String> = env::args().skip(1).collect();
     let said: Vec<&str> = args.iter().map(String::as_str).collect();
 
@@ -49,6 +55,31 @@ fn main() -> ExitCode {
             eprintln!("{reason}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// **画面の拡大表示を、そのままの画素で見る**（2026-09-14・Windows 機で実測して足した）。
+///
+/// 宣言しないプロセスを、Windows は「DPI 非対応」として扱い、**座標を勝手に換算して見せる。**
+/// 換算された座標の中では辻褄が合うので、**押す所は当たる。**気づけない。
+///
+/// 壊れるのは**残る絵**のほう。`GetWindowRect` が換算後の小さい値を返し、
+/// その大きさの器に `PrintWindow` が実寸で描くので、**窓の左上だけが切り取られる。**
+///
+/// ```text
+/// 125%   窓は実寸 1181x1020   撮れた絵 945x816    右と下が落ちる
+/// 150%   窓は実寸 1418x1008   撮れた絵 945x672    本文がまるごと消える
+/// ```
+///
+/// **一見すると普通のスクリーンショットに見える。**画面の 2〜4 割が無いことを、
+/// 証跡は何も言わない。**検証したように見える証跡が残る** —— いちばん悪い壊れ方。
+///
+/// **顧客の Windows はたいてい拡大表示が入っている**（この機械も、推奨は 125%）。
+fn see_real_pixels() {
+    // SAFETY: 何も持たない宣言で、失敗しても困らない（100% の機械では何も変わらない）。
+    unsafe {
+        // **失敗しても進む。**古い Windows では宣言の口が無いが、そこでは拡大表示も効かない。
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
 }
 
