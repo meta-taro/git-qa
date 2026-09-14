@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   assertDesktopPortFree,
   desktopLaunch,
+  killTreeArgs,
   runWithLiveView,
   tauriDevArgs,
 } from '../src/index.js';
@@ -226,5 +227,29 @@ describe('assertDesktopPortFree', () => {
         explain: () => Promise.resolve('掴んでいるのは 72394'),
       }),
     ).rejects.toThrow('72394');
+  });
+});
+
+/**
+ * **止めたら、開いた窓も片付ける**（外部レビュー meta-taro/git-qa#7）。
+ *
+ * signal は届いていた（2026-09-14 に測り直した）。届いていなかったのは**後始末のほう** ——
+ * ハンドラが `child` に触れていなかったので、`tauri → vite` の木が生き残っていた。
+ *
+ * **`child.kill()` では足りない。**殺せるのは `tauri` だけで、その下の `vite` は残る。
+ * **木ごと止める。**
+ */
+describe('killTreeArgs', () => {
+  it('Windows は taskkill で木ごと', () => {
+    const call = killTreeArgs(1234, 'win32');
+
+    expect(call?.command).toBe('taskkill');
+    expect(call?.args).toEqual(['/pid', '1234', '/T', '/F']);
+  });
+
+  /** macOS と Linux は、**プロセス群へ**送る（外の道具を呼ばない）。 */
+  it('macOS と Linux は道具を使わない', () => {
+    expect(killTreeArgs(1234, 'darwin')).toBeUndefined();
+    expect(killTreeArgs(1234, 'linux')).toBeUndefined();
   });
 });

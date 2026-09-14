@@ -4,6 +4,8 @@ export {
   DESKTOP_DEV_PORT,
   assertDesktopPortFree,
   desktopLaunch,
+  killTree,
+  killTreeArgs,
   runWithLiveView,
   spawnDesktop,
   tauriDevArgs,

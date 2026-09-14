@@ -122,10 +122,72 @@ export async function assertDesktopPortFree(
   throw new Error(await check.explain(port));
 }
 
-/** 画面を起こす。**閉じられるまでは、呼んだ側が見張る。** */
+/**
+ * 画面を起こす。**閉じられるまでは、呼んだ側が見張る。**
+ *
+ * **自分のプロセス群で起こす**（macOS / Linux）。`tauri` の下に `vite` が付くので、
+ * **木ごと止められる形**にしておく（外部レビュー meta-taro/git-qa#7）。
+ * 群を分けると端末の Ctrl-C はもう届かないが、**こちらが `killTree` で止める**ので困らない。
+ */
 export function spawnDesktop(args: readonly string[]): ChildProcess {
   const launch = desktopLaunch(args);
-  return spawn(launch.command, [...launch.args], { cwd: launch.cwd, stdio: 'inherit' });
+  return spawn(launch.command, [...launch.args], {
+    cwd: launch.cwd,
+    stdio: 'inherit',
+    detached: process.platform !== 'win32',
+  });
+}
+
+/**
+ * 木ごと止めるための外の道具。**Windows だけ要る。**
+ *
+ * macOS と Linux は**プロセス群へ**送れば済む（`process.kill(-pid)`）。
+ * Windows に群は無いので、`taskkill /T` に頼る。
+ */
+export function killTreeArgs(pid: number, platform: string): ToolCall | undefined {
+  if (platform !== 'win32') return undefined;
+  return { command: 'taskkill', args: ['/pid', String(pid), '/T', '/F'] };
+}
+
+export interface ToolCall {
+  readonly command: string;
+  readonly args: readonly string[];
+}
+
+/**
+ * **開いた窓を、木ごと片付ける**（外部レビュー meta-taro/git-qa#7）。
+ *
+ * **`child.kill()` では足りない。**殺せるのは `tauri` だけで、その下の `vite` は
+ * 1420 を掴んだまま残る。次に始めるとき「Port 1420 is already in use」で死ぬ。
+ *
+ * **失敗しても投げない。**後始末は「失敗しても構わない」場所で呼ばれる ——
+ * ここで投げると、証跡を書き終えた直後に落ちることになる。
+ */
+export function killTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (pid === undefined) return;
+
+  const call = killTreeArgs(pid, process.platform);
+  if (call !== undefined) {
+    try {
+      spawn(call.command, [...call.args], { stdio: 'ignore' }).unref();
+    } catch {
+      // 片付けられなくても進む。**掴んだままでも、次に始めるとき理由が出る。**
+    }
+    return;
+  }
+
+  try {
+    // 負の数はプロセス群。`spawnDesktop` が群を分けてある。
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    // 群がもう無い（既に終わっている）。
+    try {
+      child.kill();
+    } catch {
+      // ここも失敗するなら、もう居ない。
+    }
+  }
 }
 
 /** Tauri の既定の開発サーバ。`packages/desktop/vite.config.ts` と揃えている。 */

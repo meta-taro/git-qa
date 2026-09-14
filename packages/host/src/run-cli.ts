@@ -6,7 +6,7 @@ import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
-import { spawnDesktop, tauriDevArgs, assertDesktopPortFree } from './app.js';
+import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 
 /**
  * 検証シートを 1 本走らせる。**一本道**（Issue 004）。
@@ -109,6 +109,14 @@ installSaveOnExit({
   },
   save: async () => {
     session.abort('人が実行を止めた（Ctrl-C / 終了の合図）');
+    /**
+     * **開いた窓も片付ける**（外部レビュー meta-taro/git-qa#7）。
+     *
+     * signal は届いていた（2026-09-14 に測り直した）。届いていなかったのは
+     * **後始末のほう** —— ここが `child` に触れていなかったので、
+     * `tauri → vite` の木が生き残り、次の実行が 1420 で死んでいた。
+     */
+    killTree(child);
     const partial = await session.done;
     await session.close();
     const saved = await saveRunProgress(fromInvocationDir('runs'), partial);
@@ -127,4 +135,5 @@ console.log(`[git-qa] 証跡: ${path}`);
 const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
 console.log(`[git-qa] ${String(run.cases.length)} 件中 ${String(placed)} 件を人が見て置いた`);
 
-child.kill();
+// **木ごと止める。**`child.kill()` では下の `vite` が残る（#7）。
+killTree(child);
