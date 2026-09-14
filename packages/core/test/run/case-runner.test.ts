@@ -58,6 +58,9 @@ const runner = (screenText: string | Error) =>
   createSheetCaseRunner({
     readScreenText: () =>
       screenText instanceof Error ? Promise.reject(screenText) : Promise.resolve(screenText),
+    // **ここでは待たせない。**画面が変わらないことは分かっているので、
+    // 落ちる判定のたびに本当に 2 秒待っても、確かめられることは増えない。
+    expectation: { waitMs: 0, stepMs: 1 },
   });
 
 describe('createSheetCaseRunner — 手順を実行して AI の判定を出す', () => {
@@ -241,6 +244,7 @@ describe('createSheetCaseRunner — 起動', () => {
     const run = createSheetCaseRunner({
       readScreenText: () => Promise.resolve('ホーム画面'),
       app: 'com.android.settings',
+      expectation: { waitMs: 0, stepMs: 1 },
     });
 
     const verdict = await run(

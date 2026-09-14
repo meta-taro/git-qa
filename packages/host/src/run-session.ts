@@ -82,6 +82,13 @@ export interface StartRunSessionOptions {
    */
   readonly previous?: Run;
   /**
+   * **期待結果が出るまで待つ長さ**（外部レビュー meta-taro/git-qa#12）。
+   *
+   * 既定は 2 秒。**検査では小さくする** —— 落ちる判定のたびに本当に 2 秒待つと、
+   * 検査そのものが待ち切れなくなる（実際にそうなった）。
+   */
+  readonly expectation?: { readonly waitMs?: number; readonly stepMs?: number };
+  /**
    * **鑑賞モード**（2026-09-11・人の指示）。
    *
    * > 人はぼーっとみながら AI のテストを鑑賞します。……途中で止められる配慮も必要です。
@@ -420,6 +427,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     // **相手が名乗った能力をそのまま渡す。**Android の事情を全部の相手に押し付けない。
     textInput: options.adapter.capabilities.textInput,
     keyInput: options.adapter.capabilities.keyInput,
+    ...(options.expectation === undefined ? {} : { expectation: options.expectation }),
     appId: options.adapter.capabilities.appId,
   });
 

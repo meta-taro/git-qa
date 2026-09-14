@@ -70,6 +70,8 @@ const start = (bridge: ReturnType<typeof fakeBridge>, screenText = '保存しま
     operator: { handle: 'octocat' },
     readScreenText: () => Promise.resolve(screenText),
     startBridge: bridge.start,
+    // **検査では待たせない。**落ちる判定のたびに 2 秒待つと、検査が待ち切れない。
+    expectation: { waitMs: 0, stepMs: 1 },
   });
 
 /** 条件が満たされるまで待つ。満たされなければ、何を待っていたかを言って落ちる。 */

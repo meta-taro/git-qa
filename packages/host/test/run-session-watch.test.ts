@@ -74,6 +74,8 @@ const start = (
     operator: { handle: 'octocat' },
     readScreenText: () => Promise.resolve('保存しました'),
     startBridge: bridge.start,
+    // **検査では待たせない。**落ちる判定のたびに 2 秒待つと、検査が待ち切れない。
+    expectation: { waitMs: 0, stepMs: 1 },
     watch: { sleep: noPause, ...watch },
   });
 
