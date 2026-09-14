@@ -71,7 +71,8 @@ async function watch(controlUrl: string): Promise<{
   return {
     last: () => last,
     async awaiting(no: number) {
-      for (let i = 0; i < 400; i += 1) {
+      // **回数ではなく時計で待つ**（込み合った機械では setTimeout が伸びる）。
+      for (const until = Date.now() + 10_000; Date.now() < until;) {
         if (last?.awaiting === no) return;
         await new Promise((r) => setTimeout(r, 5));
       }

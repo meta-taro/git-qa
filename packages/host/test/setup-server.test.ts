@@ -38,7 +38,8 @@ const phaseOf = async (server: { url: string }): Promise<string> =>
 
 /** 条件が満たされるまで待つ。満たされなければ、何を待っていたかを言って落ちる。 */
 const waitFor = async (predicate: () => Promise<boolean>): Promise<void> => {
-  for (let i = 0; i < 100; i += 1) {
+  // **回数ではなく時計で待つ**（込み合った機械では setTimeout が伸びる）。
+  for (const until = Date.now() + 10_000; Date.now() < until;) {
     if (await predicate()) return;
     await new Promise((r) => setTimeout(r, 20));
   }
@@ -76,7 +77,7 @@ describe('startSetupServer', () => {
     });
     expect(res.status).toBe(202);
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       const state = await json(`${server.url}/state`);
       if (state['phase'] === 'running') {
         expect(state['liveUrl']).toBe('http://127.0.0.1:9/live/x.h264');
@@ -102,7 +103,7 @@ describe('startSetupServer', () => {
       body: JSON.stringify({ serial: 'x', sheetPath: '/a.tsv' }),
     });
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       const state = await json(`${server.url}/state`);
       if (state['phase'] === 'failed') {
         expect(state['error']).toContain('端末が見つからない');
@@ -180,7 +181,7 @@ describe('置いた人（ハンドル）', () => {
       }),
     });
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       if (start.mock.calls.length > 0) {
         expect(start).toHaveBeenCalledWith({
           serial: 'emulator-5554',
@@ -306,7 +307,7 @@ describe('担当者ハンドル', () => {
       body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv', watch: true }),
     });
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       if (start.mock.calls.length > 0) {
         expect(start).toHaveBeenCalledWith({
           serial: 'emulator-5554',
@@ -334,7 +335,7 @@ describe('担当者ハンドル', () => {
       body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv' }),
     });
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       if (start.mock.calls.length > 0) {
         expect(start.mock.calls[0]?.[0]).not.toHaveProperty('watch');
         return;
@@ -392,7 +393,7 @@ describe('担当者ハンドル', () => {
       }),
     });
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       if (start.mock.calls.length > 0) {
         expect(start.mock.calls[0]?.[0]).toMatchObject({ resume: '20260911-090000' });
         return;
@@ -420,7 +421,7 @@ describe('担当者ハンドル', () => {
       }),
     });
 
-    for (let i = 0; i < 50; i += 1) {
+    for (const until = Date.now() + 10_000; Date.now() < until;) {
       if (start.mock.calls.length > 0) {
         expect(start.mock.calls[0]?.[0]).not.toHaveProperty('resume');
         return;

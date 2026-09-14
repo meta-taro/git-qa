@@ -79,8 +79,18 @@ const start = (
     watch: { sleep: noPause, ...watch },
   });
 
+/**
+ * 条件が満たされるまで待つ。満たされなければ、何を待っていたかを言って落ちる。
+ *
+ * **回数ではなく時計で待つ**（2026-09-14）。前は 400 回 × 5 ms で数えていたが、
+ * **込み合った機械では `setTimeout(5)` が 5 ms で返らない。**
+ * 待っている中身は速いのに、**数え終わってしまって落ちていた**（CI でだけ出た）。
+ *
+ * **検査が遅い機械で落ちるのは、検査の作りのほう。**
+ */
 async function waitFor(predicate: () => boolean, label: string): Promise<void> {
-  for (let i = 0; i < 400; i += 1) {
+  const until = Date.now() + 10_000;
+  while (Date.now() < until) {
     if (predicate()) return;
     await new Promise((r) => setTimeout(r, 5));
   }
