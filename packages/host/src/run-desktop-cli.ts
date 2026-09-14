@@ -1,9 +1,14 @@
 import { readFile } from 'node:fs/promises';
 
-import { createDesktopAdapter, readDesktopScreenText } from '@git-qa/adapter-desktop';
+import {
+  createDesktopAdapter,
+  createWindowsDesktopAdapter,
+  readDesktopScreenText,
+  whyNoDesktop,
+} from '@git-qa/adapter-desktop';
 import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
 
-import { findInput, findOcr } from './ocr-path.js';
+import { findInput, findOcr, findWinTool } from './ocr-path.js';
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
@@ -65,14 +70,44 @@ let reportPointed:
   | ((at: { x: number; y: number; width?: number; height?: number; label?: string }) => void)
   | undefined;
 
+/**
+ * **OS でデスクトップの見方を振り分ける**（2026-09-12・Windows 機で実測して足した）。
+ *
+ * ここは **macOS のアダプタしか呼んでいなかった。**Windows で走らせると
+ * `screencapture` と AX を叩きに行く —— **見られないのではなく、見られない理由が
+ * 人に伝わらない形で落ちる。**アプリからの入口（`app-cli`）は既に振り分けていたので、
+ * **同じ口なのに CLI だけ通らない**状態だった。
+ *
+ * **持っていない OS では、持っていないと言う**（`whyNoDesktop`）。
+ *
+ * 振り分けの形は `app-cli.ts` の `desktopAdapterFor` と同じ。**2 か所に同じ判断がある。**
+ * 3 か所目が要るようになったら 1 本にまとめる（いまはまだ重複が本物ではない）。
+ */
+const winToolPath = await findWinTool();
+const whyNot = whyNoDesktop(process.platform, winToolPath);
+if (whyNot !== undefined) {
+  console.error(`[git-qa] ${whyNot}`);
+  process.exit(1);
+}
+const build = { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' };
+
 const session = await startRunSession({
-  adapter: createDesktopAdapter({
-    app,
-    build: { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-    ...(ocrPath === undefined ? {} : { ocrPath }),
-    ...(inputPath === undefined ? {} : { inputPath }),
-    onPointed: (at) => reportPointed?.(at),
-  }),
+  adapter:
+    process.platform === 'win32'
+      ? // `whyNoDesktop` が通っているので、道具は在る。
+        createWindowsDesktopAdapter({
+          app,
+          build,
+          toolPath: winToolPath as string,
+          onPointed: (at) => reportPointed?.(at),
+        })
+      : createDesktopAdapter({
+          app,
+          build,
+          ...(ocrPath === undefined ? {} : { ocrPath }),
+          ...(inputPath === undefined ? {} : { inputPath }),
+          onPointed: (at) => reportPointed?.(at),
+        }),
   registerPointing: (report) => {
     reportPointed = report;
   },
