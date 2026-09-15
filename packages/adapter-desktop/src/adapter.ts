@@ -19,6 +19,7 @@ import type {
 
 import {
   axScript,
+  axTreeArgs,
   findInElements,
   manualAccessibilityScript,
   missingElementMessage,
@@ -230,11 +231,39 @@ function createSession(deps: SessionDeps): TargetSession {
     }
   };
 
+  /**
+   * 段 1 を読む。**道具が在れば道具で読む**（osascript を通さない）。
+   *
+   * 実測（2026-09-15・実物 2 つ）:
+   *
+   * ```text
+   * osascript 越し  1702 ms / 3016 ms
+   * 道具で直に        130 ms /  130 ms   ← 13〜23 倍
+   * ```
+   *
+   * **見えるものは減らない。**突き合わせたら、JXA が見つけた部品は全部在り、
+   * **JXA が取りこぼしていた部品まで見えた**（まとめ取りが黙って空を返す所がある）。
+   *
+   * 道具が落ちたときだけ osascript へ落とす。**空は失敗ではない** ——
+   * 自分で絵を描くアプリは、段 1 が本当に空になる。空で落とすと、
+   * そういう相手に毎回 3 秒払うことになる。
+   */
+  const readAx = async (): Promise<string> => {
+    if (deps.inputPath !== undefined) {
+      const said = await run(deps.inputPath, [...axTreeArgs(window.pid)]).then(
+        (out) => out,
+        () => undefined,
+      );
+      if (said !== undefined) return said;
+    }
+    return osa(axScript(app)).catch(() => '');
+  };
+
   /** **段 1 と段 2 の両方を読む。**片方が空でも、もう片方で見える。 */
   const look = async (): Promise<Seen> => {
     const shot = await shoot();
     const [axOut, ocrOut] = await Promise.all([
-      osa(axScript(app)).catch(() => ''),
+      readAx(),
       readOcr(deps.ocrPath, shot.bytes).catch(() => ''),
     ]);
     return {

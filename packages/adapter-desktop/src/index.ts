@@ -11,6 +11,7 @@ export {
   DEPTH_CUT,
   axDepth,
   axScript,
+  axTreeArgs,
   findInElements,
   manualAccessibilityScript,
   missingElementMessage,

@@ -69,6 +69,20 @@ export function axDepth(env: NodeJS.ProcessEnv = process.env): number {
 }
 
 /**
+ * **同じ木を、osascript を通さずに読む**（`git-qa-input tree`）。
+ *
+ * `axScript` は System Events（Apple Event）越しなので、まとめて取る形にしても
+ * **1.7〜3.0 秒**かかる（2026-09-15・実物 2 つ）。道具は AX の C の口を直に叩くので、
+ * 同じ木を同じ深さで読んで、**同じ形**（タブ区切りと打ち切りの印）で返す。
+ *
+ * **形を揃えるのが要点。**揃えてあるので `parseElements` / `wasCutOff` が両方に効き、
+ * 道具が無い機械では、そのまま osascript の道へ落とせる。
+ */
+export function axTreeArgs(pid: number, env: NodeJS.ProcessEnv = process.env): readonly string[] {
+  return ['tree', String(Math.round(pid)), String(axDepth(env))];
+}
+
+/**
  * 深さで打ち切ったことの印。
  *
  * **「無い」と「届かなかった」を分ける。**分けないと、読んだ人は

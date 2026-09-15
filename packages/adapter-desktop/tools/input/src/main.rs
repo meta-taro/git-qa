@@ -29,6 +29,13 @@ struct CGPoint {
     y: f64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct CGSize {
+    width: f64,
+    height: f64,
+}
+
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXUIElementCreateApplication(pid: i32) -> Ref;
@@ -55,12 +62,16 @@ extern "C" {
     fn AXUIElementPerformAction(el: Ref, action: *const c_void) -> i32;
     fn AXUIElementSetAttributeValue(el: Ref, attr: *const c_void, value: *const c_void) -> i32;
     fn AXUIElementCopyActionNames(el: Ref, out: *mut Ref) -> i32;
+    /// `AXPosition` / `AXSize` は CFString ではなく **AXValue** で返る。中身はこれで取り出す。
+    fn AXValueGetValue(value: Ref, kind: u32, out: *mut c_void) -> bool;
 
     fn CFStringCreateWithCString(alloc: *const c_void, s: *const i8, enc: u32) -> *const c_void;
     fn CFStringGetCString(s: *const c_void, buf: *mut i8, size: isize, enc: u32) -> bool;
     fn CFArrayGetCount(a: Ref) -> isize;
     fn CFArrayGetValueAtIndex(a: Ref, i: isize) -> *const c_void;
     fn CFBooleanGetValue(b: *const c_void) -> bool;
+    fn CFGetTypeID(cf: *const c_void) -> usize;
+    fn CFStringGetTypeID() -> usize;
     fn CFRelease(cf: *const c_void);
 }
 
@@ -112,6 +123,151 @@ unsafe fn ask_for_content(app: Ref) {
     }
     let _ = AXUIElementSetAttributeValue(app, yes, kCFBooleanTrue);
     let _ = CFBooleanGetValue; // 使わないが、真偽の読み取りが要るときのために残す
+}
+
+/// `kAXValueCGPointType` / `kAXValueCGSizeType`。**名前で引ける定数が無い**ので数で書く。
+const POINT_KIND: u32 = 1;
+const SIZE_KIND: u32 = 2;
+
+/// 属性を 1 つ取る。**取れないときは空**（読めない部品 1 つで一覧ごと落とさない）。
+unsafe fn attr(el: Ref, name: &str) -> Ref {
+    let mut out: Ref = std::ptr::null_mut();
+    if AXUIElementCopyAttributeValue(el, cfstr(name), &mut out) != 0 {
+        return std::ptr::null_mut();
+    }
+    out
+}
+
+/// 文字の属性。**文字でないものは空**（`AXValue` には数や真偽も入る）。
+unsafe fn text_attr(el: Ref, name: &str) -> String {
+    let v = attr(el, name);
+    if v.is_null() {
+        return String::new();
+    }
+    let out = if CFGetTypeID(v as *const c_void) == CFStringGetTypeID() {
+        read(v as *const c_void)
+    } else {
+        String::new()
+    };
+    CFRelease(v as *const c_void);
+    out
+}
+
+/// 位置と大きさ。**片方でも取れなければ、その部品は触れないので出さない。**
+unsafe fn frame_of(el: Ref) -> Option<(CGPoint, CGSize)> {
+    let p = attr(el, "AXPosition");
+    let s = attr(el, "AXSize");
+    let mut point = CGPoint { x: 0.0, y: 0.0 };
+    let mut size = CGSize { width: 0.0, height: 0.0 };
+    let got = !p.is_null()
+        && !s.is_null()
+        && AXValueGetValue(p, POINT_KIND, &mut point as *mut CGPoint as *mut c_void)
+        && AXValueGetValue(s, SIZE_KIND, &mut size as *mut CGSize as *mut c_void);
+    if !p.is_null() {
+        CFRelease(p as *const c_void);
+    }
+    if !s.is_null() {
+        CFRelease(s as *const c_void);
+    }
+    if got {
+        Some((point, size))
+    } else {
+        None
+    }
+}
+
+/// 名前。**題 → 値 → 説明 → 役割の説明**の順に見る。
+///
+/// **この順番は JXA の道に合わせてある**（2026-09-15 に、4 つの属性を実物から出して確かめた）。
+/// System Events の見せ方は、素の AX の属性と 1 対 1 ではない。
+///
+/// ```text
+/// name        = AXTitle ?? 文字の AXValue      静的テキストは、ここで本文が出る
+/// description = AXDescription ?? AXRoleDescription   窓のボタンは「close button」で出る
+/// ```
+///
+/// 取り違えると**名前が丸ごと変わる。**最初は `AXDescription` だけを見て
+/// 「group」「close button」しか名前を持たない部品を全部落とし、
+/// 次に `AXRoleDescription` だけにしたら、今度は本文が「text」になった。
+///
+/// **2 つの道が違う名前を出すと、同じシートが機械によって通ったり落ちたりする。**
+unsafe fn name_of(el: Ref) -> String {
+    for key in ["AXTitle", "AXValue", "AXDescription", "AXRoleDescription"] {
+        let said = text_attr(el, key);
+        if !said.trim().is_empty() {
+            return said;
+        }
+    }
+    String::new()
+}
+
+/// 木を下りながら、触れる部品を並べる。
+///
+/// **深さの扱いを JXA の道と揃えてある** —— 子を持つ部品が深さを越えたら、
+/// そこで打ち切って印を立てる。**「無い」と「届かなかった」を混ぜないため。**
+unsafe fn walk(el: Ref, depth: u32, max: u32, out: &mut Vec<String>, cut: &mut bool) {
+    let kids = attr(el, "AXChildren");
+    if kids.is_null() {
+        return;
+    }
+    let count = CFArrayGetCount(kids);
+    if count == 0 {
+        CFRelease(kids as *const c_void);
+        return;
+    }
+    if depth > max {
+        *cut = true;
+        CFRelease(kids as *const c_void);
+        return;
+    }
+
+    for i in 0..count {
+        let kid = CFArrayGetValueAtIndex(kids, i) as Ref;
+        if kid.is_null() {
+            continue;
+        }
+        let name = name_of(kid);
+        if !name.is_empty() {
+            if let Some((p, s)) = frame_of(kid) {
+                let role = text_attr(kid, "AXRole");
+                // **タブ区切り。**改行を含む値が混ざると行が割れるので、空白へ畳む。
+                let one = name.replace(['\n', '\r', '\t'], " ");
+                out.push(format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}",
+                    role, one, p.x, p.y, s.width, s.height
+                ));
+            }
+        }
+        walk(kid, depth + 1, max, out, cut);
+    }
+    CFRelease(kids as *const c_void);
+}
+
+/// 深さで打ち切った印。**`ax.ts` の `DEPTH_CUT` と同じ文字列**（片方だけ変えない）。
+const DEPTH_CUT: &str = "<深さで打ち切り>";
+
+/// 窓 1 つ分の木を出す。**出す形は JXA の道と同じ**（読む側は 1 つで足りる）。
+unsafe fn print_tree(pid: i32, max: u32) {
+    let app = AXUIElementCreateApplication(pid);
+    if app.is_null() {
+        fail(&format!("プロセス {pid} に繋げない"));
+    }
+    ask_for_content(app);
+
+    let windows = attr(app, "AXWindows");
+    if windows.is_null() || CFArrayGetCount(windows) == 0 {
+        // **窓が無いのは、落ちたのとは違う。**空を返して、呼ぶ側に決めさせる。
+        return;
+    }
+    let win = CFArrayGetValueAtIndex(windows, 0) as Ref;
+
+    let mut out: Vec<String> = Vec::new();
+    let mut cut = false;
+    walk(win, 0, max, &mut out, &mut cut);
+    if cut {
+        out.push(DEPTH_CUT.to_string());
+    }
+    println!("{}", out.join("\n"));
 }
 
 fn fail(message: &str) -> ! {
@@ -246,6 +402,7 @@ fn usage() -> ! {
     eprintln!("  git-qa-input press  <プロセス番号> <x> <y>");
     eprintln!("  git-qa-input scroll <x> <y> <行数>");
     eprintln!("  git-qa-input drag   <プロセス番号> <x1> <y1> <x2> <y2>");
+    eprintln!("  git-qa-input tree   <プロセス番号> [深さ]");
     std::process::exit(2);
 }
 
@@ -264,6 +421,19 @@ fn main() {
         let lines: i32 = args[4].parse().unwrap_or_else(|_| fail("行数が数ではない"));
         unsafe { scroll(x, y, lines) };
         println!("ok");
+        return;
+    }
+
+    if args[1] == "tree" {
+        if args.len() < 3 {
+            usage();
+        }
+        let pid: i32 = args[2].parse().unwrap_or_else(|_| fail("プロセス番号が数ではない"));
+        let max: u32 = args
+            .get(3)
+            .map(|v| v.parse().unwrap_or_else(|_| fail("深さが数ではない")))
+            .unwrap_or(12);
+        unsafe { print_tree(pid, max) };
         return;
     }
 

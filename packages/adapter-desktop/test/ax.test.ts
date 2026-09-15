@@ -5,6 +5,7 @@ import {
   axScript,
   findInElements,
   missingElementMessage,
+  axTreeArgs,
   parseElements,
   wasCutOff,
 } from '../src/ax.js';
@@ -194,5 +195,33 @@ describe('axScript — まとめて取る', () => {
 
     expect(said).toContain('uiElements.description()');
     expect(said).toContain('uiElements.value()');
+  });
+});
+
+/**
+ * **同じ木を、osascript を通さずに読む。**
+ *
+ * `axScript` は System Events（Apple Event）を通るので、部品の数だけ往復が要る。
+ * まとめて取る形にしても **実測 1.7〜3.0 秒**（2026-09-15・実物 2 つ）。
+ * `git-qa-input` は既に AX の C の口を直に叩いているので、**同じ道で木も読む。**
+ *
+ * **出す形は変えない。**役割・名前・x・y・幅・高さのタブ区切りと、打ち切りの印。
+ * 形を揃えてあるので、`parseElements` / `wasCutOff` はそのまま両方に効く。
+ */
+describe('axTreeArgs — 道具に直接聞く', () => {
+  it('プロセス番号と深さを渡す', () => {
+    expect(axTreeArgs(1234, {})).toEqual(['tree', '1234', '12']);
+  });
+
+  /** **2 つの道で深さが食い違わない。**同じ環境変数を、同じように見る。 */
+  it('深さの指定は osascript の道と同じものに従う', () => {
+    const env = { GIT_QA_AX_DEPTH: '20' } as unknown as NodeJS.ProcessEnv;
+
+    expect(axTreeArgs(1234, env)).toEqual(['tree', '1234', '20']);
+  });
+
+  /** プロセス番号は整数で渡す。**小数を渡すと道具側で弾かれる。** */
+  it('プロセス番号を整数にする', () => {
+    expect(axTreeArgs(1234.7, {})).toEqual(['tree', '1235', '12']);
   });
 });
