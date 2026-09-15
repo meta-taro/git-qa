@@ -22,12 +22,24 @@ export interface ZoomView {
 }
 
 export interface ZoomOptions {
-  /** 見えている枠の大きさ。 */
+  /** 見えている枠（`.live-canvas` の箱）。**ここから外は見えない。** */
   readonly frame: { readonly width: number; readonly height: number };
-  /** 等倍で描かれている映像の大きさ。 */
-  readonly image: { readonly width: number; readonly height: number };
+  /**
+   * 枠の中で、**実際に絵が描かれている矩形。**
+   *
+   * **枠と同じではない**（外部レビュー meta-taro/git-qa#16）。`object-fit: contain` は
+   * 比を保つので、比が違えば必ず余白が出る。実測で、箱 803x730 に対して絵は 803x502 ——
+   * **228px は絵ではない。**そこを絵として扱って拡大したので、
+   * 寄る先がずれ、映像が枠の外へはみ出し、中身の無い帯が出た。
+   */
+  readonly image: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
   readonly scale: number;
-  /** 寄る先（映像の中の座標）。**無ければ真ん中。** */
+  /** 寄る先（**絵の中**の座標）。**無ければ絵の真ん中。** */
   readonly focus?: { readonly x: number; readonly y: number };
 }
 
@@ -37,8 +49,8 @@ export function zoomTransform(options: ZoomOptions): ZoomView {
 
   return {
     scale,
-    translateX: offset(frame.width, image.width * scale, focus.x * scale),
-    translateY: offset(frame.height, image.height * scale, focus.y * scale),
+    translateX: offset(frame.width, image.left, image.width, scale, focus.x),
+    translateY: offset(frame.height, image.top, image.height, scale, focus.y),
   };
 }
 
@@ -46,16 +58,28 @@ export function zoomTransform(options: ZoomOptions): ZoomView {
  * 1 方向の移動量。**端の外は見せない。**
  *
  * 見えない画面で判定させないための変更なので、**空白を見せては意味がない。**
- * 拡大しても入り切る向きは、真ん中に置いたまま動かさない。
+ *
+ * 拡大は枠（箱）の左上を原点に掛かるので、**絵は `start`（余白）のぶんだけ先に居る。**
+ * そこを 0 と見なしていたのが #16 の原因なので、ここで必ず数に入れる。
  */
-function offset(frameSize: number, scaledSize: number, focusAt: number): number {
-  // **入り切る向きは動かさない。**親が中央へ寄せているので、足すと二重にずれる。
-  if (scaledSize <= frameSize) return 0;
+function offset(
+  frameSize: number,
+  start: number,
+  imageSize: number,
+  scale: number,
+  focus: number,
+): number {
+  const scaledStart = start * scale;
+  const scaledSize = imageSize * scale;
 
-  const wanted = frameSize / 2 - focusAt;
-  // 左（上）へ出しすぎない / 右（下）へ出しすぎない。
-  const min = frameSize - scaledSize;
-  return Math.min(0, Math.max(min, wanted));
+  // **入り切る向きは、真ん中に置く。**片側へ寄せると、そちらだけに帯が出る。
+  if (scaledSize <= frameSize) return (frameSize - scaledSize) / 2 - scaledStart;
+
+  const wanted = frameSize / 2 - (scaledStart + focus * scale);
+  // 手前へ出しすぎない / 奥へ出しすぎない（絵で枠を覆ったまま動かす）。
+  const most = -scaledStart;
+  const least = frameSize - (scaledStart + scaledSize);
+  return Math.min(most, Math.max(least, wanted));
 }
 
 /** 段を 1 つ上げ下げする。**端では止まる。** */

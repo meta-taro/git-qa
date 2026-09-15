@@ -121,10 +121,25 @@ body {
   overflow: hidden;
 }
 
-.live-canvas {
+/*
+ * 映像だけを包む器（外部レビュー meta-taro/git-qa#16）。
+ *
+ * 拡大した映像が**隣の説明文の上を塗っていた。**`column` に `overflow: hidden` を掛けても、
+ * **はみ出し先が同じ `column` の中**なので隠れない。**ここで切る。**
+ */
+.live-stage {
   /* **映像が先、入力欄が後。**DOM の順に依存させない（入れ替わって挟まった）。 */
   order: 0;
   flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+}
+
+.live-canvas {
+  flex: 1;
+  min-width: 0;
   min-height: 0;
   width: 100%;
   /* 端末の縦横比を保つ。引き伸ばすと、人が見て判断する材料が歪む。 */

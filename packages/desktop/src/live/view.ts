@@ -33,7 +33,8 @@ export function showLiveViewError(root: HTMLElement, message: string): void {
 
   // 映像の枠と、前に出した理由は消す。黒い枠が残ると、
   // 映っていないのか真っ黒なのかが分からない。
-  column.querySelector('.live-canvas')?.remove();
+  // **器ごと片付ける**（#16 で足した `.live-stage`）。canvas だけ消すと空の器が残る。
+  (column.querySelector('.live-stage') ?? column.querySelector('.live-canvas'))?.remove();
   column.querySelector('.live-error')?.remove();
   column.querySelector('.column-placeholder')?.remove();
 
@@ -61,8 +62,19 @@ export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions):
   canvas.width = options.width;
   canvas.height = options.height;
 
+  /**
+   * **映像だけを包む器**（外部レビュー meta-taro/git-qa#16）。
+   *
+   * 拡大すると、箱の余白（`background: Canvas`）が枠の外へ出て、
+   * **隣の説明文の上を塗っていた。**`column` に `overflow: hidden` を掛けても、
+   * **はみ出し先が同じ `column` の中**なので隠れない。
+   */
+  const stage = root.ownerDocument.createElement('div');
+  stage.className = 'live-stage';
+  stage.append(canvas);
+
   placeholder?.remove();
-  column.append(canvas);
+  column.append(stage);
 
   const context = canvas.getContext('2d');
 
@@ -91,7 +103,7 @@ export function mountLiveView(root: HTMLElement, options: MountLiveViewOptions):
       context?.drawImage(frame as unknown as Drawable, 0, 0, canvas.width, canvas.height);
     },
     unmount() {
-      canvas.remove();
+      stage.remove();
       if (placeholder !== null && placeholder !== undefined) column.append(placeholder);
     },
   };

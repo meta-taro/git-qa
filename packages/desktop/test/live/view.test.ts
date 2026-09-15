@@ -95,3 +95,50 @@ describe('mountLiveView', () => {
     expect(() => mountLiveView(empty, { width: 1, height: 1 })).toThrow(/カラム/);
   });
 });
+
+/**
+ * **拡大した映像が、隣の説明文の上に載っていた**（外部レビュー meta-taro/git-qa#16）。
+ *
+ * > 絵が窓の下端（y=888）まで伸び、**説明文「ここから押すのは…」の上に重なって読めない**
+ *
+ * `.column.is-zoomed { overflow: hidden }` は入っていたが、
+ * **はみ出しているのは `column` の中**（説明文も入力欄も同じ `column` の中に在る）なので、
+ * これでは隠れない。**映像だけを包む器**に隠させる。
+ *
+ * 絵そのものは枠を覆うように寄せてあるが、**箱の余白（地の色）は枠の外へ出る。**
+ * `.live-canvas` は `background: Canvas` を持っているので、**出た先を塗ってしまう。**
+ */
+describe('映像の器（拡大しても、隣を覆わない）', () => {
+  it('映像は、はみ出しを隠す器に入っている', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+
+    const canvas = mountLiveView(root, { width: 200, height: 400 }).canvas;
+
+    expect(canvas.parentElement?.classList.contains('live-stage')).toBe(true);
+  });
+
+  it('外すと、器も残らない', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    const surface = mountLiveView(root, { width: 200, height: 400 });
+
+    surface.unmount();
+
+    expect(root.querySelector('.live-stage')).toBeNull();
+  });
+
+  it('映らない理由を出すときも、器ごと片付ける', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    mountLiveView(root, { width: 200, height: 400 });
+
+    showLiveViewError(root, '映っていない理由');
+
+    expect(root.querySelector('.live-stage')).toBeNull();
+    expect(root.querySelector('.live-error')).not.toBeNull();
+  });
+});

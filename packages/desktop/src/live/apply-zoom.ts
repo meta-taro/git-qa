@@ -1,4 +1,5 @@
 import { MAIN_COLUMN_ID } from '../columns.js';
+import { showPointer } from './pointer.js';
 import { zoomTransform } from './zoom.js';
 import type { Pointing } from '@git-qa/core/session';
 
@@ -8,46 +9,77 @@ import type { Pointing } from '@git-qa/core/session';
  * **寄る先は AI が指した場所。**git-qa はそこを知っている（要望シート No.1 の矢印）ので、
  * **人が探して動かす手間を作らない。**指していなければ真ん中。
  *
- * **矢印も一緒に拡大する。**別々に動かすと、指す先がずれる。
+ * ## 2026-09-15、押すと 3 つ同時に崩れていた（外部レビュー meta-taro/git-qa#16）
+ *
+ * > 映像が枠の下へはみ出す／中身の無い黒帯が出る／**矢印が 424px ずれて何も無い所を指す**
+ *
+ * 原因は 2 つ。
+ *
+ * 1. **絵は枠いっぱいに描かれている、と思っていた。**`object-fit: contain` は
+ *    まさにそうしないための指定で、比が違えば必ず余白が出る（実測 803x730 の箱に絵は 803x502）
+ * 2. **矢印を、映像と同じ移動量で動かしていた。**原点が別の要素なので、同じ倍率でも動き方が違う
+ *
+ * 2 は**別当てをやめた。**矢印を置く `screenPoint` は `contain` を正しく数えているので、
+ * **拡大後の枠でもう一度置き直せば足りる**（`getBoundingClientRect` は変形後の箱を返す）。
+ * **数える所を 2 つ持たない** —— 2 つ持ったから、片方だけ間違えた。
  */
 export function applyZoom(root: HTMLElement, scale: number, at: Pointing | undefined): void {
   const column = root.querySelector<HTMLElement>(`[data-column-id="${MAIN_COLUMN_ID}"]`);
   const canvas = column?.querySelector<HTMLCanvasElement>('.live-canvas');
   if (column === null || column === undefined || canvas === null || canvas === undefined) return;
 
-  // はみ出した分を隠す。**空白や、枠の外の絵を見せない。**
+  // はみ出した分を隠す。**枠の外の絵を、隣の説明文の上に出さない。**
   column.classList.toggle('is-zoomed', scale > 1);
 
+  // **変形を外してから測る。**前の変形が残った箱で数えると、掛け算が積み上がる。
+  canvas.style.transform = '';
   const box = canvas.getBoundingClientRect();
+  const drawn = drawnImage(box, at);
+
   const view = zoomTransform({
     frame: { width: box.width, height: box.height },
-    // 映像は枠いっぱいに描かれている（枠の形に合わせてある）。
-    image: { width: box.width, height: box.height },
+    image: drawn,
     scale,
-    ...(at === undefined ? {} : { focus: focusIn(at, box) }),
+    ...(at === undefined
+      ? {}
+      : {
+          focus: { x: (at.x / at.screen.x) * drawn.width, y: (at.y / at.screen.y) * drawn.height },
+        }),
   });
 
-  const transform =
+  canvas.style.transformOrigin = '0 0';
+  canvas.style.transform =
     view.scale === 1
       ? ''
       : `translate(${String(Math.round(view.translateX))}px, ${String(Math.round(view.translateY))}px) scale(${String(view.scale)})`;
 
-  canvas.style.transformOrigin = '0 0';
-  canvas.style.transform = transform;
-
-  // **矢印も同じだけ動かす。**別々にすると、指す先がずれる。
-  const pointer = column.querySelector<HTMLElement>('.live-pointer');
-  if (pointer !== null) {
-    pointer.style.transformOrigin = '0 0';
-    pointer.style.transform = transform;
-  }
+  /**
+   * **矢印は置き直す。**同じ移動量を当てない（#16）。
+   *
+   * `showPointer` は**そのときの枠**から画素位置を出す。上で変形を当てたので、
+   * `getBoundingClientRect` は**拡大後の箱**を返す —— そこへ `contain` を数え直せば、
+   * 矢印は絵の同じ場所に付く。
+   */
+  showPointer(root, at);
 }
 
-/** 指された場所を、映像の中の座標へ直す。 */
-function focusIn(at: Pointing, box: DOMRect): { x: number; y: number } {
-  const screen = at.screen;
+/**
+ * 枠の中で、実際に絵が描かれている矩形（`object-fit: contain`）。
+ *
+ * 相手の大きさが分からないときは、**枠いっぱいだと見なす** ——
+ * 分からないものを当て推量で狭めると、寄る先がずれる。
+ */
+function drawnImage(
+  box: { width: number; height: number },
+  at: Pointing | undefined,
+): { left: number; top: number; width: number; height: number } {
+  const screen = at?.screen;
   if (screen === undefined || screen.x <= 0 || screen.y <= 0) {
-    return { x: box.width / 2, y: box.height / 2 };
+    return { left: 0, top: 0, width: box.width, height: box.height };
   }
-  return { x: (at.x / screen.x) * box.width, y: (at.y / screen.y) * box.height };
+
+  const fit = Math.min(box.width / screen.x, box.height / screen.y);
+  const width = screen.x * fit;
+  const height = screen.y * fit;
+  return { left: (box.width - width) / 2, top: (box.height - height) / 2, width, height };
 }
