@@ -299,3 +299,47 @@ describe('renderSession — 鑑賞中', () => {
     expect(root.querySelector('.key-action[data-key="Escape"]')).toBeNull();
   });
 });
+
+/**
+ * **窓を縮めると、判定キーの説明が下から消える**（外部レビュー meta-taro/git-qa#15）。
+ *
+ * > | 1269 x 782 | D / F / A / S / スペース / ↑ / ↓ の **7 つ** |
+ * > | 960 x 700  | D / F / A / S / スペース の **5 つ** |
+ * >
+ * > **↑ と ↓（前のケースを見る・次のケースを見る）が丸ごと消えます。**
+ * > パネルが縦に流れるだけで、スクロールもしないようでした。
+ *
+ * **報告のときより増えている。**#13 で拡大の 3 つ（`+` `−` `0`）を足したので、
+ * いまは 10 個が縦に積まれる。**消える量は報告時より多い。**
+ *
+ * 原因は `.column { overflow: hidden }`。**はみ出したぶんを、流しもせずに捨てていた。**
+ * 畳める形（#13 の提案 2）より先に、**どんな幅でも全部に届く**ようにする ——
+ * 畳む形は「畳んだ人にだけ見えない」状態を新しく作るので、後でよい。
+ */
+describe('判定カラム — 幅が足りないときに、下を捨てない', () => {
+  const readCss = async (): Promise<string> => {
+    const { readFile } = await import('node:fs/promises');
+    const url = await import('node:url');
+    const path = await import('node:path');
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    return readFile(path.resolve(here, '../../src/styles.css'), 'utf8');
+  };
+
+  it('はみ出したら流す規則が CSS にある', async () => {
+    const css = await readCss();
+    const rule = css.slice(css.indexOf(".column[data-column-id='verdict'] {"));
+
+    expect(rule.slice(0, rule.indexOf('}'))).toContain('overflow-y: auto');
+  });
+
+  /** **流しても、どの欄かは見えたまま。**見出しが一緒に流れると、何の一覧か分からなくなる。 */
+  it('流しても、見出しは残る', async () => {
+    const css = await readCss();
+    const head = css.indexOf(".column[data-column-id='verdict'] .column-heading {");
+    const rule = css.slice(head, css.indexOf('}', head));
+
+    expect(rule).toContain('position: sticky');
+    // 地の色を敷かないと、流れてきた文字が見出しの下に透ける。
+    expect(rule).toContain('background: Canvas');
+  });
+});

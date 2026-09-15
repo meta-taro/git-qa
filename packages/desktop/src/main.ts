@@ -11,6 +11,7 @@ import { readRecentSheets, rememberSheet, writeRecentSheets } from './setup/rece
 import { isTypingHandle, nextDrawing } from './setup/redraw.js';
 import { renderSetup } from './setup/view.js';
 import type { ConnectionStatus } from './onboarding/index.js';
+import { MAIN_COLUMN_ID } from './columns.js';
 import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
@@ -37,6 +38,7 @@ import {
 } from './live/stream.js';
 import { mountLiveView, showDesktopNote, showLiveViewError } from './live/view.js';
 import { showPointer } from './live/pointer.js';
+import { watchSize } from './live/watch-size.js';
 import { createWebCodecsDecoder, isLiveViewSupported } from './live/webcodecs.js';
 import './styles.css';
 
@@ -476,6 +478,23 @@ function startControl(controlUrl: string): void {
 
   /** いまの拡大の段。**等倍から始める。** */
   let zoom = 1;
+
+  /**
+   * **枠が変わったら、指し直す**（外部レビュー meta-taro/git-qa#15）。
+   *
+   * > 窓を横に広げたり縮めたりすると、矢印が指していた場所からずれます。
+   *
+   * 矢印は**そのときの枠**から画素位置を出して置くので、枠が変われば置き直しが要る。
+   * 上の `showPointer` は**状態が届いたときだけ**通る ——
+   * **判定を待っている間は状態が来ない。**待っている間に窓を変えると、ずれたまま残っていた。
+   *
+   * 見張るのは窓ではなく**映像のカラム**。カラムの区切りを動かしても枠は変わるのに、
+   * そちらは `resize` では拾えない。
+   */
+  watchSize(app.querySelector(`[data-column-id="${MAIN_COLUMN_ID}"]`) ?? app, () => {
+    showPointer(app, latest?.pointing);
+    if (zoom > 1) applyZoom(app, zoom, latest?.pointing);
+  });
 
   /** 打鍵とクリックで、まったく同じ道を通す。 */
   const place = (command: KeyCommand): void => {

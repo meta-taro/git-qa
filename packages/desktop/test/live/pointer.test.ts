@@ -209,3 +209,69 @@ describe('showPointer — 斜めにする境目', () => {
     expect(diagonalAt(37)).toBe(false);
   });
 });
+
+/**
+ * **窓の大きさを変えると、矢印がずれる**（外部レビュー meta-taro/git-qa#15）。
+ *
+ * > 窓を横に広げたり縮めたりすると、矢印が指していた場所からずれます。
+ * > 映像は追従するのに、矢印だけ元の画素位置に残る形です。
+ *
+ * 矢印は**呼ばれた瞬間の**枠から画素位置を出して、絶対位置で置いている。
+ * 枠が変われば答えも変わるのに、**置き直しの番人が止めていた。**
+ *
+ * ```ts
+ * const key = `${x},${y},${label}`;   // ← 相手の窓の中の座標だけ
+ * if (existing.dataset['at'] === key) return;
+ * ```
+ *
+ * 相手の中では同じ場所なので `key` は変わらない。
+ * **揺れを途切れさせないための番人が、位置直しまで止めていた。**
+ */
+describe('showPointer — 枠の大きさが変わったとき', () => {
+  let root: HTMLElement;
+  let canvas: HTMLCanvasElement;
+  let width = 400;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    width = 400;
+    canvas = mountLiveView(root, { width: 200, height: 400 }).canvas;
+    canvas.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width,
+      height: 400,
+      right: width,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  });
+
+  it('枠が変わったら、置き直す', () => {
+    const at = { x: 100, y: 200, screen: { x: 200, y: 400 } };
+    showPointer(root, at);
+    const before = root.querySelector<HTMLElement>('.live-pointer')?.style.left;
+
+    width = 200;
+    showPointer(root, at);
+
+    const after = root.querySelector<HTMLElement>('.live-pointer')?.style.left;
+    expect(before).not.toEqual(after);
+  });
+
+  /** **揺れは途切れさせない。**枠が同じなら、今までどおり置き直さない。 */
+  it('枠が同じなら、置き直さない', () => {
+    const at = { x: 100, y: 200, screen: { x: 200, y: 400 } };
+    showPointer(root, at);
+    const mark = root.querySelector('.live-pointer');
+
+    showPointer(root, at);
+
+    expect(root.querySelector('.live-pointer')).toBe(mark);
+  });
+});

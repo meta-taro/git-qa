@@ -67,10 +67,11 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
    */
   const aim = aimFor(at);
 
+  const rect = canvas.getBoundingClientRect();
   const on = screenPoint({
     x: aim.x,
     y: aim.y,
-    rect: canvas.getBoundingClientRect(),
+    rect,
     canvas: { width: at.screen.x, height: at.screen.y },
   });
   // 測れないなら指さない。**見当違いの所を指すより、指さないほうがよい。**
@@ -79,8 +80,18 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
     return;
   }
 
-  const key = `${String(Math.round(aim.x))},${String(Math.round(aim.y))},${at.label ?? ''}`;
-  // **同じ所を続けて指すなら、置き直さない。**置き直すと揺れが最初から始まる。
+  /**
+   * **枠の大きさも混ぜる**（外部レビュー meta-taro/git-qa#15）。
+   *
+   * > 窓を横に広げたり縮めたりすると、矢印が指していた場所からずれます。
+   *
+   * 矢印は**このときの枠**から画素位置を出して、絶対位置で置く。枠が変われば答えも変わる。
+   * ところが `key` が相手の窓の中の座標だけだと、**窓を変えても `key` は変わらない** ——
+   * **揺れを途切れさせないための番人が、位置直しまで止めていた。**
+   */
+  const frame = `${String(Math.round(rect.width))}x${String(Math.round(rect.height))}`;
+  const key = `${String(Math.round(aim.x))},${String(Math.round(aim.y))},${at.label ?? ''},${frame}`;
+  // **同じ所・同じ枠なら、置き直さない。**置き直すと揺れが最初から始まる。
   if (existing !== null && existing.dataset['at'] === key) return;
   existing?.remove();
 

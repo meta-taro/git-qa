@@ -76,6 +76,31 @@ body {
   border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
 }
 
+/*
+ * **判定カラムは、はみ出したら流す**（外部レビュー meta-taro/git-qa#15）。
+ *
+ * > 窓を縮めると、右の判定パネルの中身が下から順に消えます。
+ * > ↑ と ↓（前のケースを見る・次のケースを見る）が丸ごと消えます。
+ *
+ * `.column` は `overflow: hidden` なので、**はみ出したぶんを流しもせずに捨てていた。**
+ * 「走ったケースなら、戻って置き直せる」は**この画面で初めて知る機能**なので、
+ * 幅が足りない機械の人だけが一生知らない、という形になっていた。
+ *
+ * **畳める形（#13 の提案 2）より先に、どんな幅でも全部に届くようにする。**
+ * 畳む形は「畳んだ人にだけ見えない」状態を新しく作るので、後で考える。
+ */
+.column[data-column-id='verdict'] {
+  overflow-y: auto;
+}
+
+/* 流しても、どの欄かは見えたまま。**地の色を敷かないと、文字が見出しに透ける。** */
+.column[data-column-id='verdict'] .column-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: Canvas;
+}
+
 .column-placeholder {
   margin: 0;
   padding: 0.75rem;
