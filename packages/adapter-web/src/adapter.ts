@@ -117,6 +117,10 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
           ...(options.browserPath === undefined ? {} : { browserPath: options.browserPath }),
           ...(options.browser === undefined ? {} : { browser: options.browser }),
           ...(options.size === undefined ? {} : { size: options.size }),
+          // **片付けたことは黙らない**（meta-taro/git-qa#20）。
+          onNote: (message) => {
+            console.log(`[git-qa] ${message}`);
+          },
         });
         cdp = createCdpClient(await connectCdpSocket(await findPage(browser.devToolsUrl)));
 

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { AdapterError } from '@git-qa/core';
 
 import { browserArgs, browserCandidates, parseActivePort, parseDevToolsUrl } from './launch.js';
+import { STALE_MARK, closeStaleBrowsers } from './stale.js';
 import type { BrowserKind } from './launch.js';
 
 /**
@@ -32,6 +33,11 @@ export interface LaunchBrowserOptions {
   /** どのブラウザで見るか。**選ばれていれば、それ以外は探さない。** */
   readonly browser?: BrowserKind;
   readonly size?: { readonly width: number; readonly height: number };
+  /**
+   * 片付けたことを人へ伝える口（meta-taro/git-qa#20）。
+   * **黙って落とさない** —— 何を落としたのかが見えないと、人は自分の窓を疑う。
+   */
+  readonly onNote?: (message: string) => void;
   /** 繋ぎ先が出てくるまで待つ上限（ms）。 */
   readonly startTimeoutMs?: number;
 }
@@ -56,10 +62,27 @@ export async function findBrowser(explicit?: string, kind?: BrowserKind): Promis
   );
 }
 
+/** 合図を送ってから、落ちたかを見るまでの間。 */
+const CLOSE_GRACE_MS = 800;
+
 export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise<RunningBrowser> {
   const binary = await findBrowser(options.browserPath, options.browser);
+
+  /**
+   * **前の実行の置き去りを、先に片付ける**（meta-taro/git-qa#20）。
+   *
+   * 実行器を強制終了すると、ここで起こしたブラウザが残る。
+   * 溜まると**人の Dock がブラウザだらけ**になる（2026-09-15 に 30 個溜めた）。
+   *
+   * **終わりに落とす道だけでは足りない。**`SIGKILL` では片付けが走らないので、
+   * **始めるときにも見る。**落とすのは使い捨てプロファイルのものだけ ——
+   * **人のブラウザには触らない。**
+   */
+  const cleaned = await closeStaleBrowsers();
+  if (cleaned !== undefined) options.onNote?.(cleaned);
+
   // **人のプロファイルを触らない。**開いているタブ・履歴・ログイン状態に手を出さない。
-  const userDataDir = await mkdtemp(join(tmpdir(), 'git-qa-web-'));
+  const userDataDir = await mkdtemp(join(tmpdir(), STALE_MARK));
 
   const child: ChildProcess = spawn(
     binary,
@@ -73,6 +96,18 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
 
   const close = async (): Promise<void> => {
     child.kill();
+    /**
+     * **落ちたことを確かめる**（#20）。`kill` は合図を送るだけで、
+     * 受け取った側がすぐ終わるとは限らない。残っていたら、もう一段強く言う。
+     */
+    await new Promise<void>((resolve) => setTimeout(resolve, CLOSE_GRACE_MS));
+    if (child.exitCode === null && child.signalCode === null) {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // もう居ない。**片付けのために本筋を止めない。**
+      }
+    }
     // 作業場所は残さない。**人の temp に溜まり続けるのは、頼まれていない。**
     await rm(userDataDir, { recursive: true, force: true }).catch(() => undefined);
   };
