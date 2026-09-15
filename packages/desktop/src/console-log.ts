@@ -10,6 +10,31 @@
  *
  * ブラウザで開いているとき（Tauri がいないとき）は何もしない。
  */
+/**
+ * console へ渡された値を、1 行の文にする。
+ *
+ * **失敗の理由を落とさない**（meta-taro/git-qa#18）。
+ * `JSON.stringify(new Error('Load failed'))` は **`{}`** になるので、
+ * 「映らない」を調べる人が、いちばん見たい 1 語を失っていた。
+ */
+export function logLine(args: readonly unknown[]): string {
+  return args.map(one).join(' ');
+}
+
+function one(value: unknown): string {
+  if (typeof value === 'string') return value;
+  // **名前も残す。**`TypeError` なのか、こちらが投げたものなのかで、見る所が変わる。
+  if (value instanceof Error) {
+    return value.name === 'Error' ? value.message : `${value.name}: ${value.message}`;
+  }
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    // 輪になっている値。**記録のために本筋を止めない。**
+    return Object.prototype.toString.call(value);
+  }
+}
+
 export async function attachConsoleToLog(): Promise<void> {
   if (!('__TAURI_INTERNALS__' in window)) return;
   try {
@@ -20,9 +45,7 @@ export async function attachConsoleToLog(): Promise<void> {
       (...args: unknown[]): void => {
         original(...args);
         // 送れなくても画面は動き続ける。**診断のために本筋を止めない。**
-        void level(
-          args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '),
-        ).catch(() => undefined);
+        void level(logLine(args)).catch(() => undefined);
       };
 
     console.log = forward(log.info, console.log.bind(console));

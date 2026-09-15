@@ -20,6 +20,7 @@ import { humanInputFor, nextCursor, whyCannotPlace } from './session/cursor.js';
 import { applyZoom } from './live/apply-zoom.js';
 import { nextZoom, sourcePixelRatio, zoomForPixels } from './live/zoom.js';
 import { showStretchNote } from './live/stretch.js';
+import { liveStallMessage } from './live/stall.js';
 import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
@@ -155,6 +156,12 @@ void startLocaleSync({
  *
  * **繋いでいないのに空の枠を出さない。**映らないのか繋いでいないのかが人に分からなくなる。
  */
+/**
+ * 「描けていない」と言うまでの間。**短くしすぎない** ——
+ * 最初の 1 枚は相手が絵を出すまで来ないので、急かすと誤報になる。
+ */
+const LIVE_STALL_MS = 8_000;
+
 async function startLiveView(
   container: HTMLElement,
   url: string,
@@ -203,6 +210,19 @@ async function startLiveView(
       : createLivePlayer({ createDecoder: createWebCodecsDecoder, onFrame: drew });
 
   if (kind === 'h264') livePlayer = player as ReturnType<typeof createLivePlayer>;
+
+  /**
+   * **届いているのに描けていないなら、そう言う**（meta-taro/git-qa#18）。
+   *
+   * 種類を取り違えて JPEG を H.264 の復号器へ流し込んでいたとき、
+   * **例外も記録も出ず、ただ真っ白**になった。**黙って白くしない。**
+   */
+  window.setTimeout(() => {
+    const said = liveStallMessage({ bytes: diagnostics.bytes, drawn: diagnostics.drawn, kind });
+    if (said === undefined) return;
+    diagnostics.lastError = said;
+    showLiveViewError(container, said);
+  }, LIVE_STALL_MS);
 
   // 受け取ったバイト数を数える。**0 なら橋まで届いていない**（画面の問題ではない）。
   const counted = (await openLiveStream(url)).pipeThrough(

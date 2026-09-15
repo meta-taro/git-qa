@@ -89,11 +89,24 @@ function parseSetupState(raw: unknown): SetupState | undefined {
       )
     : undefined;
 
+  const kind = text('liveKind');
+  const liveKind = kind === 'h264' || kind === 'images' ? kind : undefined;
+
   return {
     phase: phase as SetupPhase,
     devices,
     sheets: asStrings(raw['sheets']),
     ...(text('liveUrl') === undefined ? {} : { liveUrl: text('liveUrl') as string }),
+    /**
+     * **映像の種類は、実行器が知らせる**（C54・meta-taro/git-qa#18）。
+     *
+     * ここで写し忘れていたので、画面は既定の `h264` で復号器を作り、
+     * **JPEG を H.264 として流し込んでいた** —— 例外も出ず、記録にも何も出ず、
+     * **ただ真っ白**になる。画面から始めた人だけが踏んでいた（CLI は URL に乗っている）。
+     *
+     * **知らない名前は受け取らない。**当て推量で選ぶと、また黙って白くなる。
+     */
+    ...(liveKind === undefined ? {} : { liveKind }),
     ...(text('controlUrl') === undefined ? {} : { controlUrl: text('controlUrl') as string }),
     ...(text('error') === undefined ? {} : { error: text('error') as string }),
     ...(text('deviceError') === undefined ? {} : { deviceError: text('deviceError') as string }),

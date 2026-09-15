@@ -219,3 +219,54 @@ describe('fetchSetupState — 途中で止まった実行', () => {
     expect(state?.resumable).toBeUndefined();
   });
 });
+
+/**
+ * **映像の種類を落とさない**（meta-taro/git-qa#18）。
+ *
+ * 実行器は「この相手は 1 枚ずつの絵（`images`）だ」と知らせているのに、
+ * **読み取りがそこを写していなかった。**画面は既定の `h264` として復号器を作り、
+ * **JPEG を H.264 として流し込んでいた。**
+ *
+ * **何も起きない。**復号器は待つだけなので、例外も出ず、記録にも何も出ない。
+ * 人には「ライブビューが真っ白」としか見えない ——
+ * **この道具の値打ち（人が見て判定する）が、黙って消える形。**
+ *
+ * CLI から始めたときは URL に種類が乗っているので出ていた。
+ * **画面から始めた人だけが、映像の出ない道具を渡されていた。**
+ */
+describe('fetchSetupState — 映像の種類', () => {
+  const stateWith = (extra: Record<string, unknown>): typeof fetch =>
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ phase: 'running', devices: [], sheets: [], ...extra }), {
+        status: 200,
+      }),
+    );
+
+  it('1 枚ずつの絵だと知らせてきたら、そう受け取る', async () => {
+    const state = await fetchSetupState(
+      'http://127.0.0.1:5/setup/abc',
+      stateWith({ liveUrl: 'http://x/live', liveKind: 'images' }),
+    );
+
+    expect(state?.liveKind).toBe('images');
+  });
+
+  it('h264 も受け取る', async () => {
+    const state = await fetchSetupState(
+      'http://127.0.0.1:5/setup/abc',
+      stateWith({ liveUrl: 'http://x/live', liveKind: 'h264' }),
+    );
+
+    expect(state?.liveKind).toBe('h264');
+  });
+
+  /** **知らない名前は受け取らない。**当て推量で復号器を選ぶと、また黙って白くなる。 */
+  it('知らない種類は受け取らない', async () => {
+    const state = await fetchSetupState(
+      'http://127.0.0.1:5/setup/abc',
+      stateWith({ liveUrl: 'http://x/live', liveKind: 'vp9' }),
+    );
+
+    expect(state?.liveKind).toBeUndefined();
+  });
+});

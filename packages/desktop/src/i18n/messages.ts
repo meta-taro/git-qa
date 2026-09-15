@@ -22,6 +22,8 @@ const ja = {
   // **畳めるのは脇だけ**（外部レビュー #17）。映像に幅を返すため。
   'key.zoomPixels': '相手の画素と 1 対 1 で見る',
   'key.zoomPixels.note': 'これ以上は引き伸ばしになり、細部は増えません',
+  'live.stalled':
+    '映像は届いているのに、1 枚も描けていません（{bytes} バイト受け取り／種類は {kind}）。相手と映像の種類が食い違っているかもしれません',
   'live.stretched':
     'ここから先は引き伸ばしです（相手の 1 画素を {ratio} 画素で出しています。細部は増えません）',
   'column.fold': 'この欄を畳む（映像を広くする）',
@@ -158,6 +160,8 @@ const en: Record<keyof typeof ja, string> = {
   'column.verdict.heading': 'Verdict',
   'key.zoomPixels': 'Match the target pixel for pixel',
   'key.zoomPixels.note': 'Beyond this it is stretching; no more detail appears',
+  'live.stalled':
+    'Frames are arriving but none could be drawn ({bytes} bytes received, kind {kind}) — the stream kind may not match the target',
   'live.stretched': 'Stretching from here ({ratio}x per source pixel) — no more detail appears',
   'column.fold': 'Fold this panel (widen the video)',
   'column.unfold': 'Unfold this panel',
