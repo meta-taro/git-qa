@@ -1,4 +1,4 @@
-import type { SessionCase, SessionState } from '@git-qa/core/session';
+import type { SessionCase, SessionField, SessionState } from '@git-qa/core/session';
 
 import { t } from '../i18n/current.js';
 import { KEY_BINDINGS, keyCap } from './keys.js';
@@ -167,17 +167,22 @@ function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | 
   }
 
   headline.textContent = `${String(awaiting.no)}. ${awaiting.title}`;
+  target.append(headline);
 
-  const ai = doc.createElement('p');
-  ai.className = 'verdict-ai';
-  // **AI が何を見たかを人へ見せる。**見ずに置くための道具ではない。
-  ai.textContent = `AI の判定: ${awaiting.aiResult ?? ''}`;
+  /**
+   * **人が主で、AI の但し書きは脇**（外部レビュー meta-taro/git-qa#19）。
+   *
+   * > 判定を置く人は「何をすればいいか」も「なぜそれを確かめるのか」も画面から読めません。
+   * > 読めるのは AI が自分の限界を説明した文だけです。**順番が逆**だと思いました。
+   *
+   * 見出しの次が**何をするか**、その次が**何が起きれば合格か**。
+   * 列名は決め打ちしない —— **書き手が足した列も、その言葉のまま出る。**
+   */
+  for (const field of awaiting.fields ?? []) {
+    target.append(renderField(doc, field));
+  }
 
-  const note = doc.createElement('p');
-  note.className = 'verdict-note';
-  note.textContent = awaiting.note ?? '';
-
-  target.append(headline, ai, note);
+  target.append(renderAi(doc, awaiting));
 
   if (revising) {
     // **置いても次へ進まない**ことを、押す前に言う。
@@ -188,6 +193,46 @@ function renderVerdict(root: HTMLElement, state: SessionState, cursor: number | 
   }
 
   target.append(renderKeyHelp(doc, true));
+}
+
+/** シートの 1 欄。**書いた人の言葉のまま出す**（外部レビュー meta-taro/git-qa#19）。 */
+function renderField(doc: Document, field: SessionField): HTMLElement {
+  const box = doc.createElement('div');
+  box.className = 'verdict-field';
+
+  const label = doc.createElement('span');
+  label.className = 'verdict-field-label';
+  label.textContent = field.label;
+
+  const value = doc.createElement('p');
+  value.className = 'verdict-field-value';
+  value.textContent = field.value;
+
+  box.append(label, value);
+  return box;
+}
+
+/**
+ * AI の判定と、その但し書き。
+ *
+ * **但し書きは畳んでおく**（外部レビュー #19 の提案 2）。
+ * 必要な人は開ける。いちばん目立つ所に置くと、**人が読むべきもの（手順）が下へ押される。**
+ * **判定そのものは畳まない** —— AI が何と言ったかは、押す前に見える所に在るべき。
+ */
+function renderAi(doc: Document, subject: SessionCase): HTMLElement {
+  const detail = doc.createElement('details');
+  detail.className = 'verdict-ai-detail';
+
+  const head = doc.createElement('summary');
+  head.className = 'verdict-ai';
+  head.textContent = `AI の判定: ${subject.aiResult ?? ''}`;
+
+  const note = doc.createElement('p');
+  note.className = 'verdict-note';
+  note.textContent = subject.note ?? '';
+
+  detail.append(head, note);
+  return detail;
 }
 
 /**

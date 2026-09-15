@@ -8,10 +8,30 @@ import type { AiResult, CaseResult, HumanResult } from '../run/types.js';
  * 形の違うものを黙って受け取ると、`run.json` に人が置いていない判定が入りうる。
  */
 
+/**
+ * シートに書いてある 1 欄（外部レビュー meta-taro/git-qa#19）。
+ *
+ * **列名は決め打ちしない。**`No.` と `項目` 以外を、**書いた人の言葉のまま**運ぶ。
+ * 決め打ちにすると、書き手が足した「なぜ見るのか」のような列が届かない。
+ */
+export interface SessionField {
+  readonly label: string;
+  readonly value: string;
+}
+
 /** 画面に出ている 1 ケース。 */
 export interface SessionCase {
   readonly no: number;
   readonly title: string;
+  /**
+   * **人が判定を置くために読むもの**（手順・期待結果・書き手が足した列）。
+   *
+   * > 署名する人が、何を確かめているのか画面から読めない。
+   *
+   * 運んでいなかったので、判定カラムには**見出しと AI の但し書きしか出ていなかった。**
+   * **人が主で、AI の但し書きは脇。**
+   */
+  readonly fields?: readonly SessionField[];
   /** AI が出した判定。まだ走っていないケースは持たない。 */
   readonly aiResult?: AiResult;
   /** 確定した最終結果。人が置くか、実行が次へ進んだ時点で決まる。 */
@@ -273,14 +293,39 @@ function parseCase(raw: unknown): SessionCase | undefined {
   const text = (key: string): string | undefined =>
     typeof raw[key] === 'string' ? raw[key] : undefined;
 
+  const fields = parseFields(raw['fields']);
+  // **半端な欄は画面に出さない。**形が違うものが 1 つでもあれば、欄ごと持たない。
+  if (fields === null) return undefined;
+
   return {
     no: raw['no'],
     title: raw['title'],
+    ...(fields === undefined ? {} : { fields }),
     ...(aiResult === undefined ? {} : { aiResult: aiResult }),
     ...(result === undefined ? {} : { result: result }),
     ...(text('verifiedBy') === undefined ? {} : { verifiedBy: text('verifiedBy') as string }),
     ...(text('note') === undefined ? {} : { note: text('note') as string }),
   };
+}
+
+/**
+ * シートの欄を受け取る。**形が違えば `null`**（半端な欄を画面に出さない）。
+ *
+ * `undefined` は「無い」。今までのシート（欄を運んでいない実行）もそのまま動く。
+ */
+function parseFields(raw: unknown): readonly SessionField[] | undefined | null {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) return null;
+
+  const fields: SessionField[] = [];
+  for (const item of raw) {
+    if (!isRecord(item)) return null;
+    const label = item['label'];
+    const value = item['value'];
+    if (typeof label !== 'string' || typeof value !== 'string') return null;
+    fields.push({ label, value });
+  }
+  return fields;
 }
 
 function parsePointing(raw: unknown): Pointing | undefined {

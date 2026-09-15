@@ -1,7 +1,14 @@
 // 画面（webview）と実行器（Node）の共通の形。**ブラウザでも読める。**
 // Node 専用のもの（ファイル IO）を巻き込まない（`./live` と同じ理由）。
 export { parseHumanInput, parseSessionState } from './protocol.js';
-export type { HumanInput, Pointing, SessionCase, SessionPhase, SessionState } from './protocol.js';
+export type {
+  HumanInput,
+  Pointing,
+  SessionCase,
+  SessionField,
+  SessionPhase,
+  SessionState,
+} from './protocol.js';
 // 鑑賞モードの「間」。**画面にも実行器にも要る。**
 export { WATCH_PAUSE_MS, watchPause } from './watch.js';
 export type { WatchOutcome, WatchPauseOptions } from './watch.js';
@@ -14,3 +21,4 @@ export type { AiResult, CaseResult, HumanResult } from '../run/types.js';
 // 置いた人のハンドルの規則。**画面（webview）からも要る**ので、
 // Node 専用の口を引き込まないこの入口から出す。
 export { HANDLE_RULE, isValidHandle } from '../run/handle.js';
+export { caseFields } from './fields.js';

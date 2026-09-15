@@ -253,3 +253,64 @@ describe('parseSessionState — 鑑賞の案内', () => {
     expect(state?.watch).toBeUndefined();
   });
 });
+
+/**
+ * **判定する人に、手順も期待結果も渡っていなかった**（外部レビュー meta-taro/git-qa#19）。
+ *
+ * > 人は、AI の判定範囲よりも、どう操作する。と、それをすることの意図が読みたいので。
+ * > 「AI はここまでしかできません」という文章を読んでも、
+ * > は？ この検証の意味が分からないけど
+ *
+ * 運んでいたのは `no` と `title` だけ。**画面が出したくても持っていなかった。**
+ *
+ * **列名は決め打ちしない。**`No.` と `項目` 以外は、**シートを書いた人の言葉のまま**運ぶ。
+ * 決め打ちにすると、書き手が足した「なぜ見るのか」のような列が届かない ——
+ * **届かない設計になっていたのが、そもそもの筋悪だった。**
+ */
+describe('SessionCase — シートの中身を運ぶ', () => {
+  const caseWith = (fields: unknown): unknown => ({
+    runId: '20260915-120000',
+    phase: 'waiting',
+    cases: [{ no: 1, title: 'ボタンを押すと反応する', fields }],
+  });
+
+  it('列の名前と値を、並び順のまま運ぶ', () => {
+    const state = parseSessionState(
+      caseWith([
+        { label: '手順', value: '「実行」をクリックする' },
+        { label: '期待結果', value: '結果の表が出る' },
+      ]),
+    );
+
+    expect(state?.cases[0]?.fields).toEqual([
+      { label: '手順', value: '「実行」をクリックする' },
+      { label: '期待結果', value: '結果の表が出る' },
+    ]);
+  });
+
+  /** **書き手が足した列も、そのまま届く**（提案 3）。運ぶ側が列名を知っている必要は無い。 */
+  it('知らない列も、そのまま運ぶ', () => {
+    const state = parseSessionState(
+      caseWith([{ label: 'なぜ見るのか', value: 'ボタン側か問い合わせ側かを分けるための対照' }]),
+    );
+
+    expect(state?.cases[0]?.fields?.[0]?.label).toBe('なぜ見るのか');
+  });
+
+  /** **形の違うものは受け取らない**（黙って半端な欄を画面に出さない）。 */
+  it('形が違えば、その欄は落とす', () => {
+    const state = parseSessionState(caseWith([{ label: '手順' }, { value: '値だけ' }, '文字']));
+
+    expect(state?.cases[0]?.fields).toBeUndefined();
+  });
+
+  it('無ければ持たない（今までのシートも動く）', () => {
+    const state = parseSessionState({
+      runId: '20260915-120000',
+      phase: 'waiting',
+      cases: [{ no: 1, title: 'ボタンを押すと反応する' }],
+    });
+
+    expect(state?.cases[0]?.fields).toBeUndefined();
+  });
+});

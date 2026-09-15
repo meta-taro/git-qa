@@ -22,7 +22,7 @@ import type {
   TargetSession,
   TestSpecSheet,
 } from '@git-qa/core';
-import { WATCH_PAUSE_MS, parseHumanInput, watchPause } from '@git-qa/core/session';
+import { WATCH_PAUSE_MS, caseFields, parseHumanInput, watchPause } from '@git-qa/core/session';
 import type { HumanInput, SessionCase, SessionPhase, SessionState } from '@git-qa/core/session';
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
@@ -182,8 +182,20 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     },
   });
 
+  /**
+   * **人が判定を置くために読むもの**も一緒に運ぶ（外部レビュー meta-taro/git-qa#19）。
+   *
+   * > 判定を置く人は「何をすればいいか」も「なぜそれを確かめるのか」も画面から読めません。
+   *
+   * 実行器は行を丸ごと持っていたのに、**`no` と `title` だけ抜き出して送っていた。**
+   * 列名は決め打ちしない —— 書き手が足した列も、そのまま届く。
+   */
+  const columns = options.sheet.columns.map((c) => c.name);
   const cases = new Map<number, SessionCase>(
-    subjects.map((s) => [s.no, { no: s.no, title: s.title }]),
+    subjects.map((s) => {
+      const fields = caseFields(s.row, columns);
+      return [s.no, { no: s.no, title: s.title, ...(fields.length === 0 ? {} : { fields }) }];
+    }),
   );
   let phase: SessionPhase = 'running';
   let awaiting: number | undefined;
