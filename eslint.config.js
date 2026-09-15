@@ -46,7 +46,7 @@ export default tseslint.config(
   },
   {
     // 建てる手順に使う小さな script（Node で走る）。
-    files: ['spikes/**/*.mjs', 'packages/*/scripts/**/*.mjs'],
+    files: ['spikes/**/*.mjs', 'packages/*/scripts/**/*.mjs', 'sheets/**/*.mjs'],
     languageOptions: {
       globals: { console: 'readonly', URL: 'readonly', process: 'readonly' },
     },

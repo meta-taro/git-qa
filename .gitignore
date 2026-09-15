@@ -28,6 +28,8 @@ packages/desktop/src-tauri/resources/host-bundle.mjs
 sheets/*
 !sheets/*-sample-*.tsv
 !sheets/android-settings*.tsv
+# 見本のシートが指している相手（参照だけ足して実体を置かない形にしない・§23）
+!sheets/sample-page/
 
 # 建てて作る道具（同梱はビルドで行う）。
 packages/desktop/src-tauri/resources/git-qa-ocr

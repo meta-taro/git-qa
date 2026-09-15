@@ -278,6 +278,26 @@
         font-size: 13px;
         color: var(--text-tertiary);
       }
+      /*
+       * 入れたら何が出るのか、先に見せる。**入れてから知る**のは遅い。
+       * 実物の窓をそのまま撮ってある（作り絵ではない）。
+       */
+      figure.shot {
+        margin: 0 0 32px;
+      }
+      figure.shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+      }
+      figure.shot figcaption {
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+      }
       footer a {
         color: var(--text-secondary);
       }
@@ -305,6 +325,18 @@
           <span class="tag">MIT / OSS</span>
         </div>
       </header>
+
+      <figure class="shot">
+        <img
+          src="./screenshot.png"
+          alt="git-qa の画面。左にケース一覧、中央に相手の画面の映像、右に AI の判定と判定キーが並んでいる"
+        />
+        <figcaption>
+          <b>実物の画面です。</b>左が検証シートのケース、中央が相手の画面（いま AI
+          が押した直後）、右が AI の判定と、人が押すキー。
+          <b>済んだケースには「VERIFIED / 誰が見たか」が付きます。</b>
+        </figcaption>
+      </figure>
 
       <h2>落とす</h2>
       <p class="note" id="when">配布物は GitHub Releases に置いています。</p>

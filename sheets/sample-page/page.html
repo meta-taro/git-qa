@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>見本のページ</title>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    font: menu;
+    font-size: 16px;
+  }
+  main {
+    display: grid;
+    gap: 1.25rem;
+    justify-items: center;
+    padding: 2rem;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  #state {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+  button {
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.5rem 2rem;
+    border-radius: 8px;
+  }
+</style>
+<main>
+  <h1>ローカルで動いているページ</h1>
+  <p id="state">まだ押されていない</p>
+  <button id="go" type="button">押す</button>
+</main>
+<script>
+  document.querySelector('#go').addEventListener('click', () => {
+    document.querySelector('#state').textContent = '押された';
+  });
+</script>
