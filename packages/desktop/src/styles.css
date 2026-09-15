@@ -61,7 +61,15 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /*
+   * **はみ出したら流す**（外部レビュー meta-taro/git-qa#15・人の指摘 2026-09-15）。
+   *
+   * 前は `overflow: hidden` だったので、**入り切らないぶんを流しもせずに捨てていた。**
+   * 判定カラムでは `↑` `↓` の案内が消え、真ん中では「続きから」の一覧が切れていた。
+   * **幅や高さが足りない機械の人だけが、その機能を一生知らない**という形になる。
+   */
+  overflow-x: hidden;
+  overflow-y: auto;
   /* 判定を前面に出すための基準（`.verdict-flash`）。 */
   position: relative;
   /* カラムの区切り。色は決めていないので、文字色から作る。 */
@@ -69,7 +77,16 @@ body {
 }
 
 .column-heading {
+  /* 流しても、どの欄かは見えたまま。**地の色を敷かないと、文字が見出しに透ける。** */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: Canvas;
   margin: 0;
+  /* 畳む口を右端へ置くため（#17）。 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 600;
@@ -77,28 +94,63 @@ body {
 }
 
 /*
- * **判定カラムは、はみ出したら流す**（外部レビュー meta-taro/git-qa#15）。
- *
- * > 窓を縮めると、右の判定パネルの中身が下から順に消えます。
- * > ↑ と ↓（前のケースを見る・次のケースを見る）が丸ごと消えます。
- *
- * `.column` は `overflow: hidden` なので、**はみ出したぶんを流しもせずに捨てていた。**
- * 「走ったケースなら、戻って置き直せる」は**この画面で初めて知る機能**なので、
- * 幅が足りない機械の人だけが一生知らない、という形になっていた。
- *
- * **畳める形（#13 の提案 2）より先に、どんな幅でも全部に届くようにする。**
- * 畳む形は「畳んだ人にだけ見えない」状態を新しく作るので、後で考える。
+ * 畳む口（外部レビュー meta-taro/git-qa#17）。**見出しの右端に小さく置く。**
+ * **記号だけで済ませない**（`aria-label` を持たせてある）。
  */
-.column[data-column-id='verdict'] {
-  overflow-y: auto;
+.column-fold {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-/* 流しても、どの欄かは見えたまま。**地の色を敷かないと、文字が見出しに透ける。** */
-.column[data-column-id='verdict'] .column-heading {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: Canvas;
+.column-fold::before {
+  content: '⟨';
+}
+
+.column-fold:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/*
+ * 畳んだ姿。**幅は返すが、開く口は残す**（戻せない畳み方をしない）。
+ * 見出しの文字は消して、口だけを残す。
+ */
+.column.is-folded {
+  flex: 0 0 auto;
+  width: 34px;
+  min-width: 34px;
+  overflow: hidden;
+}
+
+.column.is-folded > :not(.column-heading) {
+  display: none;
+}
+
+.column.is-folded .column-heading {
+  padding: 0.5rem 0.25rem;
+  gap: 0;
+}
+
+/* 畳んだら文言は消す。**口だけ残す**（戻せない畳み方をしない）。 */
+.column.is-folded .column-heading-text {
+  display: none;
+}
+
+.column.is-folded .column-fold {
+  margin: 0;
+}
+
+.column.is-folded .column-fold::before {
+  content: '⟩';
 }
 
 .column-placeholder {
@@ -150,6 +202,18 @@ body {
    * ここを #000 で固定していたため、ライトモードでも真っ黒だった。
    */
   background: Canvas;
+}
+
+/*
+ * **引き伸ばしていることを言う**（外部レビュー meta-taro/git-qa#17）。
+ * 映像の下に置く —— **見たい所の上に重ねない。**
+ */
+.live-stretched {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  opacity: 0.75;
 }
 
 /* 映らない理由。**目立たせる必要はないが、見えないと困る。** */

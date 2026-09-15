@@ -40,6 +40,15 @@ export type KeyCommand =
    * `by` は段の上げ下げ（`0` は等倍へ戻す）。**判定のキーは奪わない。**
    */
   | { readonly kind: 'zoom'; readonly by: 1 | -1 | 0 }
+  /**
+   * **相手の画素と 1 対 1 で見る**（外部レビュー meta-taro/git-qa#17）。
+   *
+   * > いまの `0` は「枠に合わせる」なので、別物として要るように思いました。
+   *
+   * 枠に合わせる（`0`）と、相手の画素に合わせる（`1`）は**狙いが別。**
+   * 前者は全部を見るため、後者は**細部を本物の画素で見る**ため。
+   */
+  | { readonly kind: 'zoomPixels' }
   /** 見ているケースを前後に動かす。**実行の進行とは別のカーソル**（Issue 013）。 */
   | { readonly kind: 'prev' }
   | { readonly kind: 'next' };
@@ -80,6 +89,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { key: '+', labelKey: 'key.zoomIn', noteKey: 'key.zoom.note' },
   { key: '-', labelKey: 'key.zoomOut', noteKey: 'key.zoom.note' },
   { key: '0', labelKey: 'key.zoomReset', noteKey: 'key.zoom.note' },
+  // **押しても細部が増えない所がある**ので、狙える口を出しておく（#17）。
+  { key: '1', labelKey: 'key.zoomPixels', noteKey: 'key.zoomPixels.note' },
 ];
 
 const VERDICTS = VERDICT_KEYS;
@@ -98,6 +109,8 @@ export function commandForKey(press: KeyPress): KeyCommand | undefined {
   if (key === '+' || key === '=') return { kind: 'zoom', by: 1 };
   if (key === '-') return { kind: 'zoom', by: -1 };
   if (key === '0') return { kind: 'zoom', by: 0 };
+  // **1 は「相手の画素と 1 対 1」。**0（枠に合わせる）とは別の狙い（#17）。
+  if (key === '1') return { kind: 'zoomPixels' };
   // 一覧は縦に並んでいるので、左右でも上下でも動かせるようにする。
   if (key === 'ArrowLeft' || key === 'ArrowUp') return { kind: 'prev' };
   if (key === 'ArrowRight' || key === 'ArrowDown') return { kind: 'next' };

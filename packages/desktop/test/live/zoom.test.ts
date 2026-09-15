@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { ZOOM_STEPS, nextZoom, zoomTransform } from '../../src/live/zoom.js';
+import {
+  ZOOM_STEPS,
+  nextZoom,
+  sourcePixelRatio,
+  zoomForPixels,
+  zoomTransform,
+} from '../../src/live/zoom.js';
 
 /**
  * **判定を置くのは人なのに、判定に必要な文字が読めない**（外部レビュー meta-taro/git-qa#13）。
@@ -151,5 +157,90 @@ describe('nextZoom', () => {
 
     expect(nextZoom(last, 1)).toBe(last);
     expect(nextZoom(1, -1)).toBe(1);
+  });
+});
+
+/**
+ * **拡大しても、細部は増えないことがある**（外部レビュー meta-taro/git-qa#17）。
+ *
+ * > こちらの画面は 1920x1080 の等倍です。Retina ではありません。
+ * > **拡大して出せる細部が、そもそも存在しません。**
+ * > 1:1 を超えたら、そう言う。「ここから先は引き伸ばしなので、細部は増えません」と
+ * > 画面が言えると、人は無駄に押さずに済みます。**いまは押せてしまうので
+ * > 「効かない道具」に見えます。**
+ *
+ * 数えるのは「**相手の 1 画素が、画面の何画素で出ているか**」。
+ * 1 を超えたら、そこから先は引き伸ばし。
+ */
+describe('sourcePixelRatio — 相手の 1 画素が、画面の何画素になっているか', () => {
+  /** 等倍の画面（Retina でない）で、枠が相手より小さい —— 報告と同じ条件。 */
+  it('縮んで出ているなら 1 を下回る', () => {
+    const ratio = sourcePixelRatio({
+      shownWidth: 803,
+      sourceWidth: 1280,
+      devicePixelRatio: 1,
+      scale: 1,
+    });
+
+    expect(ratio).toBeCloseTo(0.63, 2);
+  });
+
+  it('拡大すると、そのぶん増える', () => {
+    const ratio = sourcePixelRatio({
+      shownWidth: 803,
+      sourceWidth: 1280,
+      devicePixelRatio: 1,
+      scale: 2,
+    });
+
+    expect(ratio).toBeCloseTo(1.25, 2);
+  });
+
+  /** **Retina では、同じ見かけでも 2 倍の画素で出ている。**そこを混ぜない。 */
+  it('画面の細かさを数に入れる', () => {
+    const ratio = sourcePixelRatio({
+      shownWidth: 803,
+      sourceWidth: 1280,
+      devicePixelRatio: 2,
+      scale: 1,
+    });
+
+    expect(ratio).toBeCloseTo(1.25, 2);
+  });
+
+  it('測れないなら、言わない（0 を返さない）', () => {
+    expect(
+      sourcePixelRatio({ shownWidth: 0, sourceWidth: 1280, devicePixelRatio: 1, scale: 1 }),
+    ).toBeUndefined();
+    expect(
+      sourcePixelRatio({ shownWidth: 803, sourceWidth: 0, devicePixelRatio: 1, scale: 1 }),
+    ).toBeUndefined();
+  });
+});
+
+/**
+ * **「相手の画素と 1 対 1」を狙える口**（外部レビュー #17 の提案 2）。
+ *
+ * > 倍率を上げていく形ではなく、「相手の画素と 1 対 1」を狙えると分かりやすいです。
+ * > いまの `0` は「枠に合わせる」なので、別物として要るように思いました。
+ */
+describe('zoomForPixels — 1 対 1 になる倍率', () => {
+  it('その倍率で、ちょうど 1 対 1 になる', () => {
+    const scale = zoomForPixels({ shownWidth: 803, sourceWidth: 1280, devicePixelRatio: 1 });
+
+    expect(
+      sourcePixelRatio({ shownWidth: 803, sourceWidth: 1280, devicePixelRatio: 1, scale }),
+    ).toBeCloseTo(1, 3);
+  });
+
+  /** **既に 1 対 1 を超えているなら、下げない。**縮める口ではない。 */
+  it('もう足りているなら、等倍のまま', () => {
+    const scale = zoomForPixels({ shownWidth: 1600, sourceWidth: 1280, devicePixelRatio: 1 });
+
+    expect(scale).toBe(1);
+  });
+
+  it('測れないなら、等倍のまま', () => {
+    expect(zoomForPixels({ shownWidth: 0, sourceWidth: 1280, devicePixelRatio: 1 })).toBe(1);
   });
 });

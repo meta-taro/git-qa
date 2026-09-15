@@ -14,10 +14,12 @@ import type { ConnectionStatus } from './onboarding/index.js';
 import { MAIN_COLUMN_ID } from './columns.js';
 import { renderColumns, updateColumnTexts } from './render.js';
 import { installColumnResizers } from './resize.js';
+import { installFolding } from './fold.js';
 import { connectControl, controlUrlFromLocation, sendHumanInput } from './session/control.js';
 import { humanInputFor, nextCursor, whyCannotPlace } from './session/cursor.js';
 import { applyZoom } from './live/apply-zoom.js';
-import { nextZoom } from './live/zoom.js';
+import { nextZoom, sourcePixelRatio, zoomForPixels } from './live/zoom.js';
+import { showStretchNote } from './live/stretch.js';
 import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
@@ -98,6 +100,17 @@ let onboarding: ConnectionStatus = 'disconnected';
 renderColumns(root);
 // 区切りは、カラムを描いた後に差し込む（描き直すと消えるため）。
 installColumnResizers(root);
+/**
+ * **脇を畳んで、映像に幅を返す**（外部レビュー meta-taro/git-qa#17）。
+ *
+ * > この時点で画素の 3 分の 1 以上が捨てられていて、あとからいくら拡大しても戻りません。
+ *
+ * 畳むと枠の大きさが変わるので、**矢印を指し直す**（#15 と同じ理由。
+ * 置き直す口は状態が届いたときだけ通るので、ここから呼ばないとずれたまま残る）。
+ */
+installFolding(root, defaultStore(), () => {
+  showPointer(root, latest?.pointing);
+});
 // 外観の切り替えはメニューから（`src-tauri/src/menu.rs`）。**画面には部品を置かない。**
 void startAppearanceSync().catch((error: unknown) => {
   console.error('[appearance] メニューと繋がらない', error);
@@ -494,7 +507,52 @@ function startControl(controlUrl: string): void {
   watchSize(app.querySelector(`[data-column-id="${MAIN_COLUMN_ID}"]`) ?? app, () => {
     showPointer(app, latest?.pointing);
     if (zoom > 1) applyZoom(app, zoom, latest?.pointing);
+    // 枠が変われば、相手の画素との比も変わる（脇を畳めば増える・#17）。
+    tellIfStretched();
   });
+
+  /**
+   * いま、**相手の 1 画素が画面の何画素で出ているか**（外部レビュー #17）。
+   *
+   * 取り込んだ絵の幅は canvas の実寸、出ている幅は枠の中で `contain` した結果。
+   * **測れないなら undefined。**当てずっぽうの数を出すくらいなら黙る。
+   */
+  const measureLive = ():
+    { shownWidth: number; sourceWidth: number; devicePixelRatio: number } | undefined => {
+    const canvas = app.querySelector<HTMLCanvasElement>('.live-canvas');
+    if (canvas === null) return undefined;
+
+    const box = canvas.getBoundingClientRect();
+    if (box.width <= 0 || canvas.width <= 0 || canvas.height <= 0) return undefined;
+
+    // `object-fit: contain` の結果。**箱の幅ではない**（#16 で踏んだ所）。
+    const fit = Math.min(box.width / canvas.width, box.height / canvas.height);
+    return {
+      /**
+       * **拡大していない状態の幅**を返す。
+       *
+       * `getBoundingClientRect` は**変形後**の箱を返すので、
+       * そのまま倍率を掛けると**二重に掛かる** —— 1 対 1 にしたのに
+       * 「1.7 画素で出しています」と言っていた（2026-09-15 に実物で踏んだ）。
+       */
+      shownWidth: (canvas.width * fit) / zoom,
+      sourceWidth: canvas.width,
+      devicePixelRatio: window.devicePixelRatio,
+    };
+  };
+
+  /**
+   * **引き伸ばしているなら、そう言う**（外部レビュー #17）。
+   *
+   * > いまは押せてしまうので「効かない道具」に見えます。
+   */
+  const tellIfStretched = (): void => {
+    const seen = measureLive();
+    showStretchNote(
+      app,
+      seen === undefined ? undefined : sourcePixelRatio({ ...seen, scale: zoom }),
+    );
+  };
 
   /** 打鍵とクリックで、まったく同じ道を通す。 */
   const place = (command: KeyCommand): void => {
@@ -513,6 +571,22 @@ function startControl(controlUrl: string): void {
     if (command.kind === 'zoom') {
       zoom = command.by === 0 ? 1 : nextZoom(zoom, command.by);
       applyZoom(app, zoom, latest?.pointing);
+      tellIfStretched();
+      return;
+    }
+
+    /**
+     * **相手の画素と 1 対 1 で見る**（外部レビュー meta-taro/git-qa#17）。
+     *
+     * > 倍率を上げていく形ではなく、「相手の画素と 1 対 1」を狙えると分かりやすいです。
+     *
+     * 枠に合わせる（`0`）とは狙いが別。**細部を、本物の画素で見るための口。**
+     */
+    if (command.kind === 'zoomPixels') {
+      const seen = measureLive();
+      zoom = seen === undefined ? 1 : zoomForPixels(seen);
+      applyZoom(app, zoom, latest?.pointing);
+      tellIfStretched();
       return;
     }
 

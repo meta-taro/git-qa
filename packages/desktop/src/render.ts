@@ -19,7 +19,14 @@ export function renderColumns(root: HTMLElement, columns: readonly Column[] = CO
 
     const heading = root.ownerDocument.createElement('h2');
     heading.className = 'column-heading';
-    heading.textContent = t(column.headingKey);
+    /**
+     * **文言は入れ物に入れる。**見出しに直接書くと、
+     * 言語を描き直したときに**中に足した部品ごと消える**（畳む口が消えた・#17）。
+     */
+    const headingText = root.ownerDocument.createElement('span');
+    headingText.className = 'column-heading-text';
+    headingText.textContent = t(column.headingKey);
+    heading.append(headingText);
 
     const placeholder = root.ownerDocument.createElement('p');
     placeholder.className = 'column-placeholder';
@@ -41,7 +48,8 @@ export function updateColumnTexts(root: HTMLElement, columns: readonly Column[] 
     const section = root.querySelector<HTMLElement>(`[data-column-id="${column.id}"]`);
     if (section === null) continue;
 
-    const heading = section.querySelector('.column-heading');
+    // **見出しそのものを書き換えない**（中に畳む口が入っている・#17）。
+    const heading = section.querySelector('.column-heading-text');
     if (heading !== null) heading.textContent = t(column.headingKey);
 
     const placeholder = section.querySelector('.column-placeholder');

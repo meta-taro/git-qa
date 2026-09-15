@@ -89,3 +89,47 @@ export function nextZoom(current: number, direction: 1 | -1): number {
   const next = Math.min(ZOOM_STEPS.length - 1, Math.max(0, at + direction));
   return ZOOM_STEPS[next] ?? 1;
 }
+
+/**
+ * **相手の 1 画素が、画面の何画素で出ているか**（外部レビュー meta-taro/git-qa#17）。
+ *
+ * > こちらの画面は 1920x1080 の等倍です。Retina ではありません。
+ * > **拡大して出せる細部が、そもそも存在しません。**
+ *
+ * 1 を超えたら、そこから先は**引き伸ばし** —— 押しても細部は増えない。
+ * **それを画面が言えると、人は無駄に押さずに済む。**
+ * 言わないと「効かない道具」に見える。
+ */
+export function sourcePixelRatio(params: {
+  /** いま画面に出ている絵の幅（CSS 画素）。 */
+  readonly shownWidth: number;
+  /** 取り込んだ絵の幅（画素）。**相手の画素数そのもの。** */
+  readonly sourceWidth: number;
+  /** 画面の細かさ。Retina なら 2。 */
+  readonly devicePixelRatio: number;
+  readonly scale: number;
+}): number | undefined {
+  const { shownWidth, sourceWidth, devicePixelRatio, scale } = params;
+  // **測れないなら言わない。**当てずっぽうの数を出すくらいなら、黙るほうがよい。
+  if (shownWidth <= 0 || sourceWidth <= 0 || devicePixelRatio <= 0) return undefined;
+
+  return (shownWidth * scale * devicePixelRatio) / sourceWidth;
+}
+
+/**
+ * **「相手の画素と 1 対 1」になる倍率**（外部レビュー #17 の提案 2）。
+ *
+ * > 倍率を上げていく形ではなく、「相手の画素と 1 対 1」を狙えると分かりやすいです。
+ *
+ * **縮める口ではない。**もう足りているなら等倍のまま返す
+ * （縮めると、せっかく在る細部を捨てることになる）。
+ */
+export function zoomForPixels(params: {
+  readonly shownWidth: number;
+  readonly sourceWidth: number;
+  readonly devicePixelRatio: number;
+}): number {
+  const at = sourcePixelRatio({ ...params, scale: 1 });
+  if (at === undefined || at >= 1) return 1;
+  return 1 / at;
+}

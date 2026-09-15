@@ -194,3 +194,23 @@ describe('commandForKey — 拡大', () => {
     expect(commandForKey({ key: 'f' })).toEqual({ kind: 'verdict', humanResult: 'FAIL' });
   });
 });
+
+/**
+ * **「相手の画素と 1 対 1」で見る**（外部レビュー meta-taro/git-qa#17）。
+ *
+ * > いまの `0` は「枠に合わせる」なので、別物として要るように思いました。
+ *
+ * 枠に合わせる（`0`）と、相手の画素に合わせる（`1`）は**別の狙い。**
+ * 前者は全部を見るため、後者は**細部を本物の画素で見る**ため。
+ */
+describe('commandForKey — 1 対 1', () => {
+  it('1 で、相手の画素に合わせる', () => {
+    expect(commandForKey({ key: '1' })).toEqual({ kind: 'zoomPixels' });
+  });
+
+  /** **判定のキーは奪わない。**数字は判定に使っていない。 */
+  it('判定のキーは、これまでどおり', () => {
+    expect(commandForKey({ key: 'd' })).toEqual({ kind: 'verdict', humanResult: 'VERIFIED' });
+    expect(commandForKey({ key: '0' })).toEqual({ kind: 'zoom', by: 0 });
+  });
+});

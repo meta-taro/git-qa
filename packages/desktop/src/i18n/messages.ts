@@ -19,6 +19,13 @@ const ja = {
   'column.live.heading': 'ライブビュー',
   'column.live.placeholder': '接続すると、ここに検証中の画面が出る',
   'column.verdict.heading': '判定',
+  // **畳めるのは脇だけ**（外部レビュー #17）。映像に幅を返すため。
+  'key.zoomPixels': '相手の画素と 1 対 1 で見る',
+  'key.zoomPixels.note': 'これ以上は引き伸ばしになり、細部は増えません',
+  'live.stretched':
+    'ここから先は引き伸ばしです（相手の 1 画素を {ratio} 画素で出しています。細部は増えません）',
+  'column.fold': 'この欄を畳む（映像を広くする）',
+  'column.unfold': 'この欄を開く',
   'column.verdict.placeholder': '実行を始めると、ここに判定と証跡が出る',
 
   'key.verified': '合格にする（自分の目で見て確かめた）',
@@ -149,6 +156,11 @@ const en: Record<keyof typeof ja, string> = {
   'column.live.heading': 'Live view',
   'column.live.placeholder': 'Connect a device and its screen will appear here',
   'column.verdict.heading': 'Verdict',
+  'key.zoomPixels': 'Match the target pixel for pixel',
+  'key.zoomPixels.note': 'Beyond this it is stretching; no more detail appears',
+  'live.stretched': 'Stretching from here ({ratio}x per source pixel) — no more detail appears',
+  'column.fold': 'Fold this panel (widen the video)',
+  'column.unfold': 'Unfold this panel',
   'column.verdict.placeholder': 'Start a run and the verdict and evidence will appear here',
 
   'key.verified': 'Pass — I watched it myself',

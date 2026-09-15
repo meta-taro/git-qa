@@ -327,19 +327,33 @@ describe('判定カラム — 幅が足りないときに、下を捨てない',
 
   it('はみ出したら流す規則が CSS にある', async () => {
     const css = await readCss();
-    const rule = css.slice(css.indexOf(".column[data-column-id='verdict'] {"));
+    const rule = css.slice(css.indexOf('.column {'), css.indexOf('.column-heading {'));
 
-    expect(rule.slice(0, rule.indexOf('}'))).toContain('overflow-y: auto');
+    expect(rule).toContain('overflow-y: auto');
   });
 
   /** **流しても、どの欄かは見えたまま。**見出しが一緒に流れると、何の一覧か分からなくなる。 */
   it('流しても、見出しは残る', async () => {
     const css = await readCss();
-    const head = css.indexOf(".column[data-column-id='verdict'] .column-heading {");
+    const head = css.indexOf('.column-heading {');
     const rule = css.slice(head, css.indexOf('}', head));
 
     expect(rule).toContain('position: sticky');
     // 地の色を敷かないと、流れてきた文字が見出しの下に透ける。
     expect(rule).toContain('background: Canvas');
+  });
+
+  /**
+   * **真ん中も同じだった**（2026-09-15・人が実物で見つけた）。
+   *
+   * > あとこれ真ん中スクロールできないとみきれてるね
+   *
+   * 準備の画面は真ん中のカラムに出る。**「続きから」の一覧が下にあるので、
+   * そこが丸ごと切れていた。**判定カラムだけ直したのは、片手落ちだった。
+   */
+  it('判定カラムだけの規則にしない（どのカラムでも同じ）', async () => {
+    const css = await readCss();
+
+    expect(css).not.toContain("[data-column-id='verdict'] {");
   });
 });
