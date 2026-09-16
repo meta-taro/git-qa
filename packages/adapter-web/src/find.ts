@@ -18,6 +18,8 @@
  * 1. 名乗り（`aria-label` / `placeholder` / `value` / `title`）が完全に一致
  * 2. 読める文字が完全に一致
  * 3. 読める文字に含まれる（**いちばん内側**の要素。親を押すと別の所が反応する）
+ * 4. **名乗りに含まれる**（外部レビュー meta-taro/git-qa#28）。画面に文字が出ていない部品は
+ *    名乗りでしか指せず、その名乗りは合成された 1 本（`2026-09-20 定休日`）のことが多い
  */
 export function findElementScript(ref: string): string {
   const want = JSON.stringify(ref);
@@ -68,7 +70,19 @@ export function findElementScript(ref: string): string {
   const partial = seen
     .filter((h) => h.text.includes(want))
     .sort((a, b) => a.children - b.children || a.box.width * a.box.height - b.box.width * b.box.height);
-  return point(partial[0]);
+  if (partial.length > 0) return point(partial[0]);
+
+  /**
+   * 4. 名乗りに含まれる（外部レビュー meta-taro/git-qa#28）。
+   *
+   * **画面に文字が出ていない部品は、名乗りでしか指せない。**そしてその名乗りは
+   * たいてい合成された 1 本（\`2026-09-20 定休日\`）なので、**完全一致では当たらない。**
+   * 並べ方は 3 段目と同じ（内側・小さいほう）。
+   */
+  const byLabelPartial = seen
+    .filter((h) => h.labels.some((v) => v.includes(want)))
+    .sort((a, b) => a.children - b.children || a.box.width * a.box.height - b.box.width * b.box.height);
+  return point(byLabelPartial[0]);
 })()`;
 }
 
@@ -84,4 +98,21 @@ export function parseFoundPoint(value: unknown): FoundPoint | undefined {
   if (typeof point.x !== 'number' || typeof point.y !== 'number') return undefined;
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined;
   return { x: Math.round(point.x), y: Math.round(point.y) };
+}
+
+/**
+ * 見つからなかったときの言い分（外部レビュー meta-taro/git-qa#28）。
+ *
+ * > 落ちたログからは「そんな要素は無い」としか読めない。**実物には在る。**
+ *
+ * **探した所を言えば、次に見る場所が決まる。**
+ * 画面に出ていない部品は名乗り（`aria-label` 等）にしか無いので、
+ * **そこも探したうえで無かった**のか、**書き方が違う**のかを、人が切り分けられる。
+ */
+export function missingElementMessage(ref: string): string {
+  return (
+    `画面に見つからない要素: ${JSON.stringify(ref)}` +
+    '（読める文字は完全一致と部分一致、名乗り（aria-label / placeholder / title / value）も' +
+    '完全一致と部分一致で探した。見えていない要素は探していない）'
+  );
 }

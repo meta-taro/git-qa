@@ -17,7 +17,7 @@ import { createCdpClient } from './cdp.js';
 import type { CdpClient } from './cdp.js';
 import { launchBrowser } from './browser.js';
 import type { RunningBrowser } from './browser.js';
-import { findElementScript, parseFoundPoint } from './find.js';
+import { findElementScript, missingElementMessage, parseFoundPoint } from './find.js';
 import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
 import type { BrowserKind, BrowserTarget } from './launch.js';
 import { createScreencast } from './screencast.js';
@@ -338,7 +338,8 @@ async function resolvePoint(cdp: CdpClient, ref: PointerRef): Promise<{ x: numbe
   });
   const point = parseFoundPoint((result['result'] as { value?: unknown } | undefined)?.value);
   if (point === undefined) {
-    throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
+    // **探した所を言う**（#28）。「そんな要素は無い」だけだと、実物を見ている人と食い違う。
+    throw new AdapterError(KIND, missingElementMessage(ref.ref));
   }
   return point;
 }
