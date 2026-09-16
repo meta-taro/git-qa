@@ -218,6 +218,25 @@
             "$ref": "#/$defs/step"
           }
         },
+        "dates": {
+          "description": "流した日から決めた日付（シートに「今日から 2 日後」と書かれていたもの）。残さないと、後から読んだ人がその実行が何日を押したのか復元できない — 外部レビュー meta-taro/git-qa#29。",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["said", "resolved"],
+            "additionalProperties": false,
+            "properties": {
+              "said": {
+                "type": "string",
+                "minLength": 1
+              },
+              "resolved": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
         "humanActions": {
           "description": "人が自分で触った操作。無い場合は、人は見ただけ（あるいは触っていない）。",
           "type": "array",

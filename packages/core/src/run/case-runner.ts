@@ -3,6 +3,7 @@ import type { TestSpecSheet } from '../tsv/types.js';
 import type { AiResult } from './types.js';
 import type { CaseContext, CaseVerdict } from './execute.js';
 import type { PlannedAction, PlannedStep } from './steps.js';
+import { expandDates } from './dates.js';
 import { judgeExpectation, planExpectation, planSteps } from './steps.js';
 
 /**
@@ -71,6 +72,13 @@ export interface SheetCaseRunnerOptions {
   readonly appId?: 'package-or-url' | 'name';
   readonly stepsColumn?: string;
   readonly expectationColumn?: string;
+  /**
+   * 画面の日付の書き方（シートの `# 日付の書き方:`・外部レビュー meta-taro/git-qa#29）。
+   * **相手の実装次第**（`2026-09-20` / `9/20` / `20`）なので、こちらで当てにいかない。
+   */
+  readonly dateFormat?: string;
+  /** いまの時刻。**検査では差し替える**（日付の展開が実時計に依らないように）。 */
+  readonly now?: () => Date;
 }
 
 const errorMessage = (error: unknown): string =>
@@ -130,7 +138,32 @@ export function createSheetCaseRunner(
   const expectationColumn = options.expectationColumn ?? EXPECTATION_COLUMN;
 
   return async (ctx: CaseContext): Promise<CaseVerdict> => {
-    const planned = planSteps(ctx.subject.row.cells[stepsColumn] ?? '', {
+    /**
+     * **流した日から決まる言い方を、実際の日付にする**（外部レビュー meta-taro/git-qa#29）。
+     *
+     * > **書いた日にしか通らない行ができる。**…腐り方が時間とともに静かに進む
+     *
+     * **手順と期待結果の両方**を同じ日で展開する（1 件の中で日をまたがせない）。
+     * **何に展開したかは証跡へ残す** —— 残っていないと、後から読んだ人が
+     * **その実行が何日を押したのか復元できない。**
+     */
+    const now = options.now?.() ?? new Date();
+    const stepsText = expandDates(
+      ctx.subject.row.cells[stepsColumn] ?? '',
+      now,
+      options.dateFormat,
+    );
+    const expectedText = expandDates(
+      ctx.subject.row.cells[expectationColumn] ?? '',
+      now,
+      options.dateFormat,
+    );
+    const dates = [...stepsText.dates, ...expectedText.dates];
+    /** **どの結末でも、何日を押したかを残す。**落ちた行を追うときに、いちばん要る。 */
+    const withDates = (verdict: CaseVerdict): CaseVerdict =>
+      dates.length === 0 ? verdict : { ...verdict, dates: [...dates] };
+
+    const planned = planSteps(stepsText.text, {
       ...(options.app === undefined ? {} : { app: options.app }),
       // **相手が名乗った能力をそのまま使う。**ここで推し量らない。
       ...(options.textInput === undefined ? {} : { textInput: options.textInput }),
@@ -138,19 +171,19 @@ export function createSheetCaseRunner(
       ...(options.appId === undefined ? {} : { appId: options.appId }),
     });
     const held = holdBeforeTouching(planned);
-    if (held !== undefined) return held;
+    if (held !== undefined) return withDates(held);
 
     // ここまで来た時点で hold は無い。型の上でも落として、キャストを持ち込まない。
     const actions = planned.filter((step): step is PlannedAction => step.kind === 'action');
     const failure = await actAll(ctx, actions);
     if (failure !== undefined) {
-      return { aiResult: 'BLOCKED', note: failure };
+      return withDates({ aiResult: 'BLOCKED', note: failure });
     }
 
-    const expectation = planExpectation(ctx.subject.row.cells[expectationColumn] ?? '');
+    const expectation = planExpectation(expectedText.text);
     if (expectation.kind === 'hold') {
       // 操作は済んでいる。**人がライブで見て判断できる所まで進めるのが AI の仕事。**
-      return { aiResult: 'BLOCKED', note: expectation.reason };
+      return withDates({ aiResult: 'BLOCKED', note: expectation.reason });
     }
 
     /**
@@ -172,7 +205,10 @@ export function createSheetCaseRunner(
         screenText = await options.readScreenText(ctx.session);
       } catch (error: unknown) {
         // 画面が読めないまま通さない。**読めなかったことは「通った」ではない。**
-        return { aiResult: 'BLOCKED', note: `画面の文字を読めない: ${errorMessage(error)}` };
+        return withDates({
+          aiResult: 'BLOCKED',
+          note: `画面の文字を読めない: ${errorMessage(error)}`,
+        });
       }
       tries += 1;
       aiResult = judgeExpectation(expectation, screenText);
@@ -189,7 +225,10 @@ export function createSheetCaseRunner(
     }
 
     if (aiResult === 'PASS') {
-      return { aiResult, note: `画面の文字に「${expectation.text}」が在ることだけを見た` };
+      return withDates({
+        aiResult,
+        note: `画面の文字に「${expectation.text}」が在ることだけを見た`,
+      });
     }
     /**
      * **待ち切ったことを書く。**
@@ -207,9 +246,9 @@ export function createSheetCaseRunner(
      */
     const spent = Math.round((Date.now() - began) / 100) / 10;
     const waited = tries > 1 ? `${String(spent)} 秒のあいだに ${String(tries)} 回見ても` : '';
-    return {
+    return withDates({
       aiResult,
       note: `画面の文字に${waited}「${expectation.text}」が現れなかった`,
-    };
+    });
   };
 }

@@ -156,6 +156,14 @@ export interface RunCase {
   verifiedBy?: string;
   verifiedAt?: string;
   steps: RunStep[];
+  /**
+   * 流した日から決めた日付（外部レビュー meta-taro/git-qa#29）。
+   *
+   * シートに「今日から 2 日後」と書かれていたものを、**実際に何日として押したか。**
+   * 残さないと、**後から読んだ人が、その実行が何日を押したのか復元できない** ——
+   * 落ちた行を追いかけるときに、いちばん要る情報。
+   */
+  dates?: { said: string; resolved: string }[];
   /** 人が自分で触った操作。無ければ、人は触っていない。 */
   humanActions?: HumanAction[];
   /** 判定まわりの打鍵回数。無ければ、人はこのケースに何も打っていない。 */

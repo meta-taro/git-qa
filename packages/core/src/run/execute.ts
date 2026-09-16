@@ -51,6 +51,11 @@ export interface CaseContext {
 export interface CaseVerdict {
   aiResult: AiResult;
   note?: string;
+  /**
+   * 流した日から決めた日付（外部レビュー meta-taro/git-qa#29）。
+   * **何日を押したのかを証跡に残す**ため、判定と一緒に持ち上げる。
+   */
+  dates?: { said: string; resolved: string }[];
 }
 
 /** 人が出す判定。`AUTO_PASS` は型として書けない（C17）。 */
@@ -262,6 +267,8 @@ async function runOneCase(
       : { humanResult: human.humanResult, verifiedBy: human.by, verifiedAt: finishedAt }),
     result,
     steps,
+    // **何日を押したのか**（#29）。無ければ持たない（日付の言い方が無かったケース）。
+    ...(verdict.dates === undefined || verdict.dates.length === 0 ? {} : { dates: verdict.dates }),
     recording,
     screenshot,
     ...(note === undefined ? {} : { note }),

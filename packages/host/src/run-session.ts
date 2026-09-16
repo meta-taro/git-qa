@@ -23,6 +23,7 @@ import type {
   TestSpecSheet,
 } from '@git-qa/core';
 import { WATCH_PAUSE_MS, caseFields, parseHumanInput, watchPause } from '@git-qa/core/session';
+import { DATE_FORMAT_KEY } from '@git-qa/core';
 import type { HumanInput, SessionCase, SessionPhase, SessionState } from '@git-qa/core/session';
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
@@ -441,6 +442,10 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     keyInput: options.adapter.capabilities.keyInput,
     ...(options.expectation === undefined ? {} : { expectation: options.expectation }),
     appId: options.adapter.capabilities.appId,
+    // **画面の日付の書き方はシートが決める**（外部レビュー meta-taro/git-qa#29）。
+    ...(options.sheet.meta[DATE_FORMAT_KEY] === undefined
+      ? {}
+      : { dateFormat: options.sheet.meta[DATE_FORMAT_KEY] }),
   });
 
   const runCase = async (ctx: CaseContext): Promise<CaseVerdict> => {
