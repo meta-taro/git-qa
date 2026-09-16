@@ -329,23 +329,93 @@ export type ExpectationCheck = ExpectationContains | ExpectationHold;
 const QUOTED = /「([^」]*)」/g;
 
 /**
+ * **画面に出る文字を指している**と読める言い方（外部レビュー meta-taro/git-qa#27）。
+ *
+ * 鉤括弧の**すぐ後ろ**を見る。**文末ではない** ——
+ * 「「…」と表示され、保存されない」のように、
+ * **画面の文字を指したうえで別のことも言う**書き方が普通にあるため。
+ */
+const SHOWN_AFTER: readonly string[] = [
+  'と表示され',
+  'が表示され',
+  'は表示され',
+  'も表示され',
+  'と出',
+  'が出',
+  'は出',
+  'と書かれ',
+  'が書かれ',
+  'と見え',
+  'が見え',
+  'と現れ',
+  'が現れ',
+];
+
+/**
+ * 打ち消し。**「在るか」しか見られない**ので、「出ない」は確かめられない。
+ * ここを落とすと、**言っていることの逆**を判定することになる。
+ */
+const NOT_SHOWN = /^(?:ない|ず|ません|なくなる|なくなっている|ていない)/;
+
+/** 鉤括弧の後ろが、画面の文字を指しているか。 */
+function pointsAtScreenText(after: string): boolean {
+  const rest = after.trimStart();
+  for (const word of SHOWN_AFTER) {
+    if (!rest.startsWith(word)) continue;
+    return !NOT_SHOWN.test(rest.slice(word.length));
+  }
+  return false;
+}
+
+/**
  * 期待結果を、機械で見られる形に落とす。
  *
- * **落とせるのは「鉤括弧が 1 つだけ」の場合に限る。**2 つ以上あるとどちらを見ればよいか
- * 決められず、0 個なら見る文字列が無い。**曖昧なら人へ渡す。**
+ * **落とせるのは 2 つとも満たすときだけ。**
+ *
+ * 1. 鉤括弧が 1 組（2 つ以上あるとどちらを見ればよいか決められない）
+ * 2. **その後ろが「画面に出る文字を指す言い方」**（外部レビュー meta-taro/git-qa#27）
+ *
+ * 2 を見ていなかったので、**判定として成立しない行が「機械で判定できた行」として
+ * 結果に並んでいた。**
+ *
+ * ```text
+ * contains("選択できない")  <= 今日から 2 日後までが「選択できない」状態になっている
+ * contains("定休日")       <= 「定休日」の日は押せない
+ * ```
+ *
+ * 前者は**実装が正しくても必ず落ちる。**後者は**押せることを一度も確かめずに合格が付く。**
+ * **曖昧なら人へ渡す。**
  */
 export function planExpectation(expectedText: string): ExpectationCheck {
-  const quoted = [...expectedText.matchAll(QUOTED)]
-    .map((m) => m[1] ?? '')
-    .filter((text) => text !== '');
+  const matches = [...expectedText.matchAll(QUOTED)].filter((m) => (m[1] ?? '') !== '');
 
-  if (quoted.length === 1) {
-    return { kind: 'contains', text: quoted[0] as string };
+  if (matches.length === 1) {
+    const hit = matches[0] as RegExpMatchArray;
+    const after = expectedText.slice((hit.index ?? 0) + hit[0].length);
+    if (pointsAtScreenText(after)) {
+      return { kind: 'contains', text: hit[1] as string };
+    }
+    /**
+     * **言い換えを勧めない**（#27 のいちばん効いている指摘）。
+     *
+     * > **但し書きに従うほど、判定が間違った方向に確定します。**
+     *
+     * 「鉤括弧を足せば通る」と読ませると、**hold（正直に放棄した状態）から、
+     * 言っていることの逆を判定する状態へ移る。**
+     */
+    return {
+      kind: 'hold',
+      reason:
+        '期待結果に鉤括弧はあるが、**画面に出る文字**を指しているか判断できないので人が見る' +
+        `（押せる・選べる・状態になっている、は画面の文字ではないので言い換えても判定できない）: ${expectedText.trim()}`,
+    };
   }
+
   const reason =
-    quoted.length === 0
-      ? `期待結果を機械で判定できない（画面で探す文字列が無い）: ${expectedText.trim()}`
-      : `期待結果に鉤括弧が ${String(quoted.length)} 個あり、どれを見るか決められない: ${expectedText.trim()}`;
+    matches.length === 0
+      ? '期待結果を機械で判定できないので人が見る' +
+        `（**画面に出る文字**を「…」で囲んで「と表示される」と書けるものだけ判定できる。押せる・選べるは判定できない）: ${expectedText.trim()}`
+      : `期待結果に鉤括弧が ${String(matches.length)} 個あり、どれを見るか決められない: ${expectedText.trim()}`;
   return { kind: 'hold', reason };
 }
 
