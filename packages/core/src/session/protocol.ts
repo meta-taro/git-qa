@@ -185,7 +185,14 @@ export interface Point {
   readonly x: number;
   readonly y: number;
 }
-// **取り消しはまだ無い。**確定したケースを開け直す仕組みが要る（Issue 004 の既知の穴）。
+/**
+ * **置き直しはできる**（Issue 013）。`↑` で走ったケースへ戻り、もう一度押す。
+ * 証跡には**最後に置いた 1 つだけ**が残る（打ち直しの履歴は持たない）。
+ *
+ * **ここには「取り消しはまだ無い」と書いてあった。**実装が追いついた後も直しておらず、
+ * それを読んだ人から「戻れない」という前提で要望が来た
+ * （外部レビュー meta-taro/git-qa#24）。**コードのコメントも、古くなれば嘘になる。**
+ */
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
