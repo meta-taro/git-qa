@@ -67,6 +67,14 @@ export interface TargetBuild {
 
 export interface Target {
   kind: 'web' | 'android' | 'desktop';
+  /**
+   * 実際に見に行った場所（シートの `行き先`）。
+   *
+   * **「何を検証したか」（`build.source`）と分ける**（外部レビュー meta-taro/git-qa#22）。
+   * シートの `対象` に `owner/repo@branch` を書く運用があり、
+   * **URL に書き換えさせると「どのブランチを検証したか」が証跡から消える。**
+   */
+  destination?: string;
   device?: string;
   osVersion?: string;
   browser?: string;

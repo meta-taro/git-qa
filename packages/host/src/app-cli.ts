@@ -26,10 +26,13 @@ import {
 import {
   compareSheet,
   findWorkspace,
+  duplicateTargetMessage,
   parseTestSpecTsv,
   runsRootIn,
   saveRunProgress,
+  sheetDestination,
   sheetDigest,
+  sheetSubject,
   sheetPathIn,
 } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
@@ -165,7 +168,13 @@ const setup = await startSetupServer({
      * ここで別の場所へ行かない —— ウェブの行き先はシートの `# 対象:`（C40）。
      */
     const web = /^https?:\/\//.test(serial);
-    const url = web ? (sheet.meta['対象'] ?? serial) : undefined;
+    /** **行き先が 2 つ在るシートは走らせない**（外部レビュー meta-taro/git-qa#22）。 */
+    const duplicated = duplicateTargetMessage(sheet.duplicateMeta);
+    if (duplicated !== undefined) throw new Error(duplicated);
+
+    // **何処を見るか**は `行き先` → 無ければ `対象`。**何を検証したか**は `対象` のまま。
+    const url = web ? (sheetDestination(sheet.meta) ?? serial) : undefined;
+    const subject = sheetSubject(sheet.meta);
     /** `app:計算機` の形で来たら、デスクトップアプリ（Issue 016）。 */
     const app = serial.startsWith('app:') ? serial.slice(4) : undefined;
 
@@ -233,16 +242,31 @@ const setup = await startSetupServer({
           ? desktopAdapterFor(app)
           : web && url !== undefined && browser === 'firefox'
             ? createFirefoxAdapter({
-                build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+                build: {
+                  source: subject ?? url,
+                  label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                },
+                url,
+                destination: url,
                 size: { width: 1280, height: 900 },
               })
             : web && url !== undefined && browser === 'safari'
               ? createSafariAdapter({
-                  build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+                  build: {
+                    source: subject ?? url,
+                    label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                  },
+                  url,
+                  destination: url,
                 })
               : web && url !== undefined
                 ? createWebAdapter({
-                    build: { source: url, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+                    build: {
+                      source: subject ?? url,
+                      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                    },
+                    url,
+                    destination: url,
                     // 同じ幅で見ないと、崩れの有無を比べられない。
                     size: { width: 1280, height: 900 },
                     // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。

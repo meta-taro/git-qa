@@ -7,7 +7,15 @@ import {
   killLaunchedSync,
   readWebScreenText,
 } from '@git-qa/adapter-web';
-import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
+import {
+  duplicateTargetMessage,
+  parseTestSpecTsv,
+  saveRunProgress,
+  sheetDestination,
+  sheetDigest,
+  sheetSubject,
+  verdictKeyHint,
+} from '@git-qa/core';
 
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
@@ -55,14 +63,29 @@ const sheet = parseTestSpecTsv(text);
  * 見る場所。**シートが宣言したものを使う**（C40）。
  * 引数で渡された場合だけ、そちらを優先する（同じシートを検証環境へ当てるため）。
  */
-const target = process.argv[3] ?? sheet.meta['対象'];
+/** **行き先が 2 つ在るシートは走らせない**（#22）。宣言が 2 つあると C40 が成り立たない。 */
+const duplicated = duplicateTargetMessage(sheet.duplicateMeta);
+if (duplicated !== undefined) {
+  console.error(`[git-qa] ${duplicated}`);
+  process.exit(1);
+}
+
+const target = process.argv[3] ?? sheetDestination(sheet.meta);
 if (target === undefined || !/^https?:\/\//.test(target)) {
   console.error(
-    '[git-qa] 見る場所が分からない。シートの見出しに「# 対象: http://localhost:3000/」を書くか、' +
-      '2 つ目の引数で URL を渡す',
+    '[git-qa] 見る場所が分からない。シートの見出しに「# 対象: http://localhost:3000/」' +
+      'か「# 行き先: http://localhost:3000/」を書くか、2 つ目の引数で URL を渡す',
   );
   process.exit(1);
 }
+
+/**
+ * **何を検証したか**（外部レビュー meta-taro/git-qa#22）。
+ *
+ * `対象` に `owner/repo@branch` を書く運用がある。**行き先だけ残すと、
+ * どのブランチを検証したのかが証跡から消える。**両方残す。
+ */
+const subject = sheetSubject(sheet.meta);
 
 /**
  * **相手によって口が違う**（Issue 018）。
@@ -74,18 +97,36 @@ const session = await startRunSession({
   adapter:
     kind === 'safari'
       ? createSafariAdapter({
-          build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+          build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+          /**
+           * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
+           * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
+           */
+          url: target,
+          destination: target,
         })
       : kind === 'firefox'
         ? createFirefoxAdapter({
-            build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+            build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+            /**
+             * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
+             * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
+             */
+            url: target,
+            destination: target,
             size: { width: 1280, height: 900 },
             ...(process.env['GIT_QA_BROWSER'] === undefined
               ? {}
               : { firefoxPath: process.env['GIT_QA_BROWSER'] }),
           })
         : createWebAdapter({
-            build: { source: target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+            build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+            /**
+             * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
+             * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
+             */
+            url: target,
+            destination: target,
             // 同じ幅で見ないと、崩れの有無を比べられない。
             size: { width: 1280, height: 900 },
             ...(process.env['GIT_QA_BROWSER'] === undefined

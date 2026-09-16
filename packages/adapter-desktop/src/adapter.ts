@@ -80,6 +80,11 @@ export interface DesktopAdapterOptions {
   /** 見るアプリ。**窓の持ち主の名前**（`warifu` / `計算機` など）。 */
   readonly app: string;
   readonly build: TargetBuild;
+  /**
+   * 何処を見に行ったか（シートの `行き先`）。**「何を検証したか」（`build.source`）と分ける**
+   * —— 外部レビュー meta-taro/git-qa#22。無ければ持たない。
+   */
+  readonly destination?: string;
   /** OCR を呼ぶ実行ファイル。無ければ段 2 は使えない（段 1 だけで動く）。 */
   readonly ocrPath?: string;
   /**
@@ -320,7 +325,13 @@ function createSession(deps: SessionDeps): TargetSession {
   };
 
   return {
-    target: { kind: KIND, device: app, build },
+    target: {
+      kind: KIND,
+      device: app,
+      build,
+      // **何処を見に行ったか**（シートの `行き先`・外部レビュー #22）。
+      ...(deps.destination === undefined ? {} : { destination: deps.destination }),
+    },
     liveView,
     recording,
     get isClosed() {

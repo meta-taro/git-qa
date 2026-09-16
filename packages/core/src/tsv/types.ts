@@ -52,6 +52,14 @@ export interface TestSpecSheet {
   magic: string;
   /** `# キー: 値` の見出し */
   meta: Record<string, string>;
+  /**
+   * 2 度書かれた見出しの鍵（外部レビュー meta-taro/git-qa#22）。
+   *
+   * 様式としては**後勝ち**なので、解析器はここで弾かない。
+   * **弾くかどうかを決めるのは使う側** —— 行き先が 2 つ在ると、
+   * 証跡を読んだ人が「何処を見たのか」を辿れなくなる（C40）。
+   */
+  duplicateMeta: string[];
   directives: TsvDirective[];
   columns: TsvColumn[];
   rows: TsvRow[];

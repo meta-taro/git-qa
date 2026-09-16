@@ -63,6 +63,11 @@ const capabilities: AdapterCapabilities = {
 
 export interface FirefoxAdapterOptions {
   readonly build: TargetBuild;
+  /**
+   * 何処を見に行ったか（シートの `行き先`）。**「何を検証したか」（`build.source`）と分ける**
+   * —— 外部レビュー meta-taro/git-qa#22。無ければ持たない。
+   */
+  readonly destination?: string;
   readonly url?: string;
   /** 使う Firefox。省略すると、入っているものを探す。 */
   readonly firefoxPath?: string;
@@ -283,7 +288,12 @@ function createSession(deps: SessionDeps): TargetSession {
 
   return {
     // **何で見たかは証跡に残る。**版は Firefox 自身に聞いたものを入れる（C56）。
-    target: { kind: KIND, browser: deps.label, build: deps.options.build },
+    target: {
+      kind: KIND,
+      browser: deps.label,
+      build: deps.options.build,
+      ...(deps.options.destination === undefined ? {} : { destination: deps.options.destination }),
+    },
     liveView,
     recording,
     get isClosed() {

@@ -177,3 +177,43 @@ describe('readTestSpecTsv — 読むだけで書き換えない（C3）', () => 
     expect(fromFile.rows).toEqual(fromText.rows);
   });
 });
+
+/**
+ * **同じ見出しが 2 行あったことを、事実として残す**（外部レビュー meta-taro/git-qa#22）。
+ * **同じ見出しが 2 行あったことを、事実として残す**（外部レビュー meta-taro/git-qa#22）。
+ *
+ * > メタ行は **同一キーが後勝ち**です。`# 行き先:` が 2 行あっても弾かれず、後ろが勝ちます。
+ * > シートを人が手で編集する以上、コピーの取り違えで 2 行になることは起こりえます。
+ *
+ * **解析器はここで弾かない**（様式としては後勝ちが正しい）。
+ * **弾くかどうかを決めるのは、それを使う側** —— 行き先が 2 つ在ると、
+ * 証跡を読んだ人が「何処を見たのか」を辿れなくなる（C40）。
+ */
+describe('parseTestSpecTsv — 見出しの重複', () => {
+  it('2 度書かれた鍵を数える', () => {
+    const sheet = parseTestSpecTsv(
+      [
+        '#! md-business:test-spec-tsv/v1',
+        '# 対象: owner/repo@main',
+        '# 行き先: http://a/',
+        '# 行き先: http://b/',
+        'No.:number!\t項目!',
+        '1\tボタン',
+      ].join('\n'),
+    );
+
+    expect(sheet.duplicateMeta).toEqual(['行き先']);
+    // 様式どおり後勝ち。**捨てない。**
+    expect(sheet.meta['行き先']).toBe('http://b/');
+  });
+
+  it('重複が無ければ、空', () => {
+    const sheet = parseTestSpecTsv(
+      ['#! md-business:test-spec-tsv/v1', '# 対象: x', 'No.:number!\t項目!', '1\tボタン'].join(
+        '\n',
+      ),
+    );
+
+    expect(sheet.duplicateMeta).toEqual([]);
+  });
+});

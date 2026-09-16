@@ -6,7 +6,15 @@ import {
   readDesktopScreenText,
   whyNoDesktop,
 } from '@git-qa/adapter-desktop';
-import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
+import {
+  duplicateTargetMessage,
+  parseTestSpecTsv,
+  saveRunProgress,
+  sheetDestination,
+  sheetDigest,
+  sheetSubject,
+  verdictKeyHint,
+} from '@git-qa/core';
 
 import { findInput, findOcr, findWinTool } from './ocr-path.js';
 import { installSaveOnExit } from './save-on-exit.js';
@@ -49,7 +57,14 @@ try {
 }
 const sheet = parseTestSpecTsv(text);
 
-const app = process.argv[3] ?? sheet.meta['対象'];
+/** **行き先が 2 つ在るシートは走らせない**（外部レビュー meta-taro/git-qa#22）。 */
+const duplicated = duplicateTargetMessage(sheet.duplicateMeta);
+if (duplicated !== undefined) {
+  console.error(`[git-qa] ${duplicated}`);
+  process.exit(1);
+}
+
+const app = process.argv[3] ?? sheetDestination(sheet.meta);
 if (app === undefined || app === '') {
   console.error(
     '[git-qa] 見るアプリが分からない。シートの見出しに「# 対象: アプリ名」を書くか、' +
@@ -89,7 +104,14 @@ if (whyNot !== undefined) {
   console.error(`[git-qa] ${whyNot}`);
   process.exit(1);
 }
-const build = { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' };
+/**
+ * **何を検証したか**（シートの `対象`）。`行き先` が別に書かれていれば、
+ * `app` は行き先（アプリ名）、`source` は対象のまま —— 外部レビュー meta-taro/git-qa#22。
+ */
+const build = {
+  source: sheetSubject(sheet.meta) ?? app,
+  label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+};
 
 const session = await startRunSession({
   adapter:
@@ -98,12 +120,16 @@ const session = await startRunSession({
         createWindowsDesktopAdapter({
           app,
           build,
+          // **何処を見に行ったか**（#22）。
+          destination: app,
           toolPath: winToolPath as string,
           onPointed: (at) => reportPointed?.(at),
         })
       : createDesktopAdapter({
           app,
           build,
+          // **何処を見に行ったか**（#22）。
+          destination: app,
           ...(ocrPath === undefined ? {} : { ocrPath }),
           ...(inputPath === undefined ? {} : { inputPath }),
           onPointed: (at) => reportPointed?.(at),

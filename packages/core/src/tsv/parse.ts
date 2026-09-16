@@ -31,6 +31,8 @@ export function parseTestSpecTsv(text: string): TestSpecSheet {
   const magic = first.slice(MAGIC_PREFIX.length).trim();
 
   const meta: Record<string, string> = {};
+  /** 2 度書かれた見出しの鍵。**捨てずに数える**（外部レビュー meta-taro/git-qa#22）。 */
+  const duplicateMeta: string[] = [];
   const directives: TsvDirective[] = [];
   let columns: TsvColumn[] | undefined;
   const rows: TsvRow[] = [];
@@ -57,6 +59,14 @@ export function parseTestSpecTsv(text: string): TestSpecSheet {
         continue;
       }
       const key = rest.slice(0, sep).trim();
+      /**
+       * **2 度書かれたことを、事実として残す**（外部レビュー meta-taro/git-qa#22）。
+       *
+       * 様式としては**後勝ち**が正しいので、ここでは弾かない。
+       * **弾くかどうかを決めるのは使う側** —— 行き先が 2 つ在ると、
+       * 証跡を読んだ人が「何処を見たのか」を辿れなくなる（C40）。
+       */
+      if (key in meta && !duplicateMeta.includes(key)) duplicateMeta.push(key);
       meta[key] = rest.slice(sep + 1).trim();
       continue;
     }
@@ -73,7 +83,7 @@ export function parseTestSpecTsv(text: string): TestSpecSheet {
     throw new TsvParseError('ヘッダ行が無い');
   }
 
-  return { magic, meta, directives, columns, rows };
+  return { magic, meta, duplicateMeta, directives, columns, rows };
 }
 
 /** ファイルから読む。読むだけで、書き込みも作成もしない。 */

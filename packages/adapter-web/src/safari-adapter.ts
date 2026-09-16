@@ -51,6 +51,11 @@ const capabilities: AdapterCapabilities = {
 
 export interface SafariAdapterOptions {
   readonly build: TargetBuild;
+  /**
+   * 何処を見に行ったか（シートの `行き先`）。**「何を検証したか」（`build.source`）と分ける**
+   * —— 外部レビュー meta-taro/git-qa#22。無ければ持たない。
+   */
+  readonly destination?: string;
   readonly url?: string;
   readonly settleMs?: number;
   readonly startTimeoutMs?: number;
@@ -214,7 +219,12 @@ function createSession(deps: SessionDeps): TargetSession {
   };
 
   return {
-    target: { kind: KIND, browser: deps.label, build: deps.options.build },
+    target: {
+      kind: KIND,
+      browser: deps.label,
+      build: deps.options.build,
+      ...(deps.options.destination === undefined ? {} : { destination: deps.options.destination }),
+    },
     liveView,
     recording,
     get isClosed() {

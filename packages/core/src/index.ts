@@ -112,3 +112,12 @@ export {
   toEvidencePath,
 } from './run/workspace.js';
 export type { TargetCheck } from './run/target-check.js';
+
+// シートが宣言する「何を検証したか」と「何処を見るか」（外部レビュー #22）。
+export {
+  DESTINATION_KEY,
+  SUBJECT_KEY,
+  duplicateTargetMessage,
+  sheetDestination,
+  sheetSubject,
+} from './run/sheet-target.js';

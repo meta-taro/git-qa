@@ -36,6 +36,11 @@ const KIND = 'web';
 export interface WebAdapterOptions {
   /** 検証する相手。**シートの「# 対象:」が宣言した URL**（C40）。 */
   readonly build: TargetBuild;
+  /**
+   * 何処を見に行ったか（シートの `行き先`）。**「何を検証したか」（`build.source`）と分ける**
+   * —— 外部レビュー meta-taro/git-qa#22。無ければ持たない。
+   */
+  readonly destination?: string;
   /** 最初に開く場所。省略すると `build.source` を URL として使う。 */
   readonly url?: string;
   readonly browserPath?: string;
@@ -144,6 +149,7 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
           browser,
           now,
           build: options.build,
+          ...(options.destination === undefined ? {} : { destination: options.destination }),
           browserLabel: label,
           ...(options.settleMs === undefined ? {} : { settleMs: options.settleMs }),
           ...(options.loadTimeoutMs === undefined ? {} : { loadTimeoutMs: options.loadTimeoutMs }),
@@ -162,6 +168,8 @@ interface SessionDeps {
   readonly cdp: CdpClient;
   readonly browser: RunningBrowser;
   readonly build: TargetBuild;
+  /** 何処を見に行ったか（シートの `行き先`・外部レビュー #22）。 */
+  readonly destination?: string;
   readonly now: () => Date;
   /** 証跡に残す「何で見たか」。例: `Google Chrome（Chrome/141.0.7390.55）`。 */
   readonly browserLabel: string;
@@ -233,7 +241,13 @@ function createSession(deps: SessionDeps): TargetSession {
 
   return {
     // **何で見たかは、run.json の `target.browser` に残る。**決め打ちにしない。
-    target: { kind: KIND, browser: deps.browserLabel, build },
+    target: {
+      kind: KIND,
+      browser: deps.browserLabel,
+      build,
+      // **何処を見に行ったか**（シートの `行き先`・外部レビュー #22）。
+      ...(deps.destination === undefined ? {} : { destination: deps.destination }),
+    },
     liveView,
     recording,
     get isClosed() {

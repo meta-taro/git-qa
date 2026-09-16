@@ -75,6 +75,11 @@
         "kind": {
           "enum": ["web", "android", "desktop"]
         },
+        "destination": {
+          "description": "実際に見に行った場所（シートの「行き先」）。「何を検証したか」（build.source）と分けて残す — 外部レビュー meta-taro/git-qa#22。",
+          "type": "string",
+          "minLength": 1
+        },
         "device": {
           "type": "string"
         },
