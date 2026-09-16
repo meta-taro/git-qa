@@ -18,8 +18,10 @@ import {
 
 import { findInput, findOcr, findWinTool } from './ocr-path.js';
 import { installSaveOnExit } from './save-on-exit.js';
+import { headlessExitCode, headlessSummary, runHeadless } from './headless.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
+import { positional } from './argv.js';
 import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 
 /**
@@ -33,7 +35,7 @@ import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './a
  * `@git-qa/adapter-desktop` と `@git-qa/core` にあり、そちらは検査してある。
  */
 
-const sheetPath = process.argv[2] ?? process.env['GIT_QA_SHEET'];
+const sheetPath = positional(process.argv, 0) ?? process.env['GIT_QA_SHEET'];
 if (sheetPath === undefined) {
   console.error('使い方: pnpm run:sheet:desktop <検証シート.tsv> [アプリ名]');
   process.exit(1);
@@ -64,7 +66,7 @@ if (duplicated !== undefined) {
   process.exit(1);
 }
 
-const app = process.argv[3] ?? sheetDestination(sheet.meta);
+const app = positional(process.argv, 1) ?? sheetDestination(sheet.meta);
 if (app === undefined || app === '') {
   console.error(
     '[git-qa] 見るアプリが分からない。シートの見出しに「# 対象: アプリ名」を書くか、' +
@@ -113,27 +115,54 @@ const build = {
   label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
 };
 
+const adapter =
+  process.platform === 'win32'
+    ? // `whyNoDesktop` が通っているので、道具は在る。
+      createWindowsDesktopAdapter({
+        app,
+        build,
+        // **何処を見に行ったか**（#22）。
+        destination: app,
+        toolPath: winToolPath as string,
+        onPointed: (at) => reportPointed?.(at),
+      })
+    : createDesktopAdapter({
+        app,
+        build,
+        // **何処を見に行ったか**（#22）。
+        destination: app,
+        ...(ocrPath === undefined ? {} : { ocrPath }),
+        ...(inputPath === undefined ? {} : { inputPath }),
+        onPointed: (at) => reportPointed?.(at),
+      });
+
+/**
+ * **誰も見ていない実行**（外部レビュー meta-taro/git-qa#21）。`--no-ui` で画面を起こさない。
+ * 出るのは `AUTO_PASS` 止まり（`VERIFIED` は型として書けない・C17）。
+ */
+if (process.argv.includes('--no-ui')) {
+  const run = await runHeadless({
+    adapter,
+    sheet,
+    sheetRef: {
+      path: sheetPath,
+      sha256: sheetDigest(text),
+      ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
+      ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
+    },
+    runId: runIdFrom(new Date()),
+    runsRoot: fromInvocationDir('runs'),
+    operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
+    readScreenText: readDesktopScreenText,
+  });
+
+  console.log(`[git-qa] 無人で走らせた（誰も見ていない）: ${headlessSummary(run.cases)}`);
+  console.log(`[git-qa] 証跡: ${fromInvocationDir('runs')}/${run.runId}/run.json`);
+  process.exit(headlessExitCode(run.cases));
+}
+
 const session = await startRunSession({
-  adapter:
-    process.platform === 'win32'
-      ? // `whyNoDesktop` が通っているので、道具は在る。
-        createWindowsDesktopAdapter({
-          app,
-          build,
-          // **何処を見に行ったか**（#22）。
-          destination: app,
-          toolPath: winToolPath as string,
-          onPointed: (at) => reportPointed?.(at),
-        })
-      : createDesktopAdapter({
-          app,
-          build,
-          // **何処を見に行ったか**（#22）。
-          destination: app,
-          ...(ocrPath === undefined ? {} : { ocrPath }),
-          ...(inputPath === undefined ? {} : { inputPath }),
-          onPointed: (at) => reportPointed?.(at),
-        }),
+  adapter,
   registerPointing: (report) => {
     reportPointed = report;
   },

@@ -20,6 +20,8 @@ import {
 import { installSaveOnExit } from './save-on-exit.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
+import { positional } from './argv.js';
+import { headlessExitCode, headlessSummary, runHeadless } from './headless.js';
 import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 
 /**
@@ -33,7 +35,7 @@ import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './a
  * 打鍵の受け渡し・遷移）は `@git-qa/core` と `run-session.ts` にあり、そちらは検査してある。
  */
 
-const sheetPath = process.argv[2] ?? process.env['GIT_QA_SHEET'];
+const sheetPath = positional(process.argv, 0) ?? process.env['GIT_QA_SHEET'];
 if (sheetPath === undefined) {
   console.error('使い方: pnpm run:sheet:web <検証シート.tsv>');
   process.exit(1);
@@ -70,7 +72,7 @@ if (duplicated !== undefined) {
   process.exit(1);
 }
 
-const target = process.argv[3] ?? sheetDestination(sheet.meta);
+const target = positional(process.argv, 1) ?? sheetDestination(sheet.meta);
 if (target === undefined || !/^https?:\/\//.test(target)) {
   console.error(
     '[git-qa] 見る場所が分からない。シートの見出しに「# 対象: http://localhost:3000/」' +
@@ -93,10 +95,19 @@ const subject = sheetSubject(sheet.meta);
  */
 const kind = process.env['GIT_QA_BROWSER_KIND'];
 
-const session = await startRunSession({
-  adapter:
-    kind === 'safari'
-      ? createSafariAdapter({
+const adapter =
+  kind === 'safari'
+    ? createSafariAdapter({
+        build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+        /**
+         * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
+         * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
+         */
+        url: target,
+        destination: target,
+      })
+    : kind === 'firefox'
+      ? createFirefoxAdapter({
           build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
           /**
            * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
@@ -104,55 +115,76 @@ const session = await startRunSession({
            */
           url: target,
           destination: target,
+          size: { width: 1280, height: 900 },
+          ...(process.env['GIT_QA_BROWSER'] === undefined
+            ? {}
+            : { firefoxPath: process.env['GIT_QA_BROWSER'] }),
         })
-      : kind === 'firefox'
-        ? createFirefoxAdapter({
-            build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-            /**
-             * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
-             * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
-             */
-            url: target,
-            destination: target,
-            size: { width: 1280, height: 900 },
-            ...(process.env['GIT_QA_BROWSER'] === undefined
-              ? {}
-              : { firefoxPath: process.env['GIT_QA_BROWSER'] }),
-          })
-        : createWebAdapter({
-            build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
-            /**
-             * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
-             * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
-             */
-            url: target,
-            destination: target,
-            // 同じ幅で見ないと、崩れの有無を比べられない。
-            size: { width: 1280, height: 900 },
-            ...(process.env['GIT_QA_BROWSER'] === undefined
-              ? {}
-              : { browserPath: process.env['GIT_QA_BROWSER'] }),
-            // どのブラウザで見るか。**証跡には、実際に起きたものの版が残る。**
-            ...(process.env['GIT_QA_BROWSER_KIND'] === 'edge'
-              ? { browser: 'edge' as const }
-              : process.env['GIT_QA_BROWSER_KIND'] === 'chromium'
-                ? { browser: 'chromium' as const }
-                : process.env['GIT_QA_BROWSER_KIND'] === 'chrome'
-                  ? { browser: 'chrome' as const }
-                  : {}),
-          }),
+      : createWebAdapter({
+          build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
+          /**
+           * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
+           * **そこを URL として開かない** —— `owner/repo@branch` が入りうる。
+           */
+          url: target,
+          destination: target,
+          // 同じ幅で見ないと、崩れの有無を比べられない。
+          size: { width: 1280, height: 900 },
+          ...(process.env['GIT_QA_BROWSER'] === undefined
+            ? {}
+            : { browserPath: process.env['GIT_QA_BROWSER'] }),
+          // どのブラウザで見るか。**証跡には、実際に起きたものの版が残る。**
+          ...(process.env['GIT_QA_BROWSER_KIND'] === 'edge'
+            ? { browser: 'edge' as const }
+            : process.env['GIT_QA_BROWSER_KIND'] === 'chromium'
+              ? { browser: 'chromium' as const }
+              : process.env['GIT_QA_BROWSER_KIND'] === 'chrome'
+                ? { browser: 'chrome' as const }
+                : {}),
+        });
+
+/**
+ * **誰も見ていない実行**（外部レビュー meta-taro/git-qa#21）。
+ *
+ * > 夜間にひととおり流して、**落ちた行と証跡だけを朝に人が見る**
+ *
+ * `--no-ui` で画面を起こさない。**出るのは `AUTO_PASS` 止まり**で、
+ * `VERIFIED` は型として書けない（C17）。証跡には `mode: "auto"` が残る。
+ */
+const sheetRef = {
+  path: sheetPath,
+  // 実行後にシートが変わったら、突き合わせで分かるようにする。
+  sha256: sheetDigest(text),
+  ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
+  ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
+};
+const operator = { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' };
+
+if (process.argv.includes('--no-ui')) {
+  const run = await runHeadless({
+    adapter,
+    sheet,
+    sheetRef,
+    runId: runIdFrom(new Date()),
+    runsRoot: fromInvocationDir('runs'),
+    operator,
+    readScreenText: readWebScreenText,
+  });
+
+  console.log(`[git-qa] 無人で走らせた（誰も見ていない）: ${headlessSummary(run.cases)}`);
+  console.log(`[git-qa] 証跡: ${fromInvocationDir('runs')}/${run.runId}/run.json`);
+  // **朝に開くべきものが在るかを、終了コードで返す**（1 = 落ちた / 2 = 人が見ないと決まらない）。
+  process.exit(headlessExitCode(run.cases));
+}
+
+const session = await startRunSession({
+  adapter,
   sheet,
-  sheetRef: {
-    path: sheetPath,
-    // 実行後にシートが変わったら、突き合わせで分かるようにする。
-    sha256: sheetDigest(text),
-    ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
-    ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
-  },
+  sheetRef,
   runId: runIdFrom(new Date()),
   // 画面のメニューから開けるようにする。解決済みの絶対パスを渡す。
   sheetPath: resolvedSheet,
-  operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
+  operator,
   readScreenText: readWebScreenText,
 });
 

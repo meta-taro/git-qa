@@ -295,6 +295,7 @@ pnpm run:sheet sheets/android-settings.tsv
 ```bash
 pnpm live:web http://localhost:3000/        # 映像だけ見る
 pnpm run:sheet:web sheets/web-sample-ja.tsv # シートを 1 本走らせる
+pnpm run:sheet:web sheets/web-sample-ja.tsv --no-ui  # 誰も見ずに流す（下ごしらえ）
 ```
 
 人が持っているブラウザ（Chrome 等）を CDP で動かします。**依存は足していません**（C54）。
@@ -321,6 +322,19 @@ pnpm run:sheet:web sheets/web-sample-ja.tsv # シートを 1 本走らせる
 | `a` | `BLOCKED`（人にも判断できない） |
 | `s` | `SKIP`（今回は見ない） |
 | `Space` | 置かずに次へ（`AUTO_PASS` のまま残る） |
+
+#### `--no-ui` — 誰も見ずに流す（外部レビュー meta-taro/git-qa#21）
+
+> 夜間にひととおり流して、**落ちた行と証跡だけを朝に人が見る**
+
+**画面を起こしません。**出るのは `AUTO_PASS` 止まりで、**`VERIFIED` は型として書けません**（C17）。
+証跡には `mode: "auto"` が残るので、**どの行を人が見て、どの行を機械が流しただけか**を取り違えません。
+
+| 終了コード | 意味 |
+|---|---|
+| `0` | 全部通った |
+| `1` | **落ちた行が在る** |
+| `2` | **人が見ないと決まらない行が在る**（判断保留。1 件も走っていない場合も） |
 
 **ライブビューの中で端末を直接触れます。**
 

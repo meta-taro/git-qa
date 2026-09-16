@@ -4,8 +4,10 @@ import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-and
 import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
 
 import { installSaveOnExit } from './save-on-exit.js';
+import { headlessExitCode, headlessSummary, runHeadless } from './headless.js';
 import { startRunSession } from './run-session.js';
 import { fromInvocationDir } from './paths.js';
+import { positional } from './argv.js';
 import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 
 /**
@@ -17,7 +19,7 @@ import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './a
  * 打鍵の受け渡し・遷移）は `@git-qa/core` と `run-session.ts` にあり、そちらは検査してある。
  */
 
-const sheetPath = process.argv[2] ?? process.env['GIT_QA_SHEET'];
+const sheetPath = positional(process.argv, 0) ?? process.env['GIT_QA_SHEET'];
 if (sheetPath === undefined) {
   console.error('使い方: pnpm run:sheet <検証シート.tsv>');
   process.exit(1);
@@ -43,26 +45,50 @@ try {
 }
 const sheet = parseTestSpecTsv(text);
 
-const session = await startRunSession({
-  adapter: createAndroidAdapter({
-    build: {
-      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
-    },
-    // 枠の中に描く方式（C27 の方式 A / C32）。別窓ではない。
-    liveView: { mode: 'h264-stream' },
-    ...(process.env['GIT_QA_ANDROID_SERIAL'] === undefined
-      ? {}
-      : { serial: process.env['GIT_QA_ANDROID_SERIAL'] }),
-  }),
-  sheet,
-  sheetRef: {
-    path: sheetPath,
-    // 実行後にシートが変わったら、突き合わせで分かるようにする。
-    sha256: sheetDigest(text),
-    ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
-    ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
+const adapter = createAndroidAdapter({
+  build: {
+    source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+    label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
   },
+  // 枠の中に描く方式（C27 の方式 A / C32）。別窓ではない。
+  liveView: { mode: 'h264-stream' },
+  ...(process.env['GIT_QA_ANDROID_SERIAL'] === undefined
+    ? {}
+    : { serial: process.env['GIT_QA_ANDROID_SERIAL'] }),
+});
+
+const sheetRef = {
+  path: sheetPath,
+  // 実行後にシートが変わったら、突き合わせで分かるようにする。
+  sha256: sheetDigest(text),
+  ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
+  ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
+};
+
+/**
+ * **誰も見ていない実行**（外部レビュー meta-taro/git-qa#21）。`--no-ui` で画面を起こさない。
+ * 出るのは `AUTO_PASS` 止まり（`VERIFIED` は型として書けない・C17）。
+ */
+if (process.argv.includes('--no-ui')) {
+  const run = await runHeadless({
+    adapter,
+    sheet,
+    sheetRef,
+    runId: runIdFrom(new Date()),
+    runsRoot: fromInvocationDir('runs'),
+    operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
+    readScreenText: readAndroidScreenText,
+  });
+
+  console.log(`[git-qa] 無人で走らせた（誰も見ていない）: ${headlessSummary(run.cases)}`);
+  console.log(`[git-qa] 証跡: ${fromInvocationDir('runs')}/${run.runId}/run.json`);
+  process.exit(headlessExitCode(run.cases));
+}
+
+const session = await startRunSession({
+  adapter,
+  sheet,
+  sheetRef,
   runId: runIdFrom(new Date()),
   // 画面のメニューから開けるようにする。解決済みの絶対パスを渡す。
   sheetPath: resolvedSheet,
