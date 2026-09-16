@@ -45,6 +45,11 @@ export interface WebAdapterOptions {
   readonly url?: string;
   readonly browserPath?: string;
   /**
+   * ブラウザのプロファイルの置き場所（外部レビュー meta-taro/git-qa#26）。
+   * **渡すと、終わりに消さない**（ログイン済みの状態を保つための口）。
+   */
+  readonly userDataDir?: string;
+  /**
    * どのブラウザで見るか。**選ばれていれば、それ以外は探さない。**
    *
    * 「Chrome で見る」と言われたのに Edge が起きたら、
@@ -120,6 +125,7 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
       try {
         browser = await launchBrowser({
           ...(options.browserPath === undefined ? {} : { browserPath: options.browserPath }),
+          ...(options.userDataDir === undefined ? {} : { userDataDir: options.userDataDir }),
           ...(options.browser === undefined ? {} : { browser: options.browser }),
           ...(options.size === undefined ? {} : { size: options.size }),
           // **片付けたことは黙らない**（meta-taro/git-qa#20）。

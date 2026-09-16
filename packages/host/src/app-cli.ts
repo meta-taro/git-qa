@@ -269,6 +269,14 @@ const setup = await startSetupServer({
                     destination: url,
                     // 同じ幅で見ないと、崩れの有無を比べられない。
                     size: { width: 1280, height: 900 },
+                    /**
+                     * **ログイン済みの状態で見る**（外部レビュー meta-taro/git-qa#26）。
+                     * 渡すと、そのプロファイルを使い**終わりに消さない。**
+                     * **最初のログインは人が手で行う**（§14）。
+                     */
+                    ...(process.env['GIT_QA_PROFILE'] === undefined
+                      ? {}
+                      : { userDataDir: process.env['GIT_QA_PROFILE'] }),
                     // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
                     // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
                     ...(browserPath === undefined ? {} : { browserPath }),

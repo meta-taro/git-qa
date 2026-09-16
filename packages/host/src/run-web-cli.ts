@@ -130,6 +130,16 @@ const adapter =
           destination: target,
           // 同じ幅で見ないと、崩れの有無を比べられない。
           size: { width: 1280, height: 900 },
+          /**
+           * **ログイン済みの状態で見る**（外部レビュー meta-taro/git-qa#26）。
+           *
+           * 渡すと、そのプロファイルを使い、**終わりに消さない。**
+           * **最初のログインは人が手で行う** —— git-qa は秘密情報を作らない・置かない（§14）。
+           * **人が普段使っているプロファイルを渡さない**（検証で触られる）。
+           */
+          ...(process.env['GIT_QA_PROFILE'] === undefined
+            ? {}
+            : { userDataDir: process.env['GIT_QA_PROFILE'] }),
           ...(process.env['GIT_QA_BROWSER'] === undefined
             ? {}
             : { browserPath: process.env['GIT_QA_BROWSER'] }),

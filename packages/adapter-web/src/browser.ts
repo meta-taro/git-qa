@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { AdapterError } from '@git-qa/core';
 
 import { browserArgs, browserCandidates, parseActivePort, parseDevToolsUrl } from './launch.js';
+import { profileNote, shouldRemoveProfile } from './profile.js';
 import { STALE_MARK, closeStaleBrowsers, forgetLaunched, rememberLaunched } from './stale.js';
 import type { BrowserKind } from './launch.js';
 
@@ -38,6 +39,14 @@ export interface LaunchBrowserOptions {
    * **黙って落とさない** —— 何を落としたのかが見えないと、人は自分の窓を疑う。
    */
   readonly onNote?: (message: string) => void;
+  /**
+   * ブラウザのプロファイルの置き場所（外部レビュー meta-taro/git-qa#26）。
+   *
+   * **渡すと、終わりに消さない。**ログインが要る画面を検証するための口で、
+   * **人が一度だけ手でログインしておくためのもの。**
+   * **人が普段使っているプロファイルを渡さない**（検証で触られる）。
+   */
+  readonly userDataDir?: string;
   /** 繋ぎ先が出てくるまで待つ上限（ms）。 */
   readonly startTimeoutMs?: number;
 }
@@ -80,9 +89,21 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
    */
   const cleaned = await closeStaleBrowsers();
   if (cleaned !== undefined) options.onNote?.(cleaned);
+  // **用意された置き場所を使うなら、そう言う**（#26）。黙って使わない。
+  const note = profileNote(options.userDataDir);
+  if (note !== undefined) options.onNote?.(note);
 
-  // **人のプロファイルを触らない。**開いているタブ・履歴・ログイン状態に手を出さない。
-  const userDataDir = await mkdtemp(join(tmpdir(), STALE_MARK));
+  /**
+   * **人のプロファイルを触らない。**開いているタブ・履歴・ログイン状態に手を出さない。
+   *
+   * **ただし、検証用の置き場所は渡せる**（外部レビュー meta-taro/git-qa#26）。
+   * ログインが要る画面は、まっさらでは 1 行も流せない ——
+   * **ID とパスワードをシートか環境変数に書かせることになる。**
+   *
+   * **渡された場所は消さない。**借りたものは返すが、**預かったものは消さない。**
+   * 中に入れるものは人の領分（§14。**最初のログインは人が手で行う**）。
+   */
+  const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), STALE_MARK)));
 
   const child: ChildProcess = spawn(
     binary,
@@ -112,8 +133,10 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
         // もう居ない。**片付けのために本筋を止めない。**
       }
     }
-    // 作業場所は残さない。**人の temp に溜まり続けるのは、頼まれていない。**
-    await rm(userDataDir, { recursive: true, force: true }).catch(() => undefined);
+    // **こちらが作った場所だけ消す**（#26）。人の temp に溜まり続けるのは頼まれていない。
+    if (shouldRemoveProfile(options.userDataDir)) {
+      await rm(userDataDir, { recursive: true, force: true }).catch(() => undefined);
+    }
   };
 
   try {
