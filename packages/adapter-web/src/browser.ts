@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { AdapterError } from '@git-qa/core';
 
 import { browserArgs, browserCandidates, parseActivePort, parseDevToolsUrl } from './launch.js';
-import { STALE_MARK, closeStaleBrowsers } from './stale.js';
+import { STALE_MARK, closeStaleBrowsers, forgetLaunched, rememberLaunched } from './stale.js';
 import type { BrowserKind } from './launch.js';
 
 /**
@@ -94,7 +94,11 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
     { stdio: ['ignore', 'ignore', 'pipe'] },
   );
 
+  // **合図の中から落とせるように、番号を覚えておく**（#20）。
+  rememberLaunched(child.pid);
+
   const close = async (): Promise<void> => {
+    forgetLaunched(child.pid);
     child.kill();
     /**
      * **落ちたことを確かめる**（#20）。`kill` は合図を送るだけで、

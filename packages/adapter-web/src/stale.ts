@@ -98,3 +98,43 @@ export async function closeStaleBrowsers(
   }
   return staleReport(closed);
 }
+
+/**
+ * **起こしたブラウザの番号**（meta-taro/git-qa#20）。
+ *
+ * `close()` を辿る道だけでは足りない。同じプロセスで動いている vite も
+ * 合図（`SIGINT`）を受けて終わるので、**こちらの後始末が最後まで走らない**
+ * （2026-09-16 に実測。止めたのにブラウザだけ残った）。
+ *
+ * **待たない形が要る。**合図の中から、非同期を挟まずに落とす。
+ */
+const launched = new Set<number>();
+
+export function rememberLaunched(pid: number | undefined): void {
+  if (pid !== undefined && pid > 0) launched.add(pid);
+}
+
+/** 自分で閉じたものは、落としに行かない（番号は別の誰かのものになりうる）。 */
+export function forgetLaunched(pid: number | undefined): void {
+  if (pid !== undefined) launched.delete(pid);
+}
+
+/**
+ * 覚えているものを、その場で落とす。**非同期を挟まない。**
+ *
+ * **1 つ落とせなくても、残りを落とす。**片付けを 1 件の失敗で止めない。
+ */
+export function killLaunchedSync(kill: (pid: number) => void = defaultKill): void {
+  for (const pid of [...launched]) {
+    launched.delete(pid);
+    try {
+      kill(pid);
+    } catch {
+      // もう居ない・権限が無い。**残りを片付ける。**
+    }
+  }
+}
+
+const defaultKill = (pid: number): void => {
+  process.kill(pid, 'SIGTERM');
+};

@@ -4,6 +4,7 @@ import {
   createFirefoxAdapter,
   createSafariAdapter,
   createWebAdapter,
+  killLaunchedSync,
   readWebScreenText,
 } from '@git-qa/adapter-web';
 import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
@@ -157,6 +158,14 @@ installSaveOnExit({
   },
   save: async () => {
     session.abort('人が実行を止めた（Ctrl-C / 終了の合図）');
+    /**
+     * **起こしたブラウザを、その場で落とす**（meta-taro/git-qa#20）。
+     *
+     * `close()` を辿る道だけでは足りない。**同じプロセスの vite も合図で終わる**ので、
+     * 後始末が最後まで走らないことがある（2026-09-16 に実測。ブラウザだけ残った）。
+     * **非同期を挟まずに落とす。**
+     */
+    killLaunchedSync();
     /**
      * **開いた窓も片付ける**（外部レビュー meta-taro/git-qa#7）。
      *

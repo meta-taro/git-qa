@@ -39,4 +39,10 @@ export type { SafariAdapterOptions } from './safari-adapter.js';
 export { createWebDriverClient, w3cDrag, w3cPointer, w3cType } from './webdriver.js';
 export type { WebDriverClient } from './webdriver.js';
 // 置き去りのブラウザを数えて落とす（#20）。**使い捨てプロファイルのものだけ。**
-export { STALE_MARK, closeStaleBrowsers, staleBrowserPids, staleReport } from './stale.js';
+export {
+  STALE_MARK,
+  closeStaleBrowsers,
+  killLaunchedSync,
+  staleBrowserPids,
+  staleReport,
+} from './stale.js';

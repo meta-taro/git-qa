@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { STALE_MARK, staleBrowserPids, staleReport } from '../src/stale.js';
+import {
+  STALE_MARK,
+  forgetLaunched,
+  killLaunchedSync,
+  rememberLaunched,
+  staleBrowserPids,
+  staleReport,
+} from '../src/stale.js';
 
 /**
  * **置き去りのブラウザを片付ける**（meta-taro/git-qa#20）。
@@ -82,5 +89,61 @@ describe('staleReport', () => {
 
   it('無ければ、何も言わない', () => {
     expect(staleReport(0)).toBeUndefined();
+  });
+});
+
+/**
+ * **合図を受けた瞬間に、同期で落とす**（meta-taro/git-qa#20・2026-09-16 に実測）。
+ *
+ * `SIGINT` を受けてから `close()` を辿る道を入れたのに、**ブラウザは残った。**
+ * 同じプロセスで動いている vite も合図を受けて先に終わるので、
+ * **こちらの後始末は最後まで走らない。**
+ *
+ * **待たない形が要る。**起こしたブラウザの番号を覚えておき、合図の中で直接落とす。
+ * 非同期を 1 つでも挟むと、そこで終わることがある。
+ */
+describe('killLaunchedSync', () => {
+  it('覚えているものを、その場で落とす', () => {
+    const killed: number[] = [];
+    rememberLaunched(4242);
+
+    killLaunchedSync((pid) => killed.push(pid));
+
+    expect(killed).toEqual([4242]);
+  });
+
+  /** **2 度落としに行かない。**落とした番号は別の誰かのものになりうる。 */
+  it('一度落としたら、忘れる', () => {
+    const killed: number[] = [];
+    rememberLaunched(4243);
+    killLaunchedSync(() => undefined);
+
+    killLaunchedSync((pid) => killed.push(pid));
+
+    expect(killed).toEqual([]);
+  });
+
+  it('自分で閉じたものは、落としに行かない', () => {
+    const killed: number[] = [];
+    rememberLaunched(4244);
+    forgetLaunched(4244);
+
+    killLaunchedSync((pid) => killed.push(pid));
+
+    expect(killed).toEqual([]);
+  });
+
+  /** **落とせなくても、残りを落とす。**1 つの失敗で片付けを止めない。 */
+  it('落とせないものが在っても、残りは落とす', () => {
+    const killed: number[] = [];
+    rememberLaunched(1);
+    rememberLaunched(2);
+
+    killLaunchedSync((pid) => {
+      if (pid === 1) throw new Error('もう居ない');
+      killed.push(pid);
+    });
+
+    expect(killed).toEqual([2]);
   });
 });

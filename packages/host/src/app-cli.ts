@@ -14,6 +14,7 @@ import {
   createFirefoxAdapter,
   createSafariAdapter,
   createWebAdapter,
+  killLaunchedSync,
   readWebScreenText,
 } from '@git-qa/adapter-web';
 
@@ -33,7 +34,8 @@ import {
 } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
 
-import { spawnDesktop, tauriDevArgs, assertDesktopPortFree } from './app.js';
+import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
+import { installSaveOnExit } from './save-on-exit.js';
 import { findSheets, keepRunnableSheets, newestFirst, sheetSearchRoots } from './find-sheets.js';
 import { fromInvocationDir, runsDir } from './paths.js';
 import { findInput, findOcr, findWinTool } from './ocr-path.js';
@@ -335,6 +337,39 @@ if (serveOnly) {
    */
   await assertDesktopPortFree();
   const child = spawnDesktop(tauriDevArgs(undefined, { setupUrl: setup.url }));
+
+  /**
+   * **止められたときに、起こしたものを片付ける**（meta-taro/git-qa#20）。
+   *
+   * ここには**止められたときの道が 1 本も無かった。**画面が閉じられるのだけを待っていたので、
+   * `Ctrl-C` や `kill` で終わらせると、**検証用のブラウザと、画面の木（tauri → vite）が残る。**
+   * 2026-09-15、切り分けで何度も強制終了して**ブラウザを 30 個溜めた。**
+   *
+   * `run:sheet:*`（CLI の入口）は既にこの道を持っていた。**画面の入口にだけ無かった。**
+   * **拾える落ち方だけが対象**だが、`Ctrl-C` はその筆頭。
+   */
+  installSaveOnExit({
+    on: (name, handler) => {
+      process.on(name as NodeJS.Signals, handler);
+    },
+    save: async () => {
+      session?.abort('人が実行を止めた（Ctrl-C / 終了の合図）');
+      /**
+       * **起こしたブラウザを、その場で落とす**（meta-taro/git-qa#20）。
+       *
+       * `close()` を辿る道だけでは足りない。**同じプロセスの vite も合図で終わる**ので、
+       * 後始末が最後まで走らないことがある（2026-09-16 に実測。ブラウザだけ残った）。
+       * **非同期を挟まずに落とす。**
+       */
+      killLaunchedSync();
+      // 開いた窓（tauri → vite）も片付ける（外部レビュー #7）。
+      killTree(child);
+      // **ブラウザはここで閉じる。**次に起こしたときの片付けに頼らない。
+      await session?.close();
+      await setup.close();
+    },
+    exit: (code) => process.exit(code),
+  });
 
   // 画面が閉じられたら、残りを「やっていない」ではなく判断保留として残して終える。
   child.on('close', () => session?.abort('画面が閉じられた'));
