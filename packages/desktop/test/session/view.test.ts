@@ -357,3 +357,45 @@ describe('判定カラム — 幅が足りないときに、下を捨てない',
     expect(css).not.toContain("[data-column-id='verdict'] {");
   });
 });
+
+/**
+ * **太字にすると、日本語が潰れる**（外部レビュー meta-taro/git-qa#25）。
+ *
+ * > 字が太字だと、潰れて読めない
+ *
+ * かな・漢字は、同じ大きさでもラテン文字よりずっと字画が密。13px 前後で太らせると、
+ * **線と線の間が埋まって団子になる**（「議」「験」「認」は 17〜20 画）。
+ * **英語で作って日本語で使うと、ここで初めて出る。**
+ *
+ * この一覧は**いま何を判定しているか**を示す場所なので、
+ * **一番読んでほしい 1 行が、一番読みにくい**という形になっていた。
+ *
+ * 枠線（`outline`）は既に付いているので、**太字をやめるだけで区別は付く。**
+ */
+describe('ケース一覧 — いま見ている 1 件', () => {
+  const readCss = async (): Promise<string> => {
+    const { readFile } = await import('node:fs/promises');
+    const url = await import('node:url');
+    const path = await import('node:path');
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    return readFile(path.resolve(here, '../../src/styles.css'), 'utf8');
+  };
+
+  it('太らせない（日本語が潰れる）', async () => {
+    const css = await readCss();
+    const head = css.indexOf(".case-item[aria-current='true'] {");
+    const rule = css.slice(head, css.indexOf('}', head));
+
+    expect(rule).not.toContain('font-weight');
+  });
+
+  /** **それでも、どれを見ればよいかは一目で分かること。**太字を外すだけにしない。 */
+  it('太字の代わりに、別の目印が在る', async () => {
+    const css = await readCss();
+    const head = css.indexOf(".case-item[aria-current='true'] {");
+    const rule = css.slice(head, css.indexOf('}', head));
+
+    expect(rule).toContain('outline');
+    expect(rule).toContain('background');
+  });
+});

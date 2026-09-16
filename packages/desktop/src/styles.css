@@ -244,11 +244,24 @@ body {
   border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
 }
 
-/* いま人の打鍵を待っている 1 件。**どれを見ればよいかが一目で分かること。** */
+/*
+ * いま人の打鍵を待っている 1 件。**どれを見ればよいかが一目で分かること。**
+ *
+ * **太らせない**（外部レビュー meta-taro/git-qa#25）。
+ *
+ * > 字が太字だと、潰れて読めない
+ *
+ * かな・漢字はラテン文字より字画が密なので、13px 前後で太らせると
+ * **線と線の間が埋まって団子になる**（「議」「験」「認」は 17〜20 画）。
+ * **英語で作って日本語で使うと、ここで初めて出る。**
+ *
+ * **一番読んでほしい 1 行が、一番読みにくい**という形になっていた。
+ * 枠線と、薄く敷いた地で示す —— **太さ以外で示せば、字は潰れない。**
+ */
 .case-item[aria-current='true'] {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* 記号と判定のあいだ。**題名が伸びる**ので、記号は左、判定は右に留まる。 */
