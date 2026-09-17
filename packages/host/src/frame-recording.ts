@@ -27,6 +27,13 @@ export interface FrameRecordingDeps {
   readonly now: () => Date;
   /** 並びの速さ（枚/秒）。**長さを出すのに要る。** */
   readonly fps: number;
+  /**
+   * 置き直す間隔（ms）。**既定は `fps` から決める。**
+   *
+   * CDP の映像は**変化したときだけ**絵を出すので、止まっている画面では 1 枚も来ない
+   * （実測で 1 ケース 1 枚・0.125 秒の動画になった）。**最後の絵を置き直す。**
+   */
+  readonly tickMs?: number;
 }
 
 export interface FrameRecording extends RecordingControl {
@@ -37,8 +44,25 @@ export interface FrameRecording extends RecordingControl {
 export function createFrameRecording(deps: FrameRecordingDeps): FrameRecording {
   let dir: string | undefined;
   let count = 0;
+  /** 最後に来た絵。**来ないあいだは、これを置き直す。** */
+  let last: Uint8Array | undefined;
+  let ticker: NodeJS.Timeout | undefined;
   /** 書き込みを順に並べる。**並びが崩れると、動画の順番が狂う。** */
   let queue: Promise<unknown> = Promise.resolve();
+
+  const tickMs = deps.tickMs ?? Math.round(1000 / Math.max(1, deps.fps));
+
+  /**
+   * **1 枚置く。**書くのは**この時計だけ**にしてある ——
+   * 来た絵をそのつど書くと、**速さが揺れて動画の長さが合わなくなる。**
+   */
+  const put = (): void => {
+    if (dir === undefined || last === undefined) return;
+    const bytes = last;
+    count += 1;
+    const at = `${dir}/${String(count).padStart(5, '0')}.jpg`;
+    queue = queue.then(() => deps.writeFrame(at, bytes)).catch(() => undefined);
+  };
 
   return {
     requested: true,
@@ -46,23 +70,38 @@ export function createFrameRecording(deps: FrameRecordingDeps): FrameRecording {
     start(caseNo) {
       dir = deps.dirFor(caseNo);
       count = 0;
+      last = undefined;
       queue = deps.ensureDir(dir);
+      /**
+       * **絵が来なくても、時間は流れる**（#31）。
+       *
+       * CDP の映像は変化したときだけ来るので、止まっている画面では 1 枚も来ない。
+       * **最後の絵を置き直す。**1 枚も来ていないうちは、置くものが無い（何もしない）。
+       */
+      ticker = setInterval(put, tickMs);
+      ticker.unref?.();
       return queue.then(() => undefined);
     },
 
     accept(bytes) {
       // **頼まれるまでは溜めない。**捨てるだけ（ライブ映像は流れ続ける）。
       if (dir === undefined) return;
-      count += 1;
-      const at = `${dir}/${String(count).padStart(5, '0')}.jpg`;
-      queue = queue.then(() => deps.writeFrame(at, bytes)).catch(() => undefined);
+      const first = last === undefined;
+      last = bytes;
+      // 最初の 1 枚だけは、時計を待たずに置く（短いケースで 0 枚にならないように）。
+      if (first) put();
     },
 
     async stop(): Promise<CaseRecording> {
+      // **止めたら、置き直しも止める。**走っていない間に証跡が太らない。
+      if (ticker !== undefined) clearInterval(ticker);
+      ticker = undefined;
+
       const where = dir;
       const frames = count;
       dir = undefined;
       count = 0;
+      last = undefined;
 
       // **頼まれていない。**「録れなかった」ではない（C20）。
       if (where === undefined) return { state: 'not_requested' };

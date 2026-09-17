@@ -200,9 +200,18 @@ async function runWithFrames(
   try {
     return await executeRun({ ...baseOptions(options), session, runCase: runner, recording });
   } finally {
+    /**
+     * **待たない**（2026-09-17 に実測して直した）。
+     *
+     * 絵を読む繰り返しは、**次の絵を待って止まっている。**閉じても、その待ちは解けない
+     * （相手の口は「読み手が去るまで」回り続ける作り）。
+     * ここで待つと、**走り終えても実行が終わらない** —— 150 秒で打ち切られた。
+     *
+     * **書くのは止める**（`pumping`）。**口は閉じる。**あとは掴んでいるものを離せば終わる。
+     */
     pumping = false;
     await view.close().catch(() => undefined);
-    await pump.catch(() => undefined);
+    void pump.catch(() => undefined);
   }
 }
 
