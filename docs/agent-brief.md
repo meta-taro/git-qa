@@ -24,6 +24,20 @@
 **MCP に判定を置く道具は載せていない。**載せた瞬間、AI が「人が見た」と書けてしまい、
 この製品の芯が壊れる。**回り道を探さないこと。**
 
+## MCP で触れる相手（2026-09-17）
+
+```bash
+GIT_QA_MCP_TARGET=web GIT_QA_MCP_URL=http://localhost:3000/ pnpm mcp   # ウェブ
+GIT_QA_MCP_TARGET=desktop GIT_QA_MCP_APP=メモ pnpm mcp                 # デスクトップ
+pnpm mcp                                                               # Android（既定）
+```
+
+**`element_tap` で名前で押せる**（「保存」など）。**座標を当てにいかないこと** ——
+画面を読んで座標を推し量ると、**別の所を押しても気づけない。**
+
+**既に起きているブラウザにも繋げる**（`GIT_QA_CDP`）。Playwright が前準備を済ませた
+ブラウザへ、そのまま続けて触れる。
+
 証跡（`run.json`）には 2 種類が並ぶ。**これを混ぜない。**
 
 - `VERIFIED` / `FAIL` — **人が見て置いた**

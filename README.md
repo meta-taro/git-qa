@@ -39,7 +39,7 @@ tool that exists to save effort expensive to use.
 | **Android devices** | Real devices and emulators over `adb` — tap, swipe, type |
 | **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare |
 | **Desktop apps** | macOS (Accessibility + Vision OCR) and Windows (UI Automation) |
-| **From an AI agent** | Over MCP — take a screenshot, read the screen, touch it. **Android only** |
+| **From an AI agent** | Over MCP — take a screenshot, read the screen, tap by name. Android, web, or a desktop app |
 
 ## What evidence looks like
 

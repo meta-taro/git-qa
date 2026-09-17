@@ -6,6 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { createAndroidAdapter } from '@git-qa/adapter-android';
+import { createDesktopAdapter, readDesktopScreenText, whyNoDesktop } from '@git-qa/adapter-desktop';
+import { createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
+import type { TargetSession } from '@git-qa/core';
+
+import { mcpTargetFrom, targetHint } from './target.js';
 
 import { renderAbout } from './about.js';
 import { createWindowCapture } from './screen.js';
@@ -23,18 +28,66 @@ const run = promisify(execFile);
  * **ここは配線なので検査していない。**
  */
 
-const tools = createDeviceTools({
-  connect: () =>
-    createAndroidAdapter({
-      build: {
-        source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-        label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
-      },
-      ...(process.env['GIT_QA_ANDROID_SERIAL'] === undefined
+/**
+ * **触る相手を選ぶ**（人の指示・2026-09-17）。
+ *
+ * > 全自動でテスト動画をとる場合、エージェントの操作は必須となります。
+ *
+ * 道具（`tools.ts`）は元からアダプタ非依存で、**ここの配線だけが Android 固定**だった。
+ * ウェブ・デスクトップも触れるようにする。**既定は今までどおり Android。**
+ */
+const target = mcpTargetFrom(process.env);
+const label = process.env['GIT_QA_APP_LABEL'] ?? 'dev';
+
+const connect = (): Promise<TargetSession> => {
+  if (target.kind === 'web') {
+    return createWebAdapter({
+      build: { source: target.url, label },
+      url: target.url,
+      destination: target.url,
+      // 同じ幅で見ないと、崩れの有無を比べられない。
+      size: { width: 1280, height: 900 },
+      // **既に起きているブラウザにも繋げる**（#30）。Playwright が前準備を済ませた先。
+      ...(target.attachTo === undefined ? {} : { attachTo: target.attachTo }),
+      ...(process.env['GIT_QA_PROFILE'] === undefined
         ? {}
-        : { serial: process.env['GIT_QA_ANDROID_SERIAL'] }),
-    }).connect(),
+        : { userDataDir: process.env['GIT_QA_PROFILE'] }),
+    }).connect();
+  }
+
+  if (target.kind === 'desktop') {
+    const why = whyNoDesktop(process.platform, undefined);
+    if (why !== undefined) throw new Error(why);
+    return createDesktopAdapter({
+      app: target.app,
+      build: { source: target.app, label },
+      destination: target.app,
+    }).connect();
+  }
+
+  return createAndroidAdapter({
+    build: {
+      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+      label,
+    },
+    ...(target.serial === undefined ? {} : { serial: target.serial }),
+  }).connect();
+};
+
+/** **画面の文字の読み方は相手ごとに違う。**ここで取り違えると、AI は空の画面を見る。 */
+const readScreenText =
+  target.kind === 'web'
+    ? readWebScreenText
+    : target.kind === 'desktop'
+      ? readDesktopScreenText
+      : undefined;
+
+const tools = createDeviceTools({
+  connect,
+  ...(readScreenText === undefined ? {} : { readScreenText }),
 });
+
+console.error(`[git-qa] ${targetHint(target)}`);
 
 // 落ちるときも端末を離す。掴んだままにすると、次に繋げない。
 const release = (): void => {

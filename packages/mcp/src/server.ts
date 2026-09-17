@@ -46,6 +46,29 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
     },
   );
 
+  /**
+   * **名前で押す**（人の指示・2026-09-17）。
+   *
+   * > 全自動でテスト動画をとる場合、エージェントの操作は必須となります。
+   *
+   * 座標だけだと、AI は**画面を読んで座標を当てにいく**ことになる。
+   * シートは「「保存」をクリックする」と書くので、**道具にも同じ口を置く。**
+   */
+  server.registerTool(
+    'element_tap',
+    {
+      title: '名前で押す',
+      description:
+        '画面に見えている文字（または aria-label などの名乗り）で指して押す。' +
+        '座標を当てにいかなくてよい。見つからなければ、どこを探したかを返す。',
+      inputSchema: { ref: z.string().min(1) },
+    },
+    async ({ ref }) => {
+      await tools.tapRef(ref);
+      return ok(`押した: ${JSON.stringify(ref)}`);
+    },
+  );
+
   server.registerTool(
     'device_swipe',
     {

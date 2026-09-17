@@ -22,6 +22,15 @@ export interface Screenshot {
 
 export interface DeviceTools {
   tap(x: number, y: number): Promise<void>;
+  /**
+   * **名前で押す**（人の指示・2026-09-17）。
+   *
+   * 座標しか無いと、AI は**画面を読んで座標を当てにいく**しかない。
+   * シートは「「保存」をクリックする」と書く —— **道具にも同じ口が要る。**
+   *
+   * **探し方はアダプタが持っている。**ここで別の探し方を作らない。
+   */
+  tapRef(ref: string): Promise<void>;
   swipe(from: Point, to: Point, durationMs: number): Promise<void>;
   key(name: string): Promise<void>;
   /** アプリを起動する。**`app` は端末側の識別子そのまま**（Android ならパッケージ名・C40）。 */
@@ -35,6 +44,14 @@ export interface DeviceTools {
 
 export interface DeviceToolsOptions {
   readonly connect: () => Promise<TargetSession>;
+  /**
+   * 画面の文字の読み方（人の指示・2026-09-17）。
+   *
+   * **相手ごとに違う。**Android は uiautomator の XML、ウェブは `innerText`、
+   * デスクトップはアクセシビリティ＋OCR。**ここを固定すると、相手が 1 つに縛られる。**
+   * 渡されなければ、今までどおり Android として読む。
+   */
+  readonly readScreenText?: (session: TargetSession) => Promise<string>;
 }
 
 export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
@@ -49,6 +66,11 @@ export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
   return {
     async tap(x, y) {
       await (await use()).act({ kind: 'tap', target: { at: 'point', x, y } });
+    },
+
+    async tapRef(ref) {
+      // **探し方はアダプタが持っている。**ここで別の探し方を作らない。
+      await (await use()).act({ kind: 'tap', target: { at: 'element', ref } });
     },
 
     async swipe(from, to, durationMs) {
@@ -85,7 +107,11 @@ export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
     },
 
     async screenText() {
-      const observation = await (await use()).observe();
+      const session = await use();
+      // **相手ごとの読み方が渡されていれば、それを使う。**
+      if (options.readScreenText !== undefined) return options.readScreenText(session);
+
+      const observation = await session.observe();
       if (typeof observation.raw !== 'string') {
         // 握り潰さない。読めないまま空文字を返すと、無いのか読めないのかが分からない。
         throw new Error('画面の生データが uiautomator の XML ではない');

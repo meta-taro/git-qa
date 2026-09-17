@@ -5,6 +5,11 @@
     "outDir": "./dist",
     "types": ["node"]
   },
-  "references": [{ "path": "../core" }, { "path": "../adapter-android" }],
+  "references": [
+    { "path": "../core" },
+    { "path": "../adapter-android" },
+    { "path": "../adapter-desktop" },
+    { "path": "../adapter-web" }
+  ],
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

@@ -171,3 +171,32 @@ describe('起動と入力', () => {
     expect(session.actions).toEqual([{ kind: 'type', text: 'battery' }]);
   });
 });
+
+/**
+ * **名前で押せないと、AI はウェブを触れない**（人の指示・2026-09-17）。
+ *
+ * > 全自動でテスト動画をとる場合、エージェントの操作は必須となります。
+ *
+ * 座標しか受けていなかったので、AI は**画面を読んで座標を当てにいく**しかなかった。
+ * シートは「「保存」をクリックする」と書く —— **道具にも同じ口が要る。**
+ *
+ * **探し方はアダプタが持っている**（ウェブは読める文字と名乗り、デスクトップは
+ * アクセシビリティ＋OCR）。ここで別の探し方を作らない。
+ */
+describe('createDeviceTools — 名前で押す', () => {
+  it('名前をアダプタへそのまま渡す', async () => {
+    const acted: unknown[] = [];
+    const session = {
+      act: (action: unknown) => {
+        acted.push(action);
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } as unknown as TargetSession;
+
+    const tools = createDeviceTools({ connect: () => Promise.resolve(session) });
+    await tools.tapRef('保存');
+
+    expect(acted).toEqual([{ kind: 'tap', target: { at: 'element', ref: '保存' } }]);
+  });
+});
