@@ -225,3 +225,41 @@ describe('axTreeArgs — 道具に直接聞く', () => {
     expect(axTreeArgs(1234.7, {})).toEqual(['tree', '1235', '12']);
   });
 });
+
+/**
+ * **開いている選択肢は、窓の中に居ない**（外部レビュー meta-taro/git-qa#32・
+ * 人の指摘「プルダウン選べないし、**選択するたびにアプリが前面に来て操作できない**」）。
+ *
+ * macOS の `<select>` は `NSMenu` で、**アプリ直下の `AXMenu`** として出る。
+ * 窓（`AXWindows[0]`）だけを見ていたので見つからず、**座標で押す道へ落ちていた** ——
+ * **その道は相手を前面へ出す**ので、出した拍子に選択肢が畳まれる。
+ *
+ * 道具（Rust）が木に `AXMenu` を入れるようになったので、**読む側は変えていない。**
+ * ここで縛るのは**出す形が変わっていないこと** —— 1 行 1 件のタブ区切り。
+ */
+describe('parseElements — 開いている選択肢（#32）', () => {
+  it('選択肢の中身も、ふつうの部品として読む', () => {
+    const said = [
+      'AXMenu\t選択肢\t100\t200\t180\t120',
+      'AXMenuItem\t定休日\t110\t210\t160\t22',
+    ].join('\n');
+
+    expect(parseElements(said)).toEqual([
+      { role: 'AXMenu', name: '選択肢', x: 100, y: 200, width: 180, height: 120 },
+      { role: 'AXMenuItem', name: '定休日', x: 110, y: 210, width: 160, height: 22 },
+    ]);
+  });
+
+  /** **小さいほうを選ぶ**ので、枠ではなく中身が当たる（親を押すと別の所が反応する）。 */
+  it('枠と中身が両方あれば、中身を押す', () => {
+    const found = findInElements(
+      [
+        { role: 'AXMenu', name: '定休日など', x: 100, y: 200, width: 180, height: 120 },
+        { role: 'AXMenuItem', name: '定休日', x: 110, y: 210, width: 160, height: 22 },
+      ],
+      '定休日',
+    );
+
+    expect(found).toMatchObject({ width: 160, height: 22 });
+  });
+});

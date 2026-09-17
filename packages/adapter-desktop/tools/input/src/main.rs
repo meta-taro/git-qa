@@ -254,15 +254,46 @@ unsafe fn print_tree(pid: i32, max: u32) {
     }
     ask_for_content(app);
 
+    let mut out: Vec<String> = Vec::new();
+    let mut cut = false;
+
+    // **開いている選択肢は、窓の中に居ない**（外部レビュー meta-taro/git-qa#32・
+    // 人の指摘「プルダウン選べないし、選択するたびにアプリが前面に来て操作できない」）。
+    //
+    // macOS の `<select>` は `NSMenu` で、**アプリ直下の `AXMenu`** として出る。
+    // 窓だけ見ていたので見つからず、**座標で押す道へ落ちていた** ——
+    // その道は相手を前面へ出すので、**出した拍子に選択肢が畳まれる。**
+    //
+    // **開いているものを先に見る。**閉じていれば何も出ないので、普段の木は変わらない。
+    let children = attr(app, "AXChildren");
+    if !children.is_null() {
+        let count = CFArrayGetCount(children);
+        for i in 0..count {
+            let child = CFArrayGetValueAtIndex(children, i) as Ref;
+            if child.is_null() {
+                continue;
+            }
+            if text_attr(child, "AXRole") != "AXMenu" {
+                continue;
+            }
+            // 開いている選択肢そのものも出す（中身だけでなく、枠も指せるように）。
+            if let Some((p, s)) = frame_of(child) {
+                out.push(format!("AXMenu\t{}\t{}\t{}\t{}\t{}", "選択肢", p.x, p.y, s.width, s.height));
+            }
+            walk(child, 0, max, &mut out, &mut cut);
+        }
+        CFRelease(children as *const c_void);
+    }
+
     let windows = attr(app, "AXWindows");
     if windows.is_null() || CFArrayGetCount(windows) == 0 {
-        // **窓が無いのは、落ちたのとは違う。**空を返して、呼ぶ側に決めさせる。
+        // **窓が無いのは、落ちたのとは違う。**開いている選択肢だけでも返す。
+        if !out.is_empty() {
+            println!("{}", out.join("\n"));
+        }
         return;
     }
     let win = CFArrayGetValueAtIndex(windows, 0) as Ref;
-
-    let mut out: Vec<String> = Vec::new();
-    let mut cut = false;
     walk(win, 0, max, &mut out, &mut cut);
     if cut {
         out.push(DEPTH_CUT.to_string());
