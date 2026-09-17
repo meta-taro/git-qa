@@ -20,6 +20,8 @@ import { humanInputFor, nextCursor, whyCannotPlace } from './session/cursor.js';
 import { applyZoom } from './live/apply-zoom.js';
 import { nextZoom, sourcePixelRatio, zoomForPixels } from './live/zoom.js';
 import { showStretchNote } from './live/stretch.js';
+import { showInputError } from './live/input-error.js';
+import { nextRetryMs, retryMessage } from './live/reconnect.js';
 import { liveStallMessage } from './live/stall.js';
 import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
@@ -245,6 +247,9 @@ const controlUrl = controlUrlFromLocation(window.location.search);
  * **入口が 2 つある。**起動時に URL で渡される場合（`pnpm run:sheet`）と、
  * 画面で選んで始めた場合（`pnpm app`・Issue 011 段階 3）。**どちらも同じ道を通す。**
  */
+/** 何回続けて切れたか。**繋がったら 0 に戻す**（間を空けるのは、続けて失敗するときだけ）。 */
+let liveRetries = 0;
+
 const startSession = (
   live: string,
   control: string | undefined,
@@ -254,6 +259,8 @@ const startSession = (
   renderOnboarding(root, onboarding);
 
   startLiveView(root, live, kind, (canvas) => {
+    // 繋がった。**続けて失敗したときだけ間を空ける**ので、ここで数を戻す。
+    liveRetries = 0;
     // **人が端末を触れるようにする**（Issue 013）。実行に繋がっているときだけ。
     if (control === undefined) return;
     const send = (input: HumanInput): void => {
@@ -276,13 +283,25 @@ const startSession = (
       onIgnored: (reason) => console.warn('[git-qa] 回した操作を送らなかった:', reason),
     });
   }).catch((error: unknown) => {
-    // **映らない理由を画面に出す。**console だけだと人には見えず、待ち続けることになる。
+    /**
+     * **切れたら、繋ぎ直す**（外部レビュー meta-taro/git-qa#33）。
+     *
+     * > Load failed になりましたね。**このとき再接続みたいな案内がないのと、殺風景です。**
+     *
+     * 出ていたのは `Load failed` の 4 文字だけだった。
+     * **何が切れたのかと、次に何が起きるか**を書き、**自分で繋ぎ直す。**
+     * 開発モードでは Vite の再読み込みで毎回踏むので、ここが黙ると毎回人が困る。
+     */
+    const reason = error instanceof Error ? error.message : String(error);
     console.error('[live-view]', error);
-    diagnostics.lastError = error instanceof Error ? error.message : String(error);
-    showLiveViewError(
-      root,
-      t('live.error', { message: error instanceof Error ? error.message : String(error) }),
-    );
+    diagnostics.lastError = reason;
+
+    const wait = nextRetryMs(liveRetries);
+    liveRetries += 1;
+    showLiveViewError(root, retryMessage(reason, wait));
+    window.setTimeout(() => {
+      startSession(live, control, kind);
+    }, wait);
   });
 
   if (control === undefined) return;
@@ -488,6 +507,13 @@ function startControl(controlUrl: string): void {
         liveErrorShown = state.liveError;
         showLiveViewError(app, t('live.error', { message: state.liveError }));
       }
+      /**
+       * **触ったのに届かなかった理由を、画面へ出す**（外部レビュー meta-taro/git-qa#33）。
+       *
+       * 実行器は端末へ出していた。**端末は人の画面ではない。**
+       * 届くようになったら消える（状態から消えるので、そのまま渡す）。
+       */
+      showInputError(app, state.inputError);
       // 打鍵待ちが進んだら、見ている所も追いかける（戻って見ている最中は動かさない）。
       if (cursor === undefined || cursor === previousAwaiting) cursor = state.awaiting;
       // **「ここ」と指す**（要望シート No.1）。AI が触った場所を、映像の上に出す。

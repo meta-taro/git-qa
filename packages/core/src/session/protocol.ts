@@ -66,6 +66,16 @@ export interface SessionState {
    */
   readonly liveError?: string;
   /**
+   * **触ったのに届かなかった理由**（外部レビュー meta-taro/git-qa#33）。
+   *
+   * > 問題は、それが画面に出ないこと。…「そのまま届きます」と書いてあります。
+   * > **届かなかった今回は、この案内と食い違っています。**
+   *
+   * 実行器は端末へ出していた。**端末は人の画面ではない。**
+   * **直ったら消す**（出したままだと、直っているのに直っていないように見える）。
+   */
+  readonly inputError?: string;
+  /**
    * 証跡（`run.json`）を書いた場所。**置いた判定がどこに残ったかを人へ見せる。**
    * 見せないと、保存されたのかどうかが分からないまま終わる（実機で踏んだ）。
    */
@@ -387,6 +397,9 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
   const liveError = raw['liveError'];
   if (liveError !== undefined && typeof liveError !== 'string') return undefined;
 
+  const inputError = raw['inputError'];
+  if (inputError !== undefined && typeof inputError !== 'string') return undefined;
+
   // **形が違えば、状態ごと捨てる。**当て推量で別の場所を指すと、人を誤らせる。
   let pointing: Pointing | undefined;
   if (raw['pointing'] !== undefined) {
@@ -413,6 +426,7 @@ export function parseSessionState(raw: unknown): SessionState | undefined {
     ...(awaiting === undefined ? {} : { awaiting }),
     ...(sheetPath === undefined ? {} : { sheetPath }),
     ...(liveError === undefined ? {} : { liveError }),
+    ...(inputError === undefined ? {} : { inputError }),
     ...(pointing === undefined ? {} : { pointing }),
     ...(watch === undefined ? {} : { watch }),
     cases,

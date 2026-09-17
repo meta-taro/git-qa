@@ -30,6 +30,13 @@ export interface StartLiveSessionOptions {
    * 別の道（制御チャネル）で人へ伝えられるように、ここで拾う。
    */
   readonly onLiveError?: (message: string | undefined) => void;
+  /**
+   * ライブ映像の 1 枚を、そのまま渡す（meta-taro/git-qa#31）。
+   *
+   * **絵が通るのはここ 1 か所。**録画はここで枝分かれさせる ——
+   * 相手ごとに別の録り方を作らずに済み、**人が見ていたものと同じ絵**が残る。
+   */
+  readonly onFrame?: (bytes: Uint8Array) => void;
   /** 繋ぎ直しの間隔と上限。**待たない検査のために差し替えられるようにしてある。** */
   readonly reconnect?: {
     readonly intervalMs?: number;
@@ -96,6 +103,8 @@ export async function startLiveSession(options: StartLiveSessionOptions): Promis
                 options.onLiveError?.(undefined);
                 waitedMs = 0;
               }
+              // **見ている絵をそのまま渡す**（#31）。**流れは止めない。**
+              options.onFrame?.(chunk);
               yield chunk;
             }
             // 尽きた。落ちたのではないので繋ぎ直さない（閉じられた・読み手が去った）。

@@ -103,3 +103,22 @@ describe('browserCandidates — Windows のユーザ単位の場所', () => {
     expect(paths.some((p) => p.includes('AppData'))).toBe(false);
   });
 });
+
+/**
+ * **背面でも描き続けてもらう**（meta-taro/git-qa#31 の実測から）。
+ *
+ * 無人で流して録画したら、**1 ケースにつき絵が 1〜2 枚**しか来なかった
+ * （0.125 秒の動画になる）。**Chromium は、背面や隠れた窓の描画を止める**ため。
+ *
+ * 人が見ていない実行（`--no-ui`）では、ブラウザは必ず背面にいる。
+ * **ライブ映像も録画も、そこで止まる。**
+ */
+describe('browserArgs — 背面でも止まらない', () => {
+  it('隠れた窓の描画を止めさせない', () => {
+    const args = browserArgs({ port: 0, userDataDir: '/tmp/x' }).join(' ');
+
+    expect(args).toContain('--disable-backgrounding-occluded-windows');
+    expect(args).toContain('--disable-renderer-backgrounding');
+    expect(args).toContain('--disable-background-timer-throttling');
+  });
+});

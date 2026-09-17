@@ -26,7 +26,13 @@ import {
   parseElements,
   wasCutOff,
 } from './ax.js';
-import { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
+import {
+  clickScript,
+  dragScript,
+  NOT_FRONT_MARK,
+  restoreFrontScript,
+  scrollScript,
+} from './click.js';
 import type { AxElement } from './ax.js';
 import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
 import { keyScript } from './keys.js';
@@ -663,10 +669,48 @@ const clickAt = async (
   // **中身を出してくれと頼む**（Electron は聞かれるまで木を作らない・C57）。5 秒に 1 回で足りる。
   await askForContent(app);
 
-  // **前面へ出す・出るのを待つ・押す。1 本で済ませる**（分けると 1 押しが 1 秒を超える）。
-  const said = (await run('osascript', ['-e', clickScript(app, point.x, point.y)])).trim();
+  /**
+   * **前面へ出す・出るのを待つ・押す。1 本で済ませる**（分けると 1 押しが 1 秒を超える）。
+   *
+   * **戻すのは、ここではしない**（外部レビュー meta-taro/git-qa#32）。
+   * 戻すと次の押しで `activate` が起き、**開いている選択肢が畳まれる。**
+   * 「開く → 選ぶ」は 1 つの検証の中で続くので、**続けて押している間は掴んだまま。**
+   */
+  const said = (
+    await run('osascript', ['-e', clickScript(app, point.x, point.y, { restore: false })])
+  ).trim();
   if (said.startsWith(NOT_FRONT_MARK)) {
     const front = said.slice(NOT_FRONT_MARK.length).trim();
     throw new AdapterError(KIND, notFrontmost(app, front) ?? `${app} を前面に出せなかった`);
   }
+  // **奪ったままにはしない。**静かになったら戻す。
+  restoreLater(app);
 };
+
+/**
+ * **静かになったら、元の窓へ戻す**（外部レビュー meta-taro/git-qa#32）。
+ *
+ * 押すたびに戻すと、**次の押しで開いたものが畳まれる。**
+ * 押し続けている間は掴んだままにし、**手が止まってから**戻す。
+ *
+ * **戻す相手は git-qa の窓**（人が見ている所）。**居なければ何もしない。**
+ */
+const RESTORE_AFTER_MS = 1_200;
+let restoreTimer: NodeJS.Timeout | undefined;
+
+function restoreLater(app: string): void {
+  if (restoreTimer !== undefined) clearTimeout(restoreTimer);
+  restoreTimer = setTimeout(() => {
+    restoreTimer = undefined;
+    for (const owner of GIT_QA_OWNERS) {
+      // **人が見ている窓へ返す。**居ない・戻せないのは、押したこと自体には効かない。
+      void run('osascript', ['-e', restoreFrontScript(owner)]).catch(() => undefined);
+    }
+    void app;
+  }, RESTORE_AFTER_MS);
+  // 端末を掴んだままにしない（プロセスの終わりを、これで遅らせない）。
+  restoreTimer.unref?.();
+}
+
+/** 人が見ている窓の持ち主。**どちらの名前でも出る**（開発版と配布物）。 */
+const GIT_QA_OWNERS = ['git-qa', 'git-qa-desktop'] as const;

@@ -76,6 +76,8 @@ if (process.argv.includes('--no-ui')) {
     sheetRef,
     runId: runIdFrom(new Date()),
     runsRoot: fromInvocationDir('runs'),
+    // **動画は頼まれたときだけ**（#31）。夜間に何本も流すと、黙って場所を食う。
+    ...(process.argv.includes('--record') ? { record: true } : {}),
     operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
     readScreenText: readAndroidScreenText,
   });

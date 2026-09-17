@@ -206,6 +206,13 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   /** 映像が止まった理由。**黙って真っ黒にしない。** */
   let liveError: string | undefined;
   /**
+   * **触ったのに届かなかった理由**（外部レビュー meta-taro/git-qa#33）。
+   *
+   * 端末へ出すだけでは、**人の画面には出ない。**
+   * **次に届いたら消す**（直っているのに直っていないように見せない）。
+   */
+  let inputError: string | undefined;
+  /**
    * **AI がいま触った場所**（要望シート No.1）。
    * ケースが始まるたびに消す —— 前のケースの矢印が残っていると、人が別の所を見る。
    */
@@ -238,6 +245,28 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   const sleep =
     options.watch?.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
+  /**
+   * 触った結果を、人の画面へ伝える（外部レビュー meta-taro/git-qa#33）。
+   *
+   * **届いたら消す。**出したままだと、直っているのに直っていないように見える
+   * （映像が止まった理由と同じ扱い）。
+   */
+  const tellInput = (error: unknown): void => {
+    const next =
+      error === undefined
+        ? undefined
+        : error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : // **形の分からないものを、そのまま画面へ出さない**（`[object Object]` になる）。
+              JSON.stringify(error);
+    if (next === inputError) return;
+    inputError = next;
+    if (next !== undefined) console.error(`[git-qa] 人の操作を端末へ送れない: ${next}`);
+    publish();
+  };
+
   const publish = (): void => {
     const state: SessionState = {
       runId: options.runId,
@@ -248,6 +277,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
         ? { sheetPath: options.sheetRef.path }
         : { sheetPath: options.sheetPath }),
       ...(liveError === undefined ? {} : { liveError }),
+      // **触ったのに届かなかった理由**（外部レビュー meta-taro/git-qa#33）。
+      ...(inputError === undefined ? {} : { inputError }),
       ...(runJsonPath === undefined ? {} : { runJsonPath }),
       ...(saveError === undefined ? {} : { saveError }),
       ...(pointing === undefined ? {} : { pointing }),
@@ -335,9 +366,10 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       // **中身は証跡へ残さない**（画面には顧客名や電話番号が写る・PRD §10）。
       const at = (options.now ?? (() => new Date()))().toISOString();
       touched.set(input.caseNo, [...(touched.get(input.caseNo) ?? []), { at, kind: 'text' }]);
-      void live.session.act({ kind: 'type', text: input.text }).catch((error: unknown) => {
-        console.error('[git-qa] 人の操作を端末へ送れない', error);
-      });
+      void live.session
+        .act({ kind: 'type', text: input.text })
+        .then(() => tellInput(undefined))
+        .catch((error: unknown) => tellInput(error));
       return;
     }
 
@@ -400,11 +432,10 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
           // **端末の実寸で残す。**画面に映していた大きさではなく、実際に触った位置。
           touched.set(input.caseNo, [...(touched.get(input.caseNo) ?? []), record]);
           await live.session.act(action);
+          tellInput(undefined);
         })
-        .catch((error: unknown) => {
-          // 握り潰さない。触ったのに何も起きない理由が、人に見えなくなる。
-          console.error('[git-qa] 人の操作を端末へ送れない', error);
-        });
+        // **握り潰さない。**端末へ出すだけでは、人の画面には出ない（#33）。
+        .catch((error: unknown) => tellInput(error));
       return;
     }
 

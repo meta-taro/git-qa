@@ -125,3 +125,5 @@ export {
 // 流した日から決まる日付の言い方（外部レビュー #29）。
 export { DATE_FORMAT_KEY, expandDates, formatDate } from './run/dates.js';
 export type { ResolvedDate } from './run/dates.js';
+// 1 枚ずつの絵を動画にする（外部レビュー #31）。
+export { framesToWebmCommand } from './adapter/frames-to-webm.js';

@@ -314,3 +314,39 @@ describe('SessionCase — シートの中身を運ぶ', () => {
     expect(state?.cases[0]?.fields).toBeUndefined();
   });
 });
+
+/**
+ * **触ったのに届かなかった理由を、画面へ運ぶ**（外部レビュー meta-taro/git-qa#33）。
+ *
+ * > **問題は、それが画面に出ないこと。**ライブビューの下には
+ * > 「ここから押すのは、そのまま届きます」と書いてあります。
+ * > **届かなかった今回は、この案内と食い違っています。**
+ *
+ * 実行器は `console.error` に出していた（コメントには「握り潰さない」と書いてあったのに、
+ * **人の画面には出ていなかった**）。**端末は人の画面ではない。**
+ */
+describe('SessionState — 触ったのに届かなかった理由', () => {
+  it('理由を運ぶ', () => {
+    const state = parseSessionState({
+      runId: '20260917-120000',
+      phase: 'waiting',
+      cases: [],
+      inputError: 'dbboard を前面に出せなかった（いま前面に居るのは git-qa-desktop）',
+    });
+
+    expect(state?.inputError).toContain('前面に出せなかった');
+  });
+
+  /** **直ったら消す。**出したままだと、直っているのに直っていないように見える。 */
+  it('無ければ持たない', () => {
+    const state = parseSessionState({ runId: '20260917-120000', phase: 'waiting', cases: [] });
+
+    expect(state?.inputError).toBeUndefined();
+  });
+
+  it('形が違えば受け取らない', () => {
+    expect(
+      parseSessionState({ runId: '1', phase: 'waiting', cases: [], inputError: 5 }),
+    ).toBeUndefined();
+  });
+});

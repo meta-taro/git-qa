@@ -205,6 +205,24 @@ body {
 }
 
 /*
+ * **触ったのに届かなかった理由**（外部レビュー meta-taro/git-qa#33）。
+ * 映像のすぐ下、案内の上。**押した人の目が行く所に置く。**
+ */
+.live-input-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  border-top: 2px solid var(--accent);
+}
+
+/* 届かない間は、「そのまま届きます」の案内を打ち消す（#33 の提案 3）。 */
+.live-note[data-stale='true'] {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+/*
  * **引き伸ばしていることを言う**（外部レビュー meta-taro/git-qa#17）。
  * 映像の下に置く —— **見たい所の上に重ねない。**
  */

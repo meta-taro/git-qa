@@ -13,28 +13,61 @@
 /** 前面に出られなかったときに script が返す目印。**押していない**ことを表す。 */
 export const NOT_FRONT_MARK = 'git-qa:not-frontmost';
 
-export function clickScript(app: string, x: number, y: number): string {
+export interface ClickOptions {
+  /**
+   * 押したあと、元の窓へ戻すか（外部レビュー meta-taro/git-qa#32）。
+   *
+   * **続けて押している間は戻さない。**戻すと、次の押しで `activate` が起き、
+   * **開いている選択肢が畳まれる。**「開く → 選ぶ」は 1 つの検証の中で続く。
+   */
+  readonly restore?: boolean;
+}
+
+export function clickScript(app: string, x: number, y: number, options: ClickOptions = {}): string {
   const name = JSON.stringify(app);
   return [
     'tell application "System Events"',
     // **人が見ていた窓を覚えておく。**押したあと、そこへ戻す。
     '  set wasFront to name of first process whose frontmost is true',
     'end tell',
-    `tell application ${name} to activate`,
-    'tell application "System Events"',
+    /**
+     * **既に前面なら、出し直さない**（外部レビュー meta-taro/git-qa#32）。
+     *
+     * > セレクトがライブビューだと操作できないかも。選択肢は出ますよ。
+     * > **でも押してもすかります**
+     *
+     * `activate` は**開いているものを畳む** —— ネイティブのメニュー（`<select>` は
+     * macOS だと `NSMenu`）は閉じ、HTML で描いた選択肢も焦点が外れて閉じる。
+     * **2 回目のクリックが届く頃には、もう無い。**
+     *
+     * **「開く → 選ぶ」は 1 つの検証の中で続く。**その間、前面は動かさない。
+     */
+    `if wasFront is not ${name} then`,
+    `  tell application ${name} to activate`,
+    '  tell application "System Events"',
     // `activate` は前面に出る前に返る。**出るまで待つ。**
-    '  repeat 25 times',
-    `    if (name of first process whose frontmost is true) is ${name} then exit repeat`,
-    '    delay 0.02',
-    '  end repeat',
+    '    repeat 25 times',
+    `      if (name of first process whose frontmost is true) is ${name} then exit repeat`,
+    '      delay 0.02',
+    '    end repeat',
+    '  end tell',
+    'end if',
+    'tell application "System Events"',
     `  if (name of first process whose frontmost is true) is not ${name} then`,
     `    return "${NOT_FRONT_MARK} " & (name of first process whose frontmost is true)`,
     '  end if',
     `  click at {${String(Math.round(x))}, ${String(Math.round(y))}}`,
-    // **奪ったままにしない。**戻すのを別の osascript にすると 250 ms 増えるので、ここでやる。
-    `  if wasFront is not ${name} then`,
-    '    set frontmost of process wasFront to true',
-    '  end if',
+    /**
+     * **奪ったままにしない。**ただし**元から前面だったなら、戻す操作もしない** ——
+     * 戻すこと自体が、開いたものを畳む（#32）。
+     */
+    ...(options.restore === false
+      ? []
+      : [
+          `  if wasFront is not ${name} then`,
+          '    set frontmost of process wasFront to true',
+          '  end if',
+        ]),
     'end tell',
     '"ok"',
   ].join('\n');
@@ -130,5 +163,22 @@ export function dragScript(
     `at(LEFT_UP, ${String(x2)}, ${String(y2)});`,
     `if (wasFront !== ${name}) { se.processes.byName(wasFront).frontmost = true; }`,
     '"ok";',
+  ].join('\n');
+}
+
+/**
+ * 覚えていた窓へ戻す（外部レビュー meta-taro/git-qa#32）。
+ *
+ * **押しの中で戻さないときに、別で使う。**続けて押している間は掴んだままにし、
+ * **静かになってから**戻す。**奪ったままにはしない。**
+ */
+export function restoreFrontScript(owner: string): string {
+  return [
+    'tell application "System Events"',
+    `  if exists process ${JSON.stringify(owner)} then`,
+    `    set frontmost of process ${JSON.stringify(owner)} to true`,
+    '  end if',
+    'end tell',
+    '"ok"',
   ].join('\n');
 }

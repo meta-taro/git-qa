@@ -160,6 +160,16 @@ export function browserArgs(options: BrowserArgsOptions): string[] {
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-session-crashed-bubble',
+    /**
+     * **背面でも描き続けてもらう**（meta-taro/git-qa#31 の実測から）。
+     *
+     * Chromium は**背面や隠れた窓の描画を止める。**無人で流すとブラウザは必ず背面なので、
+     * **ライブ映像も録画も、そこで止まる** —— 実測で 1 ケースにつき絵が 1〜2 枚しか来ず、
+     * **0.125 秒の動画**になった。
+     */
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling',
     ...(options.size === undefined
       ? []
       : [`--window-size=${String(options.size.width)},${String(options.size.height)}`]),
