@@ -277,6 +277,10 @@ const setup = await startSetupServer({
                     ...(process.env['GIT_QA_PROFILE'] === undefined
                       ? {}
                       : { userDataDir: process.env['GIT_QA_PROFILE'] }),
+                    // **既に起きているブラウザに繋ぐ**（#30）。起こさない・閉じない。
+                    ...(process.env['GIT_QA_CDP'] === undefined
+                      ? {}
+                      : { attachTo: process.env['GIT_QA_CDP'] }),
                     // **画面で選ばれたブラウザで見る。**証跡には実際に起きたものの版が残る。
                     // 場所が指定されていれば、そちらが優先（名前の無いブラウザ）。
                     ...(browserPath === undefined ? {} : { browserPath }),

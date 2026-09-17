@@ -360,6 +360,23 @@ pnpm run:sheet:web sheets/web-sample-ja.tsv --no-ui  # 誰も見ずに流す（�
 **画面の文字は `innerText` から取ります。**`title` / `aria-label` にしか
 書かれていない情報は、**判定には届きません**（そこは人の目に残ります）。
 
+#### 既に起きているブラウザに繋ぐ（`GIT_QA_CDP`）
+
+**Playwright などが起こしたブラウザ**に繋いで、**前準備はそちら、判定は git-qa** にできます
+（外部レビュー meta-taro/git-qa#30）。
+
+```bash
+# 例: Playwright 側がログインとデータ用意を済ませたブラウザへ繋ぐ
+GIT_QA_CDP=http://127.0.0.1:9222 pnpm run:sheet:web sheets/x.tsv
+```
+
+- **起こしません・閉じません**（他人のものを片付けない）
+- 証跡に「**既に起きていたブラウザに繋いだ**」と残ります
+  （前の操作の続きを見ている可能性がある、という意味です）
+- **git-qa は Playwright を使っていません。**CDP を直に叩いているので、
+  **Playwright が起こしたブラウザにも、手で `--remote-debugging-port` を付けて
+  起こしたブラウザにも繋がります**
+
 #### ログインが要る画面を検証する（`GIT_QA_PROFILE`）
 
 ウェブの検証は**毎回まっさらなブラウザ**で起こします（人が普段使っているブラウザを

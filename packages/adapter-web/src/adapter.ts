@@ -17,6 +17,7 @@ import { createCdpClient } from './cdp.js';
 import type { CdpClient } from './cdp.js';
 import { launchBrowser } from './browser.js';
 import type { RunningBrowser } from './browser.js';
+import { attachedNote, devToolsUrlFrom } from './attach.js';
 import { findElementScript, missingElementMessage, parseFoundPoint } from './find.js';
 import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
 import type { BrowserKind, BrowserTarget } from './launch.js';
@@ -49,6 +50,13 @@ export interface WebAdapterOptions {
    * **渡すと、終わりに消さない**（ログイン済みの状態を保つための口）。
    */
   readonly userDataDir?: string;
+  /**
+   * **既に起きているブラウザの繋ぎ先**（meta-taro/git-qa#30）。
+   *
+   * 渡すと**起こさない・閉じない。**Playwright が起こしたブラウザに繋いで、
+   * **前準備はそちら、判定はこちら**という分担にするための口。
+   */
+  readonly attachTo?: string;
   /**
    * どのブラウザで見るか。**選ばれていれば、それ以外は探さない。**
    *
@@ -123,7 +131,33 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
       let cdp: CdpClient | undefined;
 
       try {
-        browser = await launchBrowser({
+        /**
+         * **既に起きているブラウザへ繋ぐ**（meta-taro/git-qa#30）。
+         *
+         * Playwright が起こしたブラウザに繋げば、**前準備はそちら、判定はこちら**にできる。
+         * **起こさない・閉じない** —— 他人のものを片付けない（#20 の逆側の間違い）。
+         */
+        if (options.attachTo !== undefined) {
+          const devToolsUrl = devToolsUrlFrom(options.attachTo);
+          if (devToolsUrl === undefined) {
+            throw new AdapterError(
+              KIND,
+              `繋ぎ先を読めない: ${JSON.stringify(options.attachTo)}（http://127.0.0.1:9222 のような形で渡す）`,
+            );
+          }
+          // **閉じない。**持ち主（Playwright・人）が閉じる。
+          browser = {
+            devToolsUrl,
+            userDataDir: '',
+            binaryPath: '',
+            // **閉じない。**持ち主（Playwright・人）が閉じる。
+            close: () => Promise.resolve(),
+          };
+          const note = attachedNote(options.attachTo);
+          if (note !== undefined) console.log(`[git-qa] ${note}`);
+        }
+
+        browser ??= await launchBrowser({
           ...(options.browserPath === undefined ? {} : { browserPath: options.browserPath }),
           ...(options.userDataDir === undefined ? {} : { userDataDir: options.userDataDir }),
           ...(options.browser === undefined ? {} : { browser: options.browser }),

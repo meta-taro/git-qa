@@ -140,6 +140,15 @@ const adapter =
           ...(process.env['GIT_QA_PROFILE'] === undefined
             ? {}
             : { userDataDir: process.env['GIT_QA_PROFILE'] }),
+          /**
+           * **既に起きているブラウザに繋ぐ**（meta-taro/git-qa#30）。
+           *
+           * Playwright が起こしたブラウザに繋げば、**前準備はそちら、判定はこちら**。
+           * **起こさない・閉じない**（他人のものを片付けない）。
+           */
+          ...(process.env['GIT_QA_CDP'] === undefined
+            ? {}
+            : { attachTo: process.env['GIT_QA_CDP'] }),
           ...(process.env['GIT_QA_BROWSER'] === undefined
             ? {}
             : { browserPath: process.env['GIT_QA_BROWSER'] }),
