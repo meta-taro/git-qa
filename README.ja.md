@@ -60,7 +60,7 @@ UI の中心は録画プレイヤーではなく、いま動いている画面�
 
 | 対象 | 扱い |
 |---|---|
-| Web | Adapter（Playwright） |
+| Web | Adapter（**CDP を直に叩く。Playwright は使っていない**・C54） |
 | Android | Adapter（ADB / scrcpy） |
 | iOS | **未確定** — Windows から実用的な遅延で画面を見られるかを検証中 |
 | デスクトップアプリ | Adapter |

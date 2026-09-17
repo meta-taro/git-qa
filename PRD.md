@@ -170,7 +170,7 @@ AI に全部やらせて全部通ったことにする道具ではない。**丸
 
 | 組み合わせ | 状態 |
 |---|---|
-| Windows + Web | できる（Playwright） |
+| Windows + Web | できる（**CDP を直に叩く。Playwright は使っていない**・C54） |
 | Windows + Android | できる（ADB / scrcpy） |
 | **Windows + iOS** | **未知** |
 | macOS + Android / iOS | できる算段がある |
