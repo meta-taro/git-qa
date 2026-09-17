@@ -355,8 +355,8 @@
         <div class="file">
           <span class="os">Windows（x64）</span>
           <span class="what">
-            <code>.msi</code> で入れます。<b>見られるのはブラウザと Android 端末だけ</b>
-            （デスクトップアプリの検証は macOS だけです）。
+            <code>.msi</code> で入れます。<b>ブラウザ・Android 端末・デスクトップアプリ</b>
+            を見られます（<b>録画と、入力欄の一部は、まだ Windows にありません</b>）。
           </span>
           <a class="get" id="dl-win" href="https://github.com/meta-taro/git-qa/releases">
             .msi を落とす
@@ -539,9 +539,17 @@
       <div class="scroll">
         <table>
           <tr>
-            <th>Windows のデスクトップ検証</th>
+            <th>Windows の録画</th>
             <td>
-              画面を読む道具が macOS の API を使っています。<b>Windows ではウェブと Android だけ</b>
+              <b>デスクトップ検証そのものは動きます</b
+              >（窓を探す・撮る・文字を読む・押す・打つ・キー）。 <b>録画だけがありません</b> ——
+              画面は 1 件ごとに残ります
+            </td>
+          </tr>
+          <tr>
+            <th>Windows で、入力欄の一部</th>
+            <td>
+              打ち込めますが、<b>パスワード欄の中身は読みません</b>（読めても読まない、という決めです）
             </td>
           </tr>
           <tr>
