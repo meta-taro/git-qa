@@ -1,7 +1,14 @@
+import { execFile } from 'node:child_process';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
 import {
   assertRunnableSheet,
+  caseDir,
   createSheetCaseRunner,
   executeRun,
+  framesToWebmCommand,
   resolveCaseResult,
   toCaseSubjects,
 } from '@git-qa/core';
@@ -28,6 +35,12 @@ import type { HumanInput, SessionCase, SessionPhase, SessionState } from '@git-q
 import type { LiveBridge, LiveBridgeOptions } from '@git-qa/live-bridge';
 
 import { startLiveSession } from './live-session.js';
+import { createFrameRecording, shouldRecordFrames } from './frame-recording.js';
+import type { FrameRecording } from './frame-recording.js';
+
+/** ライブ映像の枚数（橋が流す速さ）。**動画の長さを出すのに要る。** */
+const LIVE_FPS = 8;
+const runTool = promisify(execFile);
 import { imageTools } from './image-tools.js';
 import { fromInvocationDir } from './paths.js';
 
@@ -107,6 +120,16 @@ export interface StartRunSessionOptions {
    * 鑑賞モードでは **git-qa の窓**を録る（人が見たものが全部入っている）。
    */
   readonly recording?: RecordingControl;
+  /**
+   * **人が見ている実行でも、動画を残す**（#31 の続き・2026-09-18）。
+   *
+   * 録画は無人（`--no-ui --record`）だけだった。**Windows のデスクトップ検証は
+   * 録画が無いまま**で、そこが最後に残った穴。**映像が通る所へ繋ぐだけ。**
+   *
+   * **頼まれたときだけ録る**（黙って場所を食わない）。
+   * 既に録画が渡されていれば、そちらを使う（鑑賞モードは git-qa の窓を録る）。
+   */
+  readonly record?: boolean;
   readonly now?: () => Date;
 }
 
@@ -172,8 +195,13 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   assertRunnableSheet(options.sheet);
   const subjects = toCaseSubjects(options.sheet);
 
+  /** 絵で流れる相手のときだけ作る（下で決める）。**流れてくる絵は、ここへ渡す。** */
+  let frames: FrameRecording | undefined;
+
   const live = await startLiveSession({
     adapter: options.adapter,
+    // **映像が通るのはここ 1 か所。**録画はここで枝分かれさせる（#31）。
+    onFrame: (bytes) => frames?.accept(bytes),
     ...(options.startBridge === undefined ? {} : { startBridge: options.startBridge }),
     ...(options.reconnect === undefined ? {} : { reconnect: options.reconnect }),
     onLiveError: (message) => {
@@ -536,6 +564,45 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     return { humanResult: input.humanResult, by: options.operator.handle };
   };
 
+  /**
+   * **録ってよい相手かを、繋いでから決める**（#31 の続き）。
+   *
+   * 絵で流れる相手だけ（H.264 を `.jpg` として並べると**開けない動画**が出来る）。
+   * 既に録画が渡されていれば、そちらを使う —— **人が見ていたものがそのまま残る**ほうがよい。
+   */
+  if (
+    shouldRecordFrames({
+      asked: options.record === true,
+      kind: live.session.liveView.transport.kind,
+      already: options.recording !== undefined,
+    })
+  ) {
+    const runsRoot = options.runsRoot ?? fromInvocationDir('runs');
+    frames = createFrameRecording({
+      dirFor: (caseNo) => join(caseDir(runsRoot, options.runId, caseNo), 'frames'),
+      ensureDir: async (dir) => {
+        await mkdir(dir, { recursive: true });
+      },
+      writeFrame: (path, bytes) => writeFile(path, bytes),
+      toWebm: async (dir, count) => {
+        const command = framesToWebmCommand(
+          imageTools(),
+          join(dir, '%05d.jpg'),
+          join(dir, '..', 'screen.webm'),
+          LIVE_FPS,
+        );
+        // **道具が無い。**絵は残してある（持っていない、と言う）。
+        if (command === undefined) return undefined;
+        await runTool(command.command, command.args);
+        console.log(`[git-qa] ${String(count)} 枚を動画にした`);
+        return { name: 'screen.webm' };
+      },
+      removeFrames: (dir) => rm(dir, { recursive: true, force: true }),
+      now: () => new Date(),
+      fps: LIVE_FPS,
+    });
+  }
+
   const done = executeRun({
     runId: options.runId,
     sheet: options.sheet,
@@ -555,8 +622,13 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
      * でもない。**人は見ているが、押さなくても進む形**だったことを、そのまま残す。
      */
     mode: options.watch === undefined ? 'assisted' : 'watched',
-    // **録るものの差し替え**（鑑賞モードでは git-qa の窓を録る）。
-    ...(options.recording === undefined ? {} : { recording: options.recording }),
+    /**
+     * **録るものの差し替え**（鑑賞モードでは git-qa の窓を録る）。
+     * 渡されていなければ、**映像の絵をそのまま溜めた録画**（#31・頼まれたときだけ）。
+     */
+    ...((options.recording ?? frames) === undefined
+      ? {}
+      : { recording: (options.recording ?? frames) as RecordingControl }),
     // **ケースごとに画面を 1 枚残す**（2026-09-11）。証跡と同じ所へ置く。
     runsRoot: options.runsRoot ?? fromInvocationDir('runs'),
     // **在れば webp にする。**無ければ撮れた形のまま（前提を増やさない・§12）。

@@ -133,3 +133,20 @@ export function createFrameRecording(deps: FrameRecordingDeps): FrameRecording {
     },
   };
 }
+
+/**
+ * ここで録ってよい相手か（#31 の続き・2026-09-18）。
+ *
+ * **絵で流れる相手だけ。**H.264 で流れるものを `.jpg` として並べると、
+ * **開けない動画**が出来る（Android は元から録画を持っている）。
+ *
+ * **既に録画があるなら、そちらを使う** —— 鑑賞モードは git-qa の窓を録るので、
+ * **人が見ていたものがそのまま残る。**二重に録らない。
+ */
+export function shouldRecordFrames(at: {
+  readonly asked: boolean;
+  readonly kind: string;
+  readonly already: boolean;
+}): boolean {
+  return at.asked && !at.already && at.kind === 'image-frames';
+}

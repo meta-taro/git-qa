@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createFrameRecording } from '../src/frame-recording.js';
+import { createFrameRecording, shouldRecordFrames } from '../src/frame-recording.js';
 
 /**
  * **人が見ていた映像を、そのまま証跡に残す**（meta-taro/git-qa#31）。
@@ -188,5 +188,37 @@ describe('createFrameRecording — 止まっている画面も録る', () => {
 
     expect(written).toEqual([]);
     expect(saved).toMatchObject({ state: 'failed' });
+  });
+});
+
+/**
+ * **人が見ている実行でも録る**（#31 の続き・2026-09-18）。
+ *
+ * 録画は無人（`--no-ui --record`）だけだった。**Windows のデスクトップ検証は録画が無いまま**で、
+ * そこが最後に残った穴。**仕組み（絵を溜めて繋ぐ）は既に在る**ので、映像が通る所へ繋ぐだけ。
+ *
+ * **繋いでよい相手かどうか**は、ここで決める。
+ */
+describe('shouldRecordFrames', () => {
+  it('頼まれていて、1 枚ずつの絵で流れるなら録る', () => {
+    expect(shouldRecordFrames({ asked: true, kind: 'image-frames', already: false })).toBe(true);
+  });
+
+  /** **頼まれていなければ録らない**（黙って場所を食わない）。 */
+  it('頼まれていなければ録らない', () => {
+    expect(shouldRecordFrames({ asked: false, kind: 'image-frames', already: false })).toBe(false);
+  });
+
+  /**
+   * **H.264 で流れる相手は、ここでは録らない。**絵ではないものを `.jpg` として並べると、
+   * **開けない動画**が出来る。Android は元から録画を持っている。
+   */
+  it('動画で流れる相手は、ここでは録らない', () => {
+    expect(shouldRecordFrames({ asked: true, kind: 'h264-stream', already: false })).toBe(false);
+  });
+
+  /** **既に録画があるなら、そちらを使う**（鑑賞モードは git-qa の窓を録る。人が見た物が残る）。 */
+  it('既に録画があるなら、二重に録らない', () => {
+    expect(shouldRecordFrames({ asked: true, kind: 'image-frames', already: true })).toBe(false);
   });
 });

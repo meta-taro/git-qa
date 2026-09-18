@@ -89,6 +89,8 @@ if (process.argv.includes('--no-ui')) {
 
 const session = await startRunSession({
   adapter,
+  // **人が見ている実行でも動画を残す**（#31 の続き）。頼まれたときだけ。
+  ...(process.argv.includes('--record') ? { record: true } : {}),
   sheet,
   sheetRef,
   runId: runIdFrom(new Date()),
