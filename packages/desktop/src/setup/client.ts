@@ -223,3 +223,21 @@ export async function pickSheet(): Promise<string | undefined> {
   });
   return typeof chosen === 'string' ? chosen : undefined;
 }
+
+/**
+ * **この配布物の名乗り**（2026-09-18）。
+ *
+ * `beta.3` も `beta.12` も名乗りは `0.2.0` のままで、**報告に版が書けなかった。**
+ * **分からないときは `undefined`** —— 空文字を返すと、画面が空の欄を作る。
+ */
+export async function appRelease(): Promise<string | undefined> {
+  if (!('__TAURI_INTERNALS__' in window)) return undefined;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const said = (await invoke<string>('app_release')).trim();
+    return said === '' ? undefined : said;
+  } catch {
+    // 名乗れなくても検証は続けられる。**ここで止めない。**
+    return undefined;
+  }
+}

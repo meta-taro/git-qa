@@ -13,6 +13,7 @@ import type {
   Run,
   RunCase,
   RunMode,
+  Runner,
   RunStep,
   SheetRef,
 } from './types.js';
@@ -79,6 +80,8 @@ export interface ExecuteRunOptions {
    */
   session?: TargetSession;
   operator: Actor;
+  /** **判定を出した道具**（版が残らないと、直った・直っていないの話が噛み合わない）。 */
+  runner?: Runner;
   mode: RunMode;
   /** ケース 1 件を実際に動かす。操作は `ctx.session` 経由。 */
   runCase: (ctx: CaseContext) => Promise<CaseVerdict>;
@@ -336,6 +339,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     startedAt,
     ...(finished ? { finishedAt: now().toISOString() } : {}),
     operator: options.operator,
+    ...(options.runner === undefined ? {} : { runner: options.runner }),
     mode: options.mode,
     sheet: options.sheetRef,
     target: session.target,

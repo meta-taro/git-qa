@@ -214,3 +214,26 @@ describe('人が触った操作（humanActions）', () => {
     expect(validateRun(run).valid).toBe(false);
   });
 });
+
+/**
+ * **判定を出した道具の版**（2026-09-18）。
+ *
+ * 証跡は「誰が・いつ・何を見て判定したか」を残すのに、
+ * **それを出した道具の版だけが残っていなかった。**
+ * 版が残らないと、**直っているはずの不具合が直っていない**という話が噛み合わない
+ * （実際、試験導入先で「beta.8 で直した」が効いていない場面があった）。
+ */
+describe('runner（判定を出した道具）', () => {
+  it('道具の名前と版を残せる', () => {
+    expectValid({ ...validRun(), runner: { name: 'git-qa', version: 'v0.2.0-beta.12' } });
+  });
+
+  it('古い証跡には無いので、無くても通る', () => {
+    expectValid(validRun());
+  });
+
+  it('版だけ・名前だけは受け取らない（片方では、どの道具か決まらない）', () => {
+    expectInvalid({ ...validRun(), runner: { version: 'v0.2.0-beta.12' } }, /name/);
+    expectInvalid({ ...validRun(), runner: { name: 'git-qa' } }, /version/);
+  });
+});

@@ -66,6 +66,9 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
   let mut child = match Command::new("node")
     .arg(&script)
     .arg("--serve")
+    // **判定を出した道具の版を、証跡へ運ぶ**（2026-09-18）。
+    // 実行器は別のプロセスなので、渡さないと自分が何版なのかを知らない。
+    .env("GIT_QA_RELEASE", crate::release())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
     .stdin(Stdio::piped())

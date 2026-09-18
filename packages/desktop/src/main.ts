@@ -6,7 +6,13 @@ import { effectiveLocale, loadLocaleChoice, startLocaleSync } from './i18n/sync.
 import { defaultStore, readSetting, writeSetting } from './setting-store.js';
 import { startAppearanceSync } from './appearance.js';
 import { connectionStatus, renderOnboarding } from './onboarding/index.js';
-import { fetchSetupState, pickSheet, requestStart, resolveSetupUrl } from './setup/client.js';
+import {
+  appRelease,
+  fetchSetupState,
+  pickSheet,
+  requestStart,
+  resolveSetupUrl,
+} from './setup/client.js';
 import { readRecentSheets, rememberSheet, writeRecentSheets } from './setup/recent.js';
 import { isTypingHandle, nextDrawing } from './setup/redraw.js';
 import { renderSetup } from './setup/view.js';
@@ -372,6 +378,9 @@ if (liveUrl !== undefined) {
      */
     let startError: string | undefined;
 
+    // **版は 1 度だけ聞く。**毎回聞いても答えは変わらない。
+    const release = await appRelease();
+
     const tick = async (): Promise<void> => {
       const state = await fetchSetupState(setupUrl);
       if (state === undefined) return;
@@ -394,6 +403,7 @@ if (liveUrl !== undefined) {
       const shown = startError === undefined ? state : { ...state, error: startError };
 
       renderSetup(app, shown, {
+        ...(release === undefined ? {} : { release }),
         ...(pickedSheet === undefined ? {} : { pickedSheet }),
         recentSheets,
         operator,

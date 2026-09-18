@@ -16,6 +16,7 @@ export type {
   Run,
   RunCase,
   RunMode,
+  Runner,
   RunStep,
   SheetRef,
   Target,

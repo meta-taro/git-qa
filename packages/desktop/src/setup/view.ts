@@ -37,6 +37,15 @@ export interface RenderSetupOptions {
     resume?: string;
   }) => void;
   /**
+   * **この配布物の名乗り**（2026-09-18）。
+   *
+   * `beta.3` も `beta.12` も名乗りは `0.2.0` のままで、**報告に版が書けなかった。**
+   * 「直したはずのものが直っていない」という話が噛み合わなくなる。
+   *
+   * **分からないときは出さない。**空の欄は「版が消えた」ように見える。
+   */
+  readonly release?: string;
+  /**
    * 自分で検証シートを選ぶ。
    *
    * **配布物では作業ディレクトリが `/` になる**ので、探して並べるだけでは足りない
@@ -527,6 +536,16 @@ export function renderSetup(
     failed.className = 'setup-error';
     failed.textContent = t('setup.failed', { message: state.error });
     section.append(failed);
+  }
+
+  // **版は、人が報告へ書き写せる所に置く**（2026-09-18）。
+  // 分からないときは出さない —— 空の欄は「版が消えた」ように見える。
+  const release = options.release?.trim();
+  if (release !== undefined && release !== '') {
+    const said = doc.createElement('p');
+    said.className = 'setup-release';
+    said.textContent = t('setup.release', { version: release });
+    section.append(said);
   }
 
   column.querySelector('.column-placeholder')?.remove();

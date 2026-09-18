@@ -594,3 +594,24 @@ describe('renderSetup — 走り終えたあと', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * **どの版を使っているか、本人にも分からなかった**（2026-09-18）。
+ *
+ * `beta.3` も `beta.12` も名乗りは `0.2.0` のまま。**報告に版が書けない。**
+ * 試験導入先で「beta.8 で直した」が効いていない場面があり、
+ * **こちらも相手も、何を触っているのか確かめられなかった。**
+ */
+describe('版の名乗り', () => {
+  it('準備の画面に版が出る（人が報告へ書き写せる所）', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), release: 'v0.2.0-beta.12' });
+
+    expect(live().querySelector('.setup-release')?.textContent).toContain('v0.2.0-beta.12');
+  });
+
+  it('分からないときは出さない（空の欄を置くと、消えた版のように見える）', () => {
+    renderSetup(root, idle, { onStart: vi.fn() });
+
+    expect(live().querySelector('.setup-release')).toBeNull();
+  });
+});

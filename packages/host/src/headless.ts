@@ -1,3 +1,4 @@
+import { runnerOf } from './release.js';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
@@ -132,6 +133,8 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<Run> {
     sheetRef: options.sheetRef,
     adapter: options.adapter,
     operator: options.operator,
+    // **判定を出した道具の版**（残らないと、直った・直っていないの話が噛み合わない）。
+    runner: runnerOf(),
     mode: 'auto',
     runCase: runner,
     // **渡すと、1 件終わるたびに書く。**途中で落ちても、そこまでが残る。
@@ -222,6 +225,8 @@ function baseOptions(options: RunHeadlessOptions): Omit<ExecuteRunOptions, 'runC
     sheet: options.sheet,
     sheetRef: options.sheetRef,
     operator: options.operator,
+    // **判定を出した道具の版**（残らないと、直った・直っていないの話が噛み合わない）。
+    runner: runnerOf(),
     mode: 'auto',
     runsRoot: options.runsRoot,
     onProgressError: (reason) => {

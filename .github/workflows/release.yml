@@ -24,6 +24,20 @@ on:
 permissions:
   contents: write
 
+# **配った版が、自分の名乗りを持つようにする**（2026-09-18）。
+#
+# `beta.3` も `beta.12` も名乗りは `0.2.0` のままだった。**どれを使っているか
+# 本人にも分からない。**試験導入先で「beta.8 で直した」が効いていない場面があり、
+# **こちらも相手も、何を触っているのか確かめられなかった。**
+#
+# **インストーラの版番号（`tauri.conf.json` の `version`）は触らない。**
+# MSI は `major.minor.patch` しか受け取らないので、そこにタグを入れると
+# **Windows の配布が壊れる。**名乗りだけを本物にする。
+#
+# **タグを打ったときだけ本物。**手で走らせたときは空で、`dev` と名乗る。
+env:
+  GIT_QA_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false

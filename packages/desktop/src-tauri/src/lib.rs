@@ -5,6 +5,30 @@ mod state;
 
 use tauri::{Emitter, Manager};
 
+/// **この配布物の名乗り**（2026-09-18）。
+///
+/// `beta.3` も `beta.12` も、名乗りは `0.2.0` のままだった。**どれを使っているか、
+/// 本人にも分からない。**試験導入先で「beta.8 で直した」が効いていない場面があり、
+/// **こちらも相手も、何を触っているのか確かめられなかった。**
+///
+/// **インストーラの版番号（`CARGO_PKG_VERSION`）は触らない。**MSI は
+/// `major.minor.patch` しか受け取らないので、そこにタグを入れると
+/// **Windows の配布が壊れる。**建てるときに `GIT_QA_RELEASE` でタグを渡し、
+/// **名乗りだけを本物にする。**
+pub fn release() -> String {
+  match option_env!("GIT_QA_RELEASE") {
+    Some(said) if !said.trim().is_empty() => said.trim().to_string(),
+    // 手元で建てたもの。**配ったものと混ぜない。**
+    _ => format!("{}-dev", env!("CARGO_PKG_VERSION")),
+  }
+}
+
+/// 画面へ名乗りを渡す。**人が見て報告に書ける所**に出すため。
+#[tauri::command]
+fn app_release() -> String {
+  release()
+}
+
 /// ウィンドウ（タイトルバー）の外観を切り替える。
 ///
 /// **CSS はページの中しか変えない。**枠は OS が描くので、ここで受けて切り替える。
@@ -97,7 +121,8 @@ pub fn run() {
       set_appearance,
       set_locale,
       open_sheet,
-      setup_url
+      setup_url,
+      app_release
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
@@ -112,4 +137,28 @@ pub fn run() {
         host::stop(app);
       }
     });
+}
+
+#[cfg(test)]
+mod tests {
+  use super::release;
+
+  /// **名乗りは、必ず何かを言う。**空だと「版が消えた」ように見える。
+  #[test]
+  fn 名乗りは空にならない() {
+    let said = release();
+    assert!(!said.trim().is_empty());
+    assert_eq!(said, said.trim());
+  }
+
+  /// **手元で建てたものは、配ったものと混ぜない。**
+  ///
+  /// `GIT_QA_RELEASE` は建てたときに焼き付くので、ここでは
+  /// **「渡していないなら `dev` が付く」**ことだけを確かめる。
+  #[test]
+  fn 渡さずに建てたら_dev_が付く() {
+    if option_env!("GIT_QA_RELEASE").is_none() {
+      assert!(release().ends_with("-dev"), "{}", release());
+    }
+  }
 }

@@ -88,6 +88,7 @@ const ja = {
   'live.error': '{message}',
 
   'setup.title': '検証の準備',
+  'setup.release': 'この git-qa は {version} です',
   'setup.operator': '0. あなたのハンドル（証跡に「誰が見たか」として残る）',
   'setup.operator.placeholder': '個人名ではなく、名乗る名前（例: めたたろ / octocat）',
   'setup.device': '1. 見る相手を選ぶ',
@@ -224,6 +225,7 @@ const en: Record<keyof typeof ja, string> = {
   'live.error': '{message}',
 
   'setup.title': 'Before you start',
+  'setup.release': 'This git-qa is {version}',
   'setup.operator': '0. Your handle (recorded as who verified)',
   'setup.operator.placeholder': 'A handle, not a personal name (e.g. octocat)',
   'setup.device': '1. Pick what to look at',

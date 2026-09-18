@@ -154,7 +154,7 @@ pub fn build<R: Runtime>(
     // 個人名・個人メールは入れない（product-baseline §25）。
     let about = AboutMetadataBuilder::new()
         .name(Some("git-qa"))
-        .version(Some(env!("CARGO_PKG_VERSION")))
+        .version(Some(&crate::release()))
         .license(Some("MIT"))
         .website(Some("https://github.com/meta-taro/git-qa"))
         .website_label(Some("リポジトリ"))

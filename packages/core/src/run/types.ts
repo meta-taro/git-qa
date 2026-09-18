@@ -186,6 +186,13 @@ export interface Finding {
   detail?: string;
 }
 
+/** 判定を出した道具。**名前と版は、片方だけでは意味を持たない。** */
+export interface Runner {
+  name: string;
+  /** 配った版の名乗り（例 `v0.2.0-beta.12`）。**手元で建てたものは `dev` が付く。** */
+  version: string;
+}
+
 export interface Run {
   schemaVersion: typeof RUN_SCHEMA_VERSION;
   runId: string;
@@ -193,6 +200,16 @@ export interface Run {
   /** 中断した実行では無い。無いことが「途中で止まった」の記録になる。 */
   finishedAt?: string;
   operator: Actor;
+  /**
+   * **判定を出した道具**（2026-09-18）。
+   *
+   * 証跡は「誰が・いつ・何を見て判定したか」を残すのに、
+   * **それを出した道具の版だけが残っていなかった。**
+   * 版が残らないと、**直っているはずの不具合が直っていない**という話が噛み合わない。
+   *
+   * 古い証跡には無いので、任意にしてある。
+   */
+  runner?: Runner;
   mode: RunMode;
   sheet: SheetRef;
   target: Target;

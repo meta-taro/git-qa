@@ -692,6 +692,13 @@ body {
   opacity: 0.7;
 }
 
+/* **版の名乗り。**報告へ書き写す所なので、選ばせる欄より弱く、しかし読める濃さで置く。 */
+.setup-release {
+  margin: 1.5rem 0 0;
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
 .setup-hint[data-bad='true'] {
   padding-left: 0.5rem;
   font-weight: 600;

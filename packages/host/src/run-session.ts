@@ -1,3 +1,4 @@
+import { runnerOf } from './release.js';
 import { execFile } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -609,6 +610,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     sheetRef: options.sheetRef,
     session: live.session,
     operator: options.operator,
+    // **判定を出した道具の版**（残らないと、直った・直っていないの話が噛み合わない）。
+    runner: runnerOf(),
     /**
      * **止めたら、そこから先は証跡に書かない**（2026-09-12）。
      *
