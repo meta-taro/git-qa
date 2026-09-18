@@ -134,3 +134,53 @@ describe('startLiveBridge', () => {
     expect(calls).toBe(1);
   });
 });
+
+/**
+ * **読み手が去ったら、撮影を止める**（外部レビュー meta-taro/git-qa#34）。
+ *
+ * > 判定待ちの状態で一晩置いたところ、翌朝この機械が異常に重くなっていました。
+ * > `load averages: 297.98` / **常時 28 個前後が同時に生きていました。**
+ *
+ * 映像を撮るループは**1 枚ずつ順番に**動くので、**1 本なら同時に 1 個**しか出ない。
+ * **28 個同時＝ループが 28 本生きていた。**
+ *
+ * 画面が繋ぎ直すたびに新しいループが生まれ、**古いループは誰も読んでいないのに回り続ける** ——
+ * 映像の口が「**読み手が去った**」を見ていなかったため（制御チャネルには在った）。
+ *
+ * **待つほど重くなる道具**になっていた。この製品は**人を待つのが本業**なので、向きが逆。
+ */
+describe('映像の口 — 読み手が去ったら止める（#34）', () => {
+  it('繋ぎが切れたら、絵を取りに行かない', async () => {
+    let asked = 0;
+    let stopped = false;
+    const source = (): AsyncIterable<Uint8Array> => ({
+      async *[Symbol.asyncIterator]() {
+        try {
+          for (;;) {
+            asked += 1;
+            await new Promise((r) => setTimeout(r, 5));
+            yield new Uint8Array([1]);
+          }
+        } finally {
+          // **読み手が去ったら、ここへ来る。**来なければ、撮り続けている。
+          stopped = true;
+        }
+      },
+    });
+
+    const bridge = await startLiveBridge({ source });
+    const controller = new AbortController();
+    const reading = fetch(bridge.url, { signal: controller.signal }).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 60));
+    const asking = asked;
+
+    controller.abort();
+    await reading;
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(stopped).toBe(true);
+    // 去ったあとは増えない（**多少の行き違いは許すが、増え続けてはいけない**）。
+    expect(asked).toBeLessThanOrEqual(asking + 2);
+    await bridge.close();
+  });
+});

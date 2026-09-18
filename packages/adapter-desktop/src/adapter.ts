@@ -36,6 +36,7 @@ import {
 import type { AxElement } from './ax.js';
 import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
 import { keyScript } from './keys.js';
+import { oneAtATime } from './one-at-a-time.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
 import type { OcrLine } from './ocr.js';
@@ -226,21 +227,30 @@ function createSession(deps: SessionDeps): TargetSession {
     return found;
   };
 
-  const shoot = async (): Promise<{ bytes: Uint8Array; scale: number; window: WindowRef }> => {
-    const target = await refreshWindow();
-    const dir = await mkdtemp(join(tmpdir(), 'git-qa-desktop-'));
-    const path = join(dir, 'frame.jpg');
-    try {
-      await run('screencapture', captureArgs(target.id, path));
-      const bytes = new Uint8Array(await readFile(path));
-      const sized = await run('sips', ['-g', 'pixelWidth', path]).catch(() => '');
-      const pixels = Number(/pixelWidth:\s*(\d+)/.exec(sized)?.[1] ?? target.width);
-      return { bytes, scale: pixels > 0 ? pixels / target.width : 1, window: target };
-    } finally {
-      // 撮った絵は残さない。**人の temp に溜まり続けるのは、頼まれていない。**
-      await rm(dir, { recursive: true, force: true }).catch(() => undefined);
-    }
-  };
+  /**
+   * **同時に 1 本しか撮らない**（外部レビュー meta-taro/git-qa#34）。
+   *
+   * 撮る道は外の道具（`osascript` / `screencapture`）なので、頼むたびにプロセスが立つ。
+   * **返るより速く頼むと積み上がる** —— 実測で `load averages: 297.98`、
+   * `osascript` が常時 28 個。**遅い機械ほど積み上がる**ので、速い機械では出ない。
+   */
+  const shoot = oneAtATime(
+    async (): Promise<{ bytes: Uint8Array; scale: number; window: WindowRef }> => {
+      const target = await refreshWindow();
+      const dir = await mkdtemp(join(tmpdir(), 'git-qa-desktop-'));
+      const path = join(dir, 'frame.jpg');
+      try {
+        await run('screencapture', captureArgs(target.id, path));
+        const bytes = new Uint8Array(await readFile(path));
+        const sized = await run('sips', ['-g', 'pixelWidth', path]).catch(() => '');
+        const pixels = Number(/pixelWidth:\s*(\d+)/.exec(sized)?.[1] ?? target.width);
+        return { bytes, scale: pixels > 0 ? pixels / target.width : 1, window: target };
+      } finally {
+        // 撮った絵は残さない。**人の temp に溜まり続けるのは、頼まれていない。**
+        await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+      }
+    },
+  );
 
   /**
    * 段 1 を読む。**道具が在れば道具で読む**（osascript を通さない）。

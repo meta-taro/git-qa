@@ -88,10 +88,28 @@ function writeVideo(
     ...cors,
   });
 
+  /**
+   * **読み手が去ったら、その場で撮影を止める**（外部レビュー meta-taro/git-qa#34）。
+   *
+   * > 判定待ちの状態で一晩置いたところ…`load averages: 297.98`
+   * > **常時 28 個前後が同時に生きていました。**
+   *
+   * ここは**絵が来たときにしか**読み手の生死を見ていなかった。画面が繋ぎ直すたびに
+   * 新しいループが生まれ、**古いループは誰も読んでいないのに回り続ける** ——
+   * 撮る側（`osascript`）はループの数だけ湧く。**待つほど機械が重くなっていた。**
+   *
+   * **この製品は人を待つのが本業**なので、向きが逆だった。
+   */
+  let gone = false;
+  res.on('close', () => {
+    gone = true;
+  });
+
   void (async () => {
     try {
       for await (const chunk of source()) {
-        if (res.writableEnded) return;
+        // **去ったら、次の絵を頼まない。**`for await` を抜けると送り元も止まる。
+        if (gone || res.writableEnded) return;
         res.write(chunk);
       }
     } catch {
