@@ -110,7 +110,19 @@ export function createFrameRecording(deps: FrameRecordingDeps): FrameRecording {
 
       // **1 枚も来ていないなら、動画は作らない。**空の webm を証跡に置かない。
       if (frames === 0) {
-        return { state: 'failed', reason: '映像が 1 枚も来なかった（録画の中身が無い）' };
+        /**
+         * **なぜ来なかったのかまで言う**（2026-09-18・実物で踏んだ）。
+         *
+         * 人が見ている実行では、**画面が繋がるまで映像が流れない**（橋は読み手が
+         * 来てから相手に絵を頼む）。アプリが起ち上がる前に終わった 1 件目は、
+         * **1 枚も来ないまま終わる。****壊れたのと、まだ始まっていなかったのは別。**
+         */
+        return {
+          state: 'failed',
+          reason:
+            '映像が 1 枚も来なかった（画面が繋がる前に終わったケース。' +
+            '人が見ている実行では、映像は画面が繋がってから流れ始める）',
+        };
       }
 
       const made = await deps.toWebm(where, frames).catch(() => undefined);

@@ -79,7 +79,16 @@ describe('createFrameRecording', () => {
     const saved = await made.stop();
 
     expect(saved).toMatchObject({ state: 'failed' });
-    expect(saved.state === 'failed' ? saved.reason : '').toContain('1 枚も');
+    /**
+     * **なぜ来なかったのかまで言う**（2026-09-18・実物で踏んだ）。
+     *
+     * 人が見ている実行では、**画面が繋がるまで映像が流れない。**
+     * アプリが起ち上がる前に終わった 1 件目は、**1 枚も来ないまま終わる。**
+     * 「中身が無い」だけだと、**壊れたのか、まだ始まっていなかったのか**が読めない。
+     */
+    const reason = saved.state === 'failed' ? saved.reason : '';
+    expect(reason).toContain('1 枚も');
+    expect(reason).toContain('画面が繋がる前');
   });
 
   /** **道具が無いのは「持っていない」。**失敗にしない（C20）。 */
