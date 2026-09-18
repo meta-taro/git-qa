@@ -438,12 +438,109 @@ unsafe fn drag(pid: i32, from: CGPoint, to: CGPoint) {
 }
 
 
+/**
+ * **押せる親まで登る**（2026-09-18・#30 の実測で要った）。
+ *
+ * ウェブの中身では、当たるのが**ボタンではなくボタンの中の文字**になることがある
+ * （Chrome で `AXStaticText 押す` 32x17 が返り、そこには `AXPress` が無い）。
+ * **同じ場所なのに、当たる深さがそのときどきで違う** —— 押せたり押せなかったりする。
+ *
+ * **押せる相手が見つかるまで親を辿る。**ただし、
+ *
+ * - **相手のアプリの中だけ**（プロセス番号を確かめる）
+ * - **5 段まで**（窓や application まで登ると、**押した場所と関係の無いものを押す**）
+ */
+unsafe fn pressable(el: Ref, pid: i32) -> Ref {
+    let mut here = el;
+    for _ in 0..5 {
+        if actions_of(here).iter().any(|n| n == "AXPress") {
+            return here;
+        }
+        let up = attr(here, "AXParent");
+        if up.is_null() {
+            return el;
+        }
+        let mut owner: i32 = 0;
+        let _ = AXUIElementGetPid(up, &mut owner);
+        if owner != pid {
+            return el;
+        }
+        here = up;
+    }
+    el
+}
+
+/**
+ * **その場所に何が在るかを言う**（押さない）。
+ *
+ * 「押したのに何も起きない」とき、**押し方が悪いのか、当たっている相手が違うのか**が
+ * 分からないと先へ進めない。`press` は押せたか否かしか言わないので、
+ * **当たった相手をそのまま見せる口**を分けてある（2026-09-18・#30 の切り分けで要った）。
+ */
+unsafe fn print_at(pid: i32, x: f32, y: f32) {
+    let app = AXUIElementCreateApplication(pid);
+    if app.is_null() {
+        fail(&format!("プロセス {pid} に繋げない"));
+    }
+    ask_for_content(app);
+
+    let mut el: Ref = std::ptr::null_mut();
+    let found = AXUIElementCopyElementAtPosition(app, x, y, &mut el);
+    let mut how = "アプリの口";
+
+    // 開いているメニューはアプリの窓の外に出るので、そこからも当てる（C68）。
+    if found != 0 || el.is_null() {
+        let system = AXUIElementCreateSystemWide();
+        let mut wide: Ref = std::ptr::null_mut();
+        if AXUIElementCopyElementAtPosition(system, x, y, &mut wide) == 0 && !wide.is_null() {
+            let mut owner: i32 = 0;
+            let _ = AXUIElementGetPid(wide, &mut owner);
+            if owner == pid {
+                el = wide;
+                how = "システム全体の口";
+            }
+        }
+    }
+
+    if el.is_null() {
+        println!("何も無い（コード {found}）");
+        return;
+    }
+
+    let up = pressable(el, pid);
+    let climbed = if up == el { "" } else { "（押せる親まで登った）" };
+    let el = up;
+
+    let role = text_attr(el, "AXRole");
+    let names = actions_of(el);
+    let frame = frame_of(el)
+        .map(|(p, s)| {
+            format!(
+                "{}\t{}\t{}\t{}",
+                p.x.round() as i64,
+                p.y.round() as i64,
+                s.width.round() as i64,
+                s.height.round() as i64
+            )
+        })
+        .unwrap_or_else(|| "\t\t\t".to_string());
+    println!(
+        "{}\t{}\t{}\t{}\t{}",
+        role,
+        name_of(el),
+        frame,
+        if names.is_empty() { "無し".to_string() } else { names.join(" / ") },
+        format!("{how}{climbed}")
+    );
+}
+
 fn usage() -> ! {
     eprintln!("使い方:");
     eprintln!("  git-qa-input press  <プロセス番号> <x> <y>");
     eprintln!("  git-qa-input scroll <x> <y> <行数>");
     eprintln!("  git-qa-input drag   <プロセス番号> <x1> <y1> <x2> <y2>");
     eprintln!("  git-qa-input tree   <プロセス番号> [深さ]");
+    eprintln!("  git-qa-input at     <プロセス番号> <x> <y>   （その場所に何が在るか）");
     std::process::exit(2);
 }
 
@@ -476,6 +573,17 @@ fn main() {
             .map(|v| v.parse().unwrap_or_else(|_| fail("深さが数ではない")))
             .unwrap_or(12);
         unsafe { print_tree(pid, max) };
+        return;
+    }
+
+    if args[1] == "at" {
+        if args.len() < 5 {
+            usage();
+        }
+        let pid: i32 = args[2].parse().unwrap_or_else(|_| fail("プロセス番号が数ではない"));
+        let x: f32 = args[3].parse().unwrap_or_else(|_| fail("x が数ではない"));
+        let y: f32 = args[4].parse().unwrap_or_else(|_| fail("y が数ではない"));
+        unsafe { print_at(pid, x, y) };
         return;
     }
 
@@ -541,6 +649,9 @@ fn main() {
             // -25204 = そのアプリは応答していない / -25211 = 触る許可が無い
             fail(&format!("その場所に触れる部品が無い（コード {found}）"));
         }
+
+        // **押せる親まで登る**（ウェブの中身では、ボタンの中の文字に当たることがある）。
+        el = pressable(el, pid);
 
         let names = actions_of(el);
         if !names.iter().any(|n| n == "AXPress") {
