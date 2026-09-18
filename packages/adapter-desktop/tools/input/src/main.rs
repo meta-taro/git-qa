@@ -10,7 +10,9 @@
 //! 試して駄目だったもの（**同じ道を二度試さないために残す**）:
 //!
 //! - `CGEventPostToPid` … 呼び出しはエラーを返さないのに、Chromium / Electron は受け取らない。
-//!   **前面に出していても届かない。**JXA からでも Rust からでも同じだった
+//!   **前面に出していても届かない。**JXA からでも Rust からでも同じだった。
+//!   **WebKit（Tauri）でも同じ**（2026-09-18 実測・外部レビュー meta-taro/git-qa#32 の提案）。
+//!   git-qa 自身の窓（Tauri）で選択肢を押してみて、**メニューは開かなかった**
 //!
 //! 効いたもの: **アクセシビリティの要素を直接押す**（`AXUIElementPerformAction` / `AXPress`）。
 //! 前面に出す必要が無く、隠れたままでも押せる。
@@ -55,6 +57,13 @@ extern "C" {
     ) -> Ref;
     fn CGEventCreateMouseEvent(source: Ref, kind: u32, at: CGPoint, button: u32) -> Ref;
     fn CGEventPost(tap: u32, event: Ref);
+    /**
+     * **相手のプロセスへ直接送る**（外部レビュー meta-taro/git-qa#32 の提案）。
+     *
+     * 前面に出さずに押せるなら、**開いている選択肢が畳まれない。**
+     * ただし**過去に Chromium / Electron では届かなかった**（この道具の先頭に残してある）。
+     * **測るために口を開ける。**
+     */
     fn CGWarpMouseCursorPosition(at: CGPoint) -> i32;
     fn CGAssociateMouseAndMouseCursorPosition(connected: i32) -> i32;
     fn AXUIElementCopyElementAtPosition(app: Ref, x: f32, y: f32, out: *mut Ref) -> i32;
@@ -428,6 +437,7 @@ unsafe fn drag(pid: i32, from: CGPoint, to: CGPoint) {
     }
 }
 
+
 fn usage() -> ! {
     eprintln!("使い方:");
     eprintln!("  git-qa-input press  <プロセス番号> <x> <y>");
@@ -454,6 +464,7 @@ fn main() {
         println!("ok");
         return;
     }
+
 
     if args[1] == "tree" {
         if args.len() < 3 {
@@ -504,7 +515,29 @@ fn main() {
 
         let mut el: Ref = std::ptr::null_mut();
         let found = AXUIElementCopyElementAtPosition(app, x, y, &mut el);
+
+        // **開いているメニューは、アプリの口からは当てられない**（外部レビュー
+        // meta-taro/git-qa#32）。`<select>` の選択肢はアプリの窓の外に出るので、
+        // アプリの要素を起点にした当て方では見つからず、**座標を押す道（前面に出る道）へ
+        // 落ちていた** —— 出した拍子に、その選択肢が畳まれる。
+        //
+        // **システム全体の口からも当てる。**ただし**別のアプリを押さない**よう、
+        // 当たった相手のプロセス番号を確かめる。
         if found != 0 || el.is_null() {
+            let system = AXUIElementCreateSystemWide();
+            let mut wide: Ref = std::ptr::null_mut();
+            let hit = AXUIElementCopyElementAtPosition(system, x, y, &mut wide);
+            if hit == 0 && !wide.is_null() {
+                let mut owner: i32 = 0;
+                let _ = AXUIElementGetPid(wide, &mut owner);
+                // **相手のものだけ押す。**他人の窓を押すのは、いちばんやってはいけない。
+                if owner == pid {
+                    el = wide;
+                }
+            }
+        }
+
+        if el.is_null() {
             // -25204 = そのアプリは応答していない / -25211 = 触る許可が無い
             fail(&format!("その場所に触れる部品が無い（コード {found}）"));
         }
