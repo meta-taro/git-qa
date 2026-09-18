@@ -1,3 +1,5 @@
+import { runnerOf } from './release.js';
+import { newerRelease } from './update.js';
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -65,6 +67,13 @@ export interface SetupState {
   readonly liveKind?: 'h264' | 'images';
   /** 始められなかった理由。**黙って idle へ戻さない。** */
   readonly error?: string;
+  /**
+   * **新しい版が出ている**（2026-09-18）。
+   *
+   * 2 日で 10 本出した。**受け取る側は、出たことを知る手段を持っていなかった。**
+   * **勝手に入れ替えない。**出ていることを言うだけで、入れるかは人が決める。
+   */
+  readonly update?: { readonly version: string; readonly url: string };
 }
 
 export interface StartedRun {
@@ -183,6 +192,12 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
   let resumable: readonly SetupResumable[] | undefined;
 
   /**
+   * **新しい版は 1 度だけ聞く。**状態は毎秒取りに来るので、
+   * そのたびに外へ出ると **GitHub に断られる**（それ以前に、外へ出る回数を増やさない）。
+   */
+  const update = await newerRelease(runnerOf().version);
+
+  /**
    * **1 つ数え損ねたくらいで、画面ごと出さないのはやりすぎ**（2026-09-12）。
    *
    * `adb` が入っていない機械では `listAndroidDevices` が `ENOENT` を投げる。
@@ -231,6 +246,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
       sheets,
       ...(resumable === undefined ? {} : { resumable }),
       ...(deviceError === undefined ? {} : { deviceError }),
+      ...(update === undefined ? {} : { update }),
       ...(started === undefined ? {} : started),
       ...(failure === undefined ? {} : { error: failure }),
     };

@@ -55,6 +55,14 @@ fn open_sheet(path: String, mode: String) -> Result<(), String> {
   open::open(&path, mode)
 }
 
+/// **配布ページを OS のブラウザで開く。**
+///
+/// **URL は受け取らない。**画面から渡させると、任意の場所を開く口になる。
+#[tauri::command]
+fn open_downloads() -> Result<(), String> {
+  open::open_downloads()
+}
+
 /// 画面が選んだ言語を受ける。`choice` は人の選択、`effective` は実際に出す言語。
 #[tauri::command]
 fn set_locale(app: tauri::AppHandle, choice: String, effective: String) -> Result<(), String> {
@@ -122,7 +130,8 @@ pub fn run() {
       set_locale,
       open_sheet,
       setup_url,
-      app_release
+      app_release,
+      open_downloads
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")

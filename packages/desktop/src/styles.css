@@ -692,6 +692,20 @@ body {
   opacity: 0.7;
 }
 
+/* **新しい版のお知らせ。**急かさないが、見落とさない濃さで置く。 */
+.setup-update {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+}
+
 /* **版の名乗り。**報告へ書き写す所なので、選ばせる欄より弱く、しかし読める濃さで置く。 */
 .setup-release {
   margin: 1.5rem 0 0;

@@ -46,6 +46,12 @@ export interface RenderSetupOptions {
    */
   readonly release?: string;
   /**
+   * **配布ページを OS のブラウザで開く**（2026-09-18）。
+   *
+   * アプリの窓からは外へ出られないので、**押しても何も起きないリンク**にしない。
+   */
+  readonly onDownloads?: () => void;
+  /**
    * 自分で検証シートを選ぶ。
    *
    * **配布物では作業ディレクトリが `/` になる**ので、探して並べるだけでは足りない
@@ -536,6 +542,23 @@ export function renderSetup(
     failed.className = 'setup-error';
     failed.textContent = t('setup.failed', { message: state.error });
     section.append(failed);
+  }
+
+  /**
+   * **新しい版が出ていることを言う**（2026-09-18）。
+   *
+   * 2 日で 10 本出した。**受け取る側は、出たことを知る手段を持っていなかった。**
+   * **勝手に入れ替えない。**出ていることを言うだけで、入れるかは人が決める。
+   */
+  if (state.update !== undefined) {
+    const said = doc.createElement('button');
+    said.type = 'button';
+    said.className = 'setup-update';
+    said.textContent = t('setup.update', { version: state.update.version });
+    // **アプリの窓からは外へ出られない**（CSP は `'self'` のみ）。
+    // ふつうのリンクにすると押しても何も起きないので、OS のブラウザへ渡す。
+    said.addEventListener('click', () => options.onDownloads?.());
+    section.append(said);
   }
 
   // **版は、人が報告へ書き写せる所に置く**（2026-09-18）。

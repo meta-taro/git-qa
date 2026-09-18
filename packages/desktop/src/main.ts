@@ -9,6 +9,7 @@ import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import {
   appRelease,
   fetchSetupState,
+  openDownloads,
   pickSheet,
   requestStart,
   resolveSetupUrl,
@@ -404,6 +405,7 @@ if (liveUrl !== undefined) {
 
       renderSetup(app, shown, {
         ...(release === undefined ? {} : { release }),
+        onDownloads: () => void openDownloads(),
         ...(pickedSheet === undefined ? {} : { pickedSheet }),
         recentSheets,
         operator,

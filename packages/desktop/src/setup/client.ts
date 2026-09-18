@@ -41,6 +41,13 @@ export interface SetupState {
   /** 流れてくる映像の種類。**画面側では決められない**ので、実行器が知らせる（C54）。 */
   readonly liveKind?: 'h264' | 'images';
   readonly error?: string;
+  /**
+   * **新しい版が出ている**（2026-09-18）。
+   *
+   * 2 日で 10 本出した。**受け取る側は、出たことを知る手段を持っていなかった。**
+   * **勝手に入れ替えない。**出ていることを言うだけ。
+   */
+  readonly update?: { readonly version: string; readonly url: string };
 }
 
 const PHASES: readonly SetupPhase[] = ['idle', 'starting', 'running', 'done', 'failed'];
@@ -89,6 +96,16 @@ function parseSetupState(raw: unknown): SetupState | undefined {
       )
     : undefined;
 
+  /**
+   * 新しい版のお知らせ。**両方そろっていなければ受け取らない** ——
+   * 版だけでは行き先が無く、行き先だけでは何の版か分からない。
+   */
+  const said = raw['update'];
+  const update =
+    isRecord(said) && typeof said['version'] === 'string' && typeof said['url'] === 'string'
+      ? { version: said['version'], url: said['url'] }
+      : undefined;
+
   const kind = text('liveKind');
   const liveKind = kind === 'h264' || kind === 'images' ? kind : undefined;
 
@@ -111,6 +128,7 @@ function parseSetupState(raw: unknown): SetupState | undefined {
     ...(text('error') === undefined ? {} : { error: text('error') as string }),
     ...(text('deviceError') === undefined ? {} : { deviceError: text('deviceError') as string }),
     ...(resumable === undefined ? {} : { resumable }),
+    ...(update === undefined ? {} : { update }),
   };
 }
 
@@ -239,5 +257,17 @@ export async function appRelease(): Promise<string | undefined> {
   } catch {
     // 名乗れなくても検証は続けられる。**ここで止めない。**
     return undefined;
+  }
+}
+
+/** **配布ページを OS のブラウザで開く。**URL は渡さない（開く先はアプリが決める）。 */
+export async function openDownloads(): Promise<void> {
+  if (!('__TAURI_INTERNALS__' in window)) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('open_downloads');
+  } catch (error: unknown) {
+    // **黙って何も起きないよりは、理由を残す。**
+    console.error('[git-qa] 配布ページを開けなかった', error);
   }
 }

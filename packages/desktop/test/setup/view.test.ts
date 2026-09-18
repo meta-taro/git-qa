@@ -615,3 +615,50 @@ describe('版の名乗り', () => {
     expect(live().querySelector('.setup-release')).toBeNull();
   });
 });
+
+/**
+ * **「入れ直してください」を毎回お願いしていた**（2026-09-18）。
+ *
+ * 2 日で 10 本出した。**受け取る側は、新しいのが出たことを知る手段を持っていない。**
+ * **勝手に入れ替えない。**出ていることを言うだけで、入れるかは人が決める。
+ */
+describe('新しい版のお知らせ', () => {
+  it('新しいのが出ていたら、その版を出す', () => {
+    renderSetup(
+      root,
+      { ...idle, update: { version: 'v0.2.0-beta.13', url: 'https://x/' } },
+      {
+        onStart: vi.fn(),
+      },
+    );
+
+    expect(live().querySelector('.setup-update')?.textContent).toContain('v0.2.0-beta.13');
+  });
+
+  /**
+   * **アプリの窓からは外へ出られない**（CSP は `'self'` のみ）。
+   * ふつうのリンクにすると**押しても何も起きない** —— いちばん悪い出し方になる。
+   * **OS のブラウザへ渡す。**
+   */
+  it('押すと、配布ページを OS のブラウザへ渡す', () => {
+    const onDownloads = vi.fn();
+    renderSetup(
+      root,
+      { ...idle, update: { version: 'v0.2.0-beta.13', url: 'https://x/' } },
+      {
+        onStart: vi.fn(),
+        onDownloads,
+      },
+    );
+
+    live().querySelector<HTMLButtonElement>('.setup-update')?.click();
+
+    expect(onDownloads).toHaveBeenCalled();
+  });
+
+  it('出ていなければ、何も出さない（毎回急かさない）', () => {
+    renderSetup(root, idle, { onStart: vi.fn() });
+
+    expect(live().querySelector('.setup-update')).toBeNull();
+  });
+});

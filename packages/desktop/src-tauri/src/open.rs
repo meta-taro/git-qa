@@ -72,3 +72,23 @@ pub fn open(path: &str, mode: OpenMode) -> Result<(), String> {
     OpenMode::Default => run(Command::new("xdg-open").arg(path)),
   }
 }
+
+/// **配布ページを、OS のブラウザで開く**（2026-09-18）。
+///
+/// アプリの窓からは外へ出られない（CSP は `'self'` のみ）。
+/// **押しても何も起きないリンク**を出すのがいちばん悪いので、ここで OS へ渡す。
+///
+/// **開く先はこちらが決める。**画面から URL を受け取ると、
+/// **任意の場所を開く口**になる（`product-baseline.md` §21・入力を信用しない）。
+pub fn open_downloads() -> Result<(), String> {
+  const PAGE: &str = "https://meta-taro.github.io/git-qa/";
+
+  #[cfg(target_os = "macos")]
+  return run(Command::new("open").arg(PAGE));
+
+  #[cfg(target_os = "windows")]
+  return run(Command::new("cmd").args(["/C", "start", "", PAGE]));
+
+  #[cfg(all(unix, not(target_os = "macos")))]
+  return run(Command::new("xdg-open").arg(PAGE));
+}
