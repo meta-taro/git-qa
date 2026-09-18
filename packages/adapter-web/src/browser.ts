@@ -47,6 +47,13 @@ export interface LaunchBrowserOptions {
    * **人が普段使っているプロファイルを渡さない**（検証で触られる）。
    */
   readonly userDataDir?: string;
+  /**
+   * **その中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。
+   *
+   * 渡さないと **`Default` が使われる** —— 普段使いの Chrome では、
+   * たいてい**いちばん私物のプロファイル**がそれ。
+   */
+  readonly profileDirectory?: string;
   /** 繋ぎ先が出てくるまで待つ上限（ms）。 */
   readonly startTimeoutMs?: number;
 }
@@ -90,6 +97,7 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
   const cleaned = await closeStaleBrowsers();
   if (cleaned !== undefined) options.onNote?.(cleaned);
   // **用意された置き場所を使うなら、そう言う**（#26）。黙って使わない。
+  // **普段使いの置き場所なら、そうと分かるように言う**（#35）。
   const note = profileNote(options.userDataDir);
   if (note !== undefined) options.onNote?.(note);
 
@@ -110,6 +118,9 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
     browserArgs({
       port: 0,
       userDataDir,
+      ...(options.profileDirectory === undefined
+        ? {}
+        : { profileDirectory: options.profileDirectory }),
       ...(options.size === undefined ? {} : { size: options.size }),
     }),
     { stdio: ['ignore', 'ignore', 'pipe'] },

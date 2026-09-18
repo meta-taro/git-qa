@@ -3,6 +3,7 @@ import { AdapterError } from '@git-qa/core';
 import type {
   Action,
   AdapterCapabilities,
+  BrowserProfileKind,
   LiveView,
   Observation,
   PointerRef,
@@ -18,6 +19,7 @@ import type { CdpClient } from './cdp.js';
 import { launchBrowser } from './browser.js';
 import type { RunningBrowser } from './browser.js';
 import { attachedNote, devToolsUrlFrom } from './attach.js';
+import { profileKind } from './profile.js';
 import { findElementScript, missingElementMessage, parseFoundPoint } from './find.js';
 import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
 import type { BrowserKind, BrowserTarget } from './launch.js';
@@ -50,6 +52,8 @@ export interface WebAdapterOptions {
    * **渡すと、終わりに消さない**（ログイン済みの状態を保つための口）。
    */
   readonly userDataDir?: string;
+  /** **その中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。 */
+  readonly profileDirectory?: string;
   /**
    * **既に起きているブラウザの繋ぎ先**（meta-taro/git-qa#30）。
    *
@@ -160,6 +164,9 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
         browser ??= await launchBrowser({
           ...(options.browserPath === undefined ? {} : { browserPath: options.browserPath }),
           ...(options.userDataDir === undefined ? {} : { userDataDir: options.userDataDir }),
+          ...(options.profileDirectory === undefined
+            ? {}
+            : { profileDirectory: options.profileDirectory }),
           ...(options.browser === undefined ? {} : { browser: options.browser }),
           ...(options.size === undefined ? {} : { size: options.size }),
           // **片付けたことは黙らない**（meta-taro/git-qa#20）。
@@ -191,6 +198,7 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
           build: options.build,
           ...(options.destination === undefined ? {} : { destination: options.destination }),
           browserLabel: label,
+          profile: profileKind(options.userDataDir),
           ...(options.settleMs === undefined ? {} : { settleMs: options.settleMs }),
           ...(options.loadTimeoutMs === undefined ? {} : { loadTimeoutMs: options.loadTimeoutMs }),
         });
@@ -213,6 +221,8 @@ interface SessionDeps {
   readonly now: () => Date;
   /** 証跡に残す「何で見たか」。例: `Google Chrome（Chrome/141.0.7390.55）`。 */
   readonly browserLabel: string;
+  /** **どのプロファイルで見たか**（外部レビュー meta-taro/git-qa#35）。 */
+  readonly profile?: BrowserProfileKind;
   readonly settleMs?: number;
   readonly loadTimeoutMs?: number;
 }
@@ -284,6 +294,14 @@ function createSession(deps: SessionDeps): TargetSession {
     target: {
       kind: KIND,
       browser: deps.browserLabel,
+      /**
+       * **どのプロファイルで見たか**（#35）。
+       *
+       * まっさら・用意されたもの・**その人の私物**は、同じ結果でも意味が違う。
+       * 「その権限の人には見えた」でしかないのか、**私物の環境を触ったのか**が
+       * 読む人に分からないと、証跡として弱い。
+       */
+      ...(deps.profile === undefined ? {} : { profile: deps.profile }),
       build,
       // **何処を見に行ったか**（シートの `行き先`・外部レビュー #22）。
       ...(deps.destination === undefined ? {} : { destination: deps.destination }),

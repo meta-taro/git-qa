@@ -148,6 +148,14 @@ export interface BrowserArgsOptions {
    * 持つ本物のプロファイルで起動してしまう。検証のために人の Chrome を乗っ取らない。
    */
   readonly userDataDir: string;
+  /**
+   * **その中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。
+   *
+   * 普段使いの Chrome は、**1 つの `user-data-dir` の中に複数のプロファイル**を持つ
+   * （報告者の機械では 19 個）。渡さないと **`Default` が使われる**ので、
+   * **ログイン済みのプロファイルを選べない。**
+   */
+  readonly profileDirectory?: string;
   /** 窓の大きさ。**同じ幅で見ないと、崩れの有無を比べられない。** */
   readonly size?: { readonly width: number; readonly height: number };
 }
@@ -156,6 +164,10 @@ export function browserArgs(options: BrowserArgsOptions): string[] {
   return [
     `--remote-debugging-port=${String(options.port)}`,
     `--user-data-dir=${options.userDataDir}`,
+    // **その中のどれか**（#35）。渡されなければ足さない —— 既定のままにする。
+    ...(options.profileDirectory === undefined
+      ? []
+      : [`--profile-directory=${options.profileDirectory}`]),
     // 初回の案内・既定ブラウザの確認・復元の確認を出さない。**人の手を止めない。**
     '--no-first-run',
     '--no-default-browser-check',

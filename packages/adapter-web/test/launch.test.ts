@@ -122,3 +122,26 @@ describe('browserArgs — 背面でも止まらない', () => {
     expect(args).toContain('--disable-background-timer-throttling');
   });
 });
+
+/**
+ * **user-data-dir の中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。
+ *
+ * > 普段使いの Chrome は、1 つの user-data-dir の中に複数のプロファイルを持ちます。
+ * > この機械の実測で **19 プロファイル**ありました。
+ *
+ * `user-data-dir` だけでは **`Default` が使われる** ので、
+ * **検証したいサイトにログイン済みのプロファイルを選べなかった。**
+ */
+describe('browserArgs（どのプロファイルか）', () => {
+  it('渡されたら --profile-directory を足す', () => {
+    const args = browserArgs({ port: 0, userDataDir: '/tmp/x', profileDirectory: 'Profile 26' });
+
+    expect(args).toContain('--profile-directory=Profile 26');
+  });
+
+  it('渡されなければ足さない（既定のままにする）', () => {
+    const args = browserArgs({ port: 0, userDataDir: '/tmp/x' });
+
+    expect(args.some((arg) => arg.startsWith('--profile-directory'))).toBe(false);
+  });
+});

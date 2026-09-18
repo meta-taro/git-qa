@@ -237,3 +237,31 @@ describe('runner（判定を出した道具）', () => {
     expectInvalid({ ...validRun(), runner: { name: 'git-qa' } }, /version/);
   });
 });
+
+/**
+ * **どのプロファイルで見たか**（外部レビュー meta-taro/git-qa#35）。
+ *
+ * まっさら・用意されたもの・**その人の私物**は、同じ結果でも意味が違う。
+ * 「その権限の人には見えた」でしかないのか、**私物の環境を触ったのか**が
+ * 読む人に分からないと、証跡として弱い。
+ */
+describe('target.profile（どのプロファイルで見たか）', () => {
+  const withProfile = (profile: string): unknown => {
+    const run = validRun();
+    return { ...run, target: { ...run.target, profile } };
+  };
+
+  it('まっさら・用意されたもの・普段使いの私物を分けて残せる', () => {
+    expectValid(withProfile('fresh'));
+    expectValid(withProfile('provided'));
+    expectValid(withProfile('personal'));
+  });
+
+  it('知らない言葉は受け取らない（当て推量で「まっさら」と書かない）', () => {
+    expectInvalid(withProfile('たぶんまっさら'), /profile/);
+  });
+
+  it('古い証跡には無いので、無くても通る', () => {
+    expectValid(validRun());
+  });
+});

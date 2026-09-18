@@ -65,6 +65,12 @@ export interface TargetBuild {
   label?: string;
 }
 
+/**
+ * `fresh` = 毎回まっさら / `provided` = 検証用に用意されたもの（ログイン済みの可能性がある）
+ * / `personal` = **普段使いのブラウザの置き場所にあるもの**（その人の私物）。
+ */
+export type BrowserProfileKind = 'fresh' | 'provided' | 'personal';
+
 export interface Target {
   kind: 'web' | 'android' | 'desktop';
   /**
@@ -78,6 +84,16 @@ export interface Target {
   device?: string;
   osVersion?: string;
   browser?: string;
+  /**
+   * **どのプロファイルで見たか**（外部レビュー meta-taro/git-qa#35）。
+   *
+   * まっさら・用意されたもの・**その人の私物**は、同じ結果でも意味が違う。
+   * 「その権限の人には見えた」でしかないのか、**私物の環境を触ったのか**が
+   * 読む人に分からないと、証跡として弱い。
+   *
+   * 古い証跡には無いので、任意にしてある。
+   */
+  profile?: BrowserProfileKind;
   build: TargetBuild;
 }
 

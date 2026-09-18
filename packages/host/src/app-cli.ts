@@ -277,6 +277,15 @@ const setup = await startSetupServer({
                     ...(process.env['GIT_QA_PROFILE'] === undefined
                       ? {}
                       : { userDataDir: process.env['GIT_QA_PROFILE'] }),
+                    /**
+                     * **その中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。
+                     *
+                     * 渡さないと `Default` が使われる —— 普段使いの Chrome では、
+                     * たいてい**いちばん私物のプロファイル**がそれ。
+                     */
+                    ...(process.env['GIT_QA_PROFILE_DIRECTORY'] === undefined
+                      ? {}
+                      : { profileDirectory: process.env['GIT_QA_PROFILE_DIRECTORY'] }),
                     // **既に起きているブラウザに繋ぐ**（#30）。起こさない・閉じない。
                     ...(process.env['GIT_QA_CDP'] === undefined
                       ? {}

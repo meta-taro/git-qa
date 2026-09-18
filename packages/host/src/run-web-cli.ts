@@ -141,6 +141,16 @@ const adapter =
             ? {}
             : { userDataDir: process.env['GIT_QA_PROFILE'] }),
           /**
+           * **その中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。
+           *
+           * 普段使いの Chrome は、1 つの `user-data-dir` の中に複数のプロファイルを持つ
+           * （報告者の機械では 19 個）。渡さないと `Default` が使われる ——
+           * たいてい**いちばん私物のプロファイル**がそれ。
+           */
+          ...(process.env['GIT_QA_PROFILE_DIRECTORY'] === undefined
+            ? {}
+            : { profileDirectory: process.env['GIT_QA_PROFILE_DIRECTORY'] }),
+          /**
            * **既に起きているブラウザに繋ぐ**（meta-taro/git-qa#30）。
            *
            * Playwright が起こしたブラウザに繋げば、**前準備はそちら、判定はこちら**。

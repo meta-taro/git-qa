@@ -6,6 +6,7 @@ export { AI_RESULTS, CASE_RESULTS, HUMAN_RESULTS, RUN_SCHEMA_VERSION } from './r
 export type {
   Actor,
   AiResult,
+  BrowserProfileKind,
   CaseRecording,
   CaseResult,
   Finding,
