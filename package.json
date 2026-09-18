@@ -20,6 +20,7 @@
     "run:sheet:desktop": "pnpm --filter @git-qa/host exec vite-node src/run-desktop-cli.ts",
     "check:run": "pnpm --filter @git-qa/host exec vite-node src/check-run-cli.ts",
     "ws:init": "pnpm --filter @git-qa/host exec vite-node src/workspace-cli.ts",
+    "doctor": "pnpm --filter @git-qa/host exec vite-node src/doctor-cli.ts",
     "mcp": "pnpm --filter @git-qa/mcp exec vite-node src/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
