@@ -143,6 +143,9 @@ importers:
       '@git-qa/adapter-desktop':
         specifier: workspace:*
         version: link:../adapter-desktop
+      '@git-qa/adapter-ios':
+        specifier: workspace:*
+        version: link:../adapter-ios
       '@git-qa/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web

@@ -43,11 +43,28 @@ import { framesFrom, iosArgs, parseIosToolDevices, type IosDevice } from './tool
 
 const KIND = 'ios' as const;
 
+/**
+ * 端末の識別子を、**同じか違うかだけ分かる形**に潰す。
+ *
+ * **証跡は人に渡る。**端末を特定できる値をそのまま残さない（§25）。
+ * 入れ替わりを見るのに要るのは「同じか違うか」だけ。
+ */
+function shortenId(id: string): string {
+  let hash = 0;
+  for (const code of id) hash = (hash * 31 + code.charCodeAt(0)) | 0;
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 export const IOS_CAPABILITIES: AdapterCapabilities = {
   // **AX 木は取れない**（WebDriverAgent が要る）。絵から文字を読む。
   observation: 'none',
-  // **流れてくる絵をそのまま残せる。**Android のように OS の録画を借りない。
-  recording: true,
+  /**
+   * **この旗は「アダプタ自身が録れるか」**（ウェブも同じ仕組みで `false` と名乗っている）。
+   *
+   * iOS の録画は**流れてくる絵から宿主が作る**（`frame-recording.ts`・`image-frames` の道）。
+   * **アダプタは録らない。**ここで `true` と名乗ると、**録れないものを録れると言うことになる。**
+   */
+  recording: false,
   // **押す口が無いので、文字も送れない。**`ascii-only` と名乗らせない（C20 の考え方）。
   textInput: 'none',
   keyInput: false,
@@ -199,11 +216,10 @@ function createIosSession(deps: SessionDeps): TargetSession {
   };
 
   /**
-   * **録る口は持っている。**流れてくる絵をそのまま残すので、
-   * Android のように OS の録画を借りない。
+   * **アダプタは録らない**（ウェブと同じ）。
    *
-   * **ただし、まだ実機で測っていない**（2026-09-19）。
-   * 実際に残せるかを確かめるまで、`requested` は立てない側（宿主）が決める。
+   * 録るのは宿主で、**流れてくる絵から作る**（`frame-recording.ts`）。
+   * ここは**持っていないと言う**（C20・できないことを `failed` にしない）。
    */
   const recording: RecordingControl = {
     requested: false,
@@ -211,7 +227,7 @@ function createIosSession(deps: SessionDeps): TargetSession {
     stop: () =>
       Promise.resolve({
         state: 'unsupported' as const,
-        reason: 'iOS の録画は、流れてくる絵から作る（まだ実機で確かめていない）',
+        reason: 'iOS の録画はアダプタ側では持っていない（流れてくる絵から宿主が作る）',
       }),
   };
 
@@ -263,10 +279,12 @@ function createIosSession(deps: SessionDeps): TargetSession {
     /**
      * **相手が入れ替わっていないかを測る**（#3）。
      *
-     * 端末そのものの入れ替えは機種と識別子で分かる。
+     * **識別子そのものは残さない。**端末を特定できる値で、証跡は人に渡るもの（§25）。
+     * **短く潰したものを残す** —— 入れ替わったかどうかは、これで分かる。
+     *
      * **画面の中で何が動いたかは測れない**（端末側に口が無い）。
      */
-    fingerprint: () => Promise.resolve(`${deps.device.model}\t${deps.device.id}`),
+    fingerprint: () => Promise.resolve(`${deps.device.model}\t${shortenId(deps.device.id)}`),
 
     async close(): Promise<void> {
       closed = true;

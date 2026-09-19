@@ -48,13 +48,38 @@ describe('mcpTargetFrom', () => {
     expect(() => mcpTargetFrom({ GIT_QA_MCP_TARGET: 'desktop' })).toThrow(/GIT_QA_MCP_APP/);
   });
 
+  /**
+   * **iPhone / iPad も受け取る**（2026-09-19・C75）。
+   *
+   * **押す口は無い。**だから AI にできるのは**見る・読む**だけ ——
+   * それでも受け取る口が無いと、**AI は画面を 1 文字も読めない。**
+   */
+  it('iPhone / iPad を受け取る', () => {
+    expect(mcpTargetFrom({ GIT_QA_MCP_TARGET: 'ios' })).toEqual({ kind: 'ios' });
+  });
+
+  it('端末を指すこともできる', () => {
+    expect(mcpTargetFrom({ GIT_QA_MCP_TARGET: 'ios', GIT_QA_MCP_IOS_DEVICE: '0001' })).toEqual({
+      kind: 'ios',
+      device: '0001',
+    });
+  });
+
   /** **知らない相手は受け取らない。**当てにいくと、別のものを触る。 */
   it('知らない相手は断る', () => {
-    expect(() => mcpTargetFrom({ GIT_QA_MCP_TARGET: 'ios' })).toThrow(/ios/);
+    expect(() => mcpTargetFrom({ GIT_QA_MCP_TARGET: 'ipados' })).toThrow(/ipados/);
   });
 });
 
 describe('targetHint', () => {
+  /** **押せないことを、最初に言う。**操作できるつもりで回させない。 */
+  it('iPhone / iPad では、押せないことまで言う', () => {
+    const said = targetHint({ kind: 'ios' });
+
+    expect(said).toContain('iPhone');
+    expect(said).toMatch(/押す口はありません/);
+  });
+
   /** **いま何を触っているかを、AI へ最初に言う。**取り違えたまま操作させない。 */
   it('いまの相手を言う', () => {
     expect(targetHint({ kind: 'web', url: 'http://a/' })).toContain('http://a/');

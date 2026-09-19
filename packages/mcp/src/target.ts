@@ -12,7 +12,14 @@
 export type McpTarget =
   | { readonly kind: 'android'; readonly serial?: string }
   | { readonly kind: 'web'; readonly url: string; readonly attachTo?: string }
-  | { readonly kind: 'desktop'; readonly app: string };
+  | { readonly kind: 'desktop'; readonly app: string }
+  /**
+   * iPhone / iPad（2026-09-19・C75）。
+   *
+   * **押す口は無い。**AI にできるのは**見る・読む**だけ。
+   * それでも受け取る口が無いと、**AI は画面を 1 文字も読めない。**
+   */
+  | { readonly kind: 'ios'; readonly device?: string };
 
 const said = (env: NodeJS.ProcessEnv, key: string): string | undefined => {
   const value = env[key];
@@ -45,8 +52,14 @@ export function mcpTargetFrom(env: NodeJS.ProcessEnv): McpTarget {
     return { kind: 'desktop', app };
   }
 
+  if (kind === 'ios') {
+    // **端末を指さなくてよい。**繋がっている 1 台目を使う（挿し替えは人がする）。
+    const device = said(env, 'GIT_QA_MCP_IOS_DEVICE');
+    return device === undefined ? { kind: 'ios' } : { kind: 'ios', device };
+  }
+
   // **知らない相手は受け取らない。**当てにいくと、別のものを触る。
-  throw new Error(`知らない相手: ${kind}（android / web / desktop のどれか）`);
+  throw new Error(`知らない相手: ${kind}（android / web / ios / desktop のどれか）`);
 }
 
 /** **いま何を触っているかを、AI へ最初に言う。**取り違えたまま操作させない。 */
@@ -56,5 +69,12 @@ export function targetHint(target: McpTarget): string {
     return `いま触っているのはウェブページ: ${target.url}${where}`;
   }
   if (target.kind === 'desktop') return `いま触っているのはデスクトップアプリ: ${target.app}`;
+  if (target.kind === 'ios') {
+    // **押せないことを最初に言う。**操作できるつもりで回させない。
+    return (
+      'いま見ているのは iPhone / iPad（USB で映している）。' +
+      '**押す口はありません** —— 見る・読むだけできます。操作は人に頼んでください'
+    );
+  }
   return 'いま触っているのは Android 端末';
 }

@@ -9,6 +9,7 @@
     { "path": "../core" },
     { "path": "../adapter-android" },
     { "path": "../adapter-desktop" },
+    { "path": "../adapter-ios" },
     { "path": "../adapter-web" }
   ],
   "include": ["src/**/*.ts", "test/**/*.ts"]

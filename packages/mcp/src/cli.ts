@@ -7,9 +7,11 @@ import { promisify } from 'node:util';
 
 import { createAndroidAdapter } from '@git-qa/adapter-android';
 import { createDesktopAdapter, readDesktopScreenText, whyNoDesktop } from '@git-qa/adapter-desktop';
+import { createIosAdapter, readIosScreenText } from '@git-qa/adapter-ios';
 import { createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
 import type { TargetSession } from '@git-qa/core';
 
+import { findIosTool, findOcrTool } from './ios-tool.js';
 import { mcpTargetFrom, targetHint } from './target.js';
 
 import { renderAbout } from './about.js';
@@ -39,6 +41,10 @@ const run = promisify(execFile);
 const target = mcpTargetFrom(process.env);
 const label = process.env['GIT_QA_APP_LABEL'] ?? 'dev';
 
+/** iPhone / iPad を映す道具と、絵から文字を読む道具。**無ければ、その相手は見られない。** */
+const toolPath = target.kind === 'ios' ? await findIosTool() : undefined;
+const ocrPath = target.kind === 'ios' ? await findOcrTool() : undefined;
+
 const connect = (): Promise<TargetSession> => {
   if (target.kind === 'web') {
     return createWebAdapter({
@@ -65,6 +71,26 @@ const connect = (): Promise<TargetSession> => {
     }).connect();
   }
 
+  if (target.kind === 'ios') {
+    /**
+     * iPhone / iPad（2026-09-19・C75）。**押す口は無い。**
+     *
+     * **道具が無ければ、見ることもできない**（`git-qa-ocr` と違い代わりの道が無い）ので、
+     * ここで理由を言って止まる。
+     */
+    if (toolPath === undefined) {
+      throw new Error(
+        'iPhone / iPad を映す道具が無い（macOS で pnpm build すると建ちます）。場所を渡すなら GIT_QA_IOS',
+      );
+    }
+    return createIosAdapter({
+      toolPath,
+      ...(target.device === undefined ? {} : { device: target.device }),
+      ...(ocrPath === undefined ? {} : { ocrPath }),
+      build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
+    }).connect();
+  }
+
   return createAndroidAdapter({
     build: {
       source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
@@ -80,7 +106,9 @@ const readScreenText =
     ? readWebScreenText
     : target.kind === 'desktop'
       ? readDesktopScreenText
-      : undefined;
+      : target.kind === 'ios'
+        ? readIosScreenText
+        : undefined;
 
 const tools = createDeviceTools({
   connect,
