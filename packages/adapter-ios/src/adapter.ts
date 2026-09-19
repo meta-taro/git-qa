@@ -307,3 +307,20 @@ export async function readIosScreenText(session: TargetSession): Promise<string>
   const said = (raw as { screenText?: unknown }).screenText;
   return typeof said === 'string' ? said : '';
 }
+
+/**
+ * **押せる名前は並べられない**（2026-09-19）。
+ *
+ * iOS は**押す口をそもそも持っていない**（WebDriverAgent が要る）。
+ * **空を返さない。**「無い」と「この相手では出来ない」を混ぜると、
+ * AI は「画面に何も無い」と受け取る。
+ */
+export function listIosElements(): Promise<string[]> {
+  return Promise.reject(
+    new AdapterError(
+      KIND,
+      'iPhone / iPad では名前で押せない（押す口が無い）。' +
+        '画面の絵と文字は取れるので、それを見て人に操作を頼んでください',
+    ),
+  );
+}

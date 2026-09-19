@@ -16,3 +16,36 @@ export async function readDesktopScreenText(session: TargetSession): Promise<str
   }
   return raw.text;
 }
+
+/**
+ * **押せる名前を並べる**（2026-09-19・MCP 拡充）。
+ *
+ * `observe()` は既に段 1（AX）の要素を持っている。**MCP が出していなかっただけ。**
+ *
+ * **契約は 1 つ。ここに並んだものは、そのまま `element_tap` に渡せる。**
+ * `findInElements` が当てにいくのは**名前**なので、名前だけを並べる。
+ *
+ * **段 1 が空でも落ちない。**絵からしか読めない相手は普通にある
+ * （Electron は聞かれるまで木を作らない・C57）。そのときは空。
+ */
+export function elementNamesOf(observation: { readonly raw: unknown }): string[] {
+  const raw = observation.raw;
+  if (typeof raw !== 'object' || raw === null) return [];
+  const elements = (raw as { elements?: unknown }).elements;
+  if (!Array.isArray(elements)) return [];
+
+  const out: string[] = [];
+  for (const element of elements) {
+    if (typeof element !== 'object' || element === null) continue;
+    const name = (element as { name?: unknown }).name;
+    if (typeof name !== 'string') continue;
+    const said = name.trim();
+    if (said !== '' && !out.includes(said)) out.push(said);
+  }
+  return out;
+}
+
+/** 繋いだセッションから、**押せる名前**を取る。 */
+export async function listDesktopElements(session: TargetSession): Promise<string[]> {
+  return elementNamesOf(await session.observe());
+}

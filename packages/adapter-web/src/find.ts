@@ -86,6 +86,67 @@ export function findElementScript(ref: string): string {
 })()`;
 }
 
+/**
+ * **押せる名前を並べる**（2026-09-19・MCP 拡充）。
+ *
+ * `element_tap` は名前で押せるのに、**どんな名前が在るかを知る口が無かった。**
+ * AI は画面の文字を読んで推し量るしかなく、外れると `missingElementMessage` で止まる。
+ *
+ * **契約は 1 つ。ここに並んだものは、そのまま `element_tap` に渡せる。**
+ * だから `findElementScript` と**同じ集め方**にしてある（見えているものだけ）。
+ *
+ * **上限を持つ。**画面 1 枚で数千返すと、AI が読めないうえに文脈を食う。
+ */
+export function listElementsScript(limit = 120): string {
+  return `(() => {
+  const names = [];
+  const push = (v) => {
+    if (typeof v !== 'string') return;
+    const said = v.trim();
+    // **長すぎるものは名前として使えない**（そのまま渡しても一致しない）。
+    if (said === '' || said.length > 60) return;
+    if (!names.includes(said)) names.push(said);
+  };
+
+  for (const el of document.querySelectorAll('*')) {
+    const box = el.getBoundingClientRect();
+    // 見えているものだけ。隠れた要素を押すと、何も起きないのに押したことになる。
+    if (box.width <= 0 || box.height <= 0) continue;
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.opacity === '0') continue;
+
+    // 名乗り（探すときの 1 段目・4 段目）。
+    push(el.getAttribute('aria-label'));
+    push(el.getAttribute('placeholder'));
+    push(el.getAttribute('title'));
+    push(el.value);
+
+    /**
+     * 読める文字（探すときの 2 段目）。**いちばん内側だけ**を並べる ——
+     * 親の文字は子の文字を全部含むので、そのまま入れると同じ名前が何段も出る。
+     */
+    if (el.children.length === 0) push(el.innerText || el.textContent);
+  }
+  return names.slice(0, ${String(limit)});
+})()`;
+}
+
+/**
+ * 返ってきた名前を読む。**当て推量で押させない**ので、文字でないものは落とす。
+ *
+ * **「無い」と「読めない」を混ぜないのは呼ぶ側**（ここは空を返すだけ）。
+ */
+export function parseElementNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const said of value) {
+    if (typeof said !== 'string') continue;
+    const name = said.trim();
+    if (name !== '' && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
 export interface FoundPoint {
   readonly x: number;
   readonly y: number;

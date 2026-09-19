@@ -1,3 +1,4 @@
+import { parseElementNames } from './find.js';
 import type { TargetSession } from '@git-qa/core';
 
 /**
@@ -31,4 +32,19 @@ export async function readWebScreenText(session: TargetSession): Promise<string>
     throw new Error('画面の生データに、ブラウザが出した「読める文字」が入っていない');
   }
   return observation.raw.text;
+}
+
+/**
+ * **押せる名前を並べる**（2026-09-19・MCP 拡充）。
+ *
+ * `element_tap` は名前で押せるのに、**どんな名前が在るかを知る口が無かった。**
+ *
+ * **契約は 1 つ。ここに並んだものは、そのまま `element_tap` に渡せる。**
+ * 集め方は `findElementScript` と同じ（`listElementsScript`）。
+ */
+export async function listWebElements(session: TargetSession): Promise<string[]> {
+  const observation = await session.observe();
+  const raw = observation.raw;
+  if (typeof raw !== 'object' || raw === null) return [];
+  return parseElementNames((raw as { elementNames?: unknown }).elementNames);
 }

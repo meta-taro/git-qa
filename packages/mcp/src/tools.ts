@@ -1,6 +1,6 @@
 import { mimeTypeOf } from '@git-qa/core';
 import type { TargetSession } from '@git-qa/core';
-import { screenText as textFromDump } from '@git-qa/adapter-android';
+import { listElementNames, screenText as textFromDump } from '@git-qa/adapter-android';
 
 /**
  * 端末を触り、画面を取るための道具。**AI（MCP の向こう側）が使う。**
@@ -38,6 +38,15 @@ export interface DeviceTools {
   type(text: string): Promise<void>;
   screenshot(): Promise<Screenshot>;
   screenText(): Promise<string>;
+  /**
+   * **押せる名前を並べる**（2026-09-19）。
+   *
+   * `tapRef` は名前で押せるのに、**どんな名前が在るかを知る口が無かった。**
+   * AI は画面の文字を読んで推し量るしかなく、外れたときだけ気づく。
+   *
+   * **契約は 1 つ。ここに並んだものは、そのまま `tapRef` に渡せる。**
+   */
+  elementNames(): Promise<string[]>;
   screenSize(): Promise<{ width: number; height: number }>;
   close(): Promise<void>;
 }
@@ -52,6 +61,14 @@ export interface DeviceToolsOptions {
    * 渡されなければ、今までどおり Android として読む。
    */
   readonly readScreenText?: (session: TargetSession) => Promise<string>;
+  /**
+   * 押せる名前の並べ方（2026-09-19）。
+   *
+   * **相手ごとに違う。**Android は uiautomator の XML、ウェブはページの中を歩く、
+   * デスクトップはアクセシビリティの要素。
+   * **渡されなければ、今までどおり Android として読む。**
+   */
+  readonly listElements?: (session: TargetSession) => Promise<string[]>;
 }
 
 export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
@@ -117,6 +134,19 @@ export function createDeviceTools(options: DeviceToolsOptions): DeviceTools {
         throw new Error('画面の生データが uiautomator の XML ではない');
       }
       return textFromDump(observation.raw);
+    },
+
+    async elementNames() {
+      const session = await use();
+      // **相手ごとの並べ方が渡されていれば、それを使う。**
+      if (options.listElements !== undefined) return options.listElements(session);
+
+      const observation = await session.observe();
+      if (typeof observation.raw !== 'string') {
+        // 握り潰さない。**「無い」と「読めない」を混ぜない。**
+        throw new Error('画面の生データが uiautomator の XML ではない');
+      }
+      return listElementNames(observation.raw);
     },
 
     async screenSize() {

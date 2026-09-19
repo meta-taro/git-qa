@@ -20,7 +20,13 @@ import { launchBrowser } from './browser.js';
 import type { RunningBrowser } from './browser.js';
 import { attachedNote, devToolsUrlFrom } from './attach.js';
 import { profileKind } from './profile.js';
-import { findElementScript, missingElementMessage, parseFoundPoint } from './find.js';
+import {
+  findElementScript,
+  listElementsScript,
+  missingElementMessage,
+  parseElementNames,
+  parseFoundPoint,
+} from './find.js';
 import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
 import type { BrowserKind, BrowserTarget } from './launch.js';
 import { createScreencast } from './screencast.js';
@@ -335,12 +341,28 @@ function createSession(deps: SessionDeps): TargetSession {
       });
       const value = (result['result'] as { value?: unknown } | undefined)?.value;
       const observed = value as { html?: unknown; text?: unknown } | undefined;
+
+      /**
+       * **押せる名前も一緒に持つ**（2026-09-19・MCP 拡充）。
+       *
+       * `element_tap` は名前で押せるのに、**どんな名前が在るかを知る口が無かった。**
+       * **集め方は探すときと同じ**（`listElementsScript`）—— 別の集め方を作ると、
+       * **並んだのに押せない名前**が出る。
+       *
+       * **取れなくても観測は返す。**名前が無いことは、画面が読めないことではない。
+       */
+      const names = await cdp
+        .send('Runtime.evaluate', { expression: listElementsScript(), returnByValue: true })
+        .then((said) => (said['result'] as { value?: unknown } | undefined)?.value)
+        .catch(() => undefined);
+
       return {
         kind: KIND,
         capturedAt: now().toISOString(),
         raw: {
           html: typeof observed?.html === 'string' ? observed.html : '',
           text: typeof observed?.text === 'string' ? observed.text : '',
+          elementNames: parseElementNames(names),
         },
       };
     },

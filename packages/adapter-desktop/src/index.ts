@@ -23,7 +23,7 @@ export { findInOcr, parseOcr } from './ocr.js';
 export type { OcrLine } from './ocr.js';
 export { createDesktopAdapter, screenTextOf } from './adapter.js';
 export type { DesktopAdapterOptions } from './adapter.js';
-export { readDesktopScreenText } from './screen-text.js';
+export { elementNamesOf, listDesktopElements, readDesktopScreenText } from './screen-text.js';
 export { clickScript, dragScript, NOT_FRONT_MARK, scrollScript } from './click.js';
 export { explainToolFailure } from './permission.js';
 export { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';

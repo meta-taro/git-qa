@@ -1,6 +1,7 @@
 export {
   createIosAdapter,
   listIosDevices,
+  listIosElements,
   readIosScreenText,
   IOS_CAPABILITIES,
 } from './adapter.js';

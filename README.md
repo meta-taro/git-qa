@@ -39,7 +39,9 @@ tool that exists to save effort expensive to use.
 | **Android devices** | Real devices and emulators over `adb` — tap, swipe, type |
 | **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare |
 | **Desktop apps** | macOS (Accessibility + Vision OCR) and Windows (UI Automation) |
-| **From an AI agent** | Over MCP — take a screenshot, read the screen, tap by name. Android, web, or a desktop app |
+| **iPhone / iPad** | Mirrored over USB — watch, read, record. **No tapping** (that needs an app signed onto the device). **Not yet tried on a real device** |
+| **Mobile browsers** | Android Chrome over `adb forward` + CDP. iOS Safari by mirroring the screen. **Not yet tried** |
+| **From an AI agent** | Over MCP — screenshot, read the screen, **list the names you can press**, tap by name. Android, web, desktop, or iPhone / iPad |
 
 ## What evidence looks like
 
@@ -55,7 +57,7 @@ under version control.
       run.json       verdicts, steps, who placed them and when
       case-001/
         screen.webp  the screen at the moment the verdict was placed
-        screen.webm  video of the AI operating (watch mode)
+        screen.webm  video of the run — **only when asked for** (`--record`)
 ```
 
 Nothing about your machine goes into the evidence: paths are relative to the
@@ -82,6 +84,17 @@ pnpm app
 
 macOS builds are signed and notarized. **Windows builds are not signed** — you
 will see "Windows protected your PC"; check the source before choosing *Run*.
+
+To see what this machine can actually do — measured, not guessed:
+
+```bash
+pnpm doctor
+```
+
+The app also states its own version on the start screen ("This git-qa is
+v0.2.0-beta.14"). **Paste that line into bug reports** — it decides which build
+you are talking about. When a newer build exists, the same place says so; git-qa
+never replaces itself.
 
 ## Status
 

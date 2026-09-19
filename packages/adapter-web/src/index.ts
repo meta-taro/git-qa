@@ -18,9 +18,15 @@ export type { LaunchBrowserOptions, RunningBrowser } from './browser.js';
 export { connectCdpSocket } from './socket.js';
 export { httpOriginFromWs, pickPageTarget } from './launch.js';
 export type { BrowserTarget } from './launch.js';
-export { readWebScreenText } from './screen-text.js';
+export { listWebElements, readWebScreenText } from './screen-text.js';
 export type { WebObservation } from './screen-text.js';
-export { findElementScript, missingElementMessage, parseFoundPoint } from './find.js';
+export {
+  findElementScript,
+  listElementsScript,
+  missingElementMessage,
+  parseElementNames,
+  parseFoundPoint,
+} from './find.js';
 export type { FoundPoint } from './find.js';
 export { createBidiClient, fromRemoteValue } from './bidi.js';
 export type { BidiClient } from './bidi.js';

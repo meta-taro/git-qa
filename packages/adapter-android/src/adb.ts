@@ -152,6 +152,29 @@ export function findElementCenter(xml: string, ref: string): Point | undefined {
   return undefined;
 }
 
+/**
+ * **押せる名前を並べる**（2026-09-19・MCP 拡充）。
+ *
+ * `element_tap` は名前で押せるのに、**どんな名前が在るかを知る口が無かった。**
+ * AI は画面の文字を読んで推し量るしかなく、外れると「押したのに何も起きない」になる。
+ *
+ * **契約は 1 つ。ここに並んだものは、そのまま `element_tap` に渡せる。**
+ * だから `findElementCenter` が当てにいく属性と**同じものだけ**を並べ、
+ * **場所が取れないものは並べない**（列挙できても押せないなら、嘘になる）。
+ */
+export function listElementNames(xml: string): string[] {
+  const found: string[] = [];
+  for (const node of xml.match(/<node\b[^>]*\/?>/g) ?? []) {
+    // **押せない所は並べない。**位置が取れないものは、名前が在っても届かない。
+    if (boundsCenter(ATTR(node, 'bounds')) === undefined) continue;
+    for (const name of ['text', 'content-desc', 'resource-id']) {
+      const value = unescapeXml(ATTR(node, name)).trim();
+      if (value !== '' && !found.includes(value)) found.push(value);
+    }
+  }
+  return found;
+}
+
 /** XML の実体参照を戻す。そのままだと、シートの期待結果と突き合わない。 */
 function unescapeXml(value: string): string {
   return value

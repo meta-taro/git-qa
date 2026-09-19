@@ -6,9 +6,14 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { createAndroidAdapter } from '@git-qa/adapter-android';
-import { createDesktopAdapter, readDesktopScreenText, whyNoDesktop } from '@git-qa/adapter-desktop';
-import { createIosAdapter, readIosScreenText } from '@git-qa/adapter-ios';
-import { createWebAdapter, readWebScreenText } from '@git-qa/adapter-web';
+import {
+  createDesktopAdapter,
+  listDesktopElements,
+  readDesktopScreenText,
+  whyNoDesktop,
+} from '@git-qa/adapter-desktop';
+import { createIosAdapter, listIosElements, readIosScreenText } from '@git-qa/adapter-ios';
+import { createWebAdapter, listWebElements, readWebScreenText } from '@git-qa/adapter-web';
 import type { TargetSession } from '@git-qa/core';
 
 import { findIosTool, findOcrTool } from './ios-tool.js';
@@ -110,9 +115,25 @@ const readScreenText =
         ? readIosScreenText
         : undefined;
 
+/**
+ * **押せる名前の並べ方も、相手ごとに違う**（2026-09-19）。
+ *
+ * ここを渡し忘れると、Android の XML として読もうとして落ちる
+ * —— **「無い」と「読めない」が混ざる**（`readScreenText` と同じ轍）。
+ */
+const listElements =
+  target.kind === 'web'
+    ? listWebElements
+    : target.kind === 'desktop'
+      ? listDesktopElements
+      : target.kind === 'ios'
+        ? listIosElements
+        : undefined;
+
 const tools = createDeviceTools({
   connect,
   ...(readScreenText === undefined ? {} : { readScreenText }),
+  ...(listElements === undefined ? {} : { listElements }),
 });
 
 console.error(`[git-qa] ${targetHint(target)}`);

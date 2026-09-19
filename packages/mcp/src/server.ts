@@ -69,6 +69,36 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
     },
   );
 
+  /**
+   * **押せる名前を並べる**（2026-09-19）。
+   *
+   * `element_tap` は名前で押せるのに、**どんな名前が在るかを知る口が無かった。**
+   * AI は画面の文字を読んで名前を推し量るしかなく、**外れたときだけ気づく。**
+   *
+   * **ここに並んだものは、そのまま `element_tap` に渡せる。**
+   */
+  server.registerTool(
+    'element_list',
+    {
+      title: '押せる名前を並べる',
+      description:
+        'いま画面で名前で押せるものを並べる。ここに出た文字は、そのまま element_tap へ渡せる。' +
+        '座標を当てにいく前に、まずこれを見る。',
+      inputSchema: {},
+    },
+    async () => {
+      const names = await tools.elementNames();
+      if (names.length === 0) {
+        // **空を黙って返さない。**「無い」のか「この相手では読めない」のかが分からなくなる。
+        return ok(
+          '押せる名前が 1 つも取れなかった。' +
+            '絵からしか読めない相手（Electron など）では起きる。device_screenshot で見て、人に操作を頼む',
+        );
+      }
+      return ok(names.join('\n'));
+    },
+  );
+
   server.registerTool(
     'device_swipe',
     {
