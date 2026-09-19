@@ -72,7 +72,13 @@ export interface TargetBuild {
 export type BrowserProfileKind = 'fresh' | 'provided' | 'personal';
 
 export interface Target {
-  kind: 'web' | 'android' | 'desktop';
+  /**
+   * `ios` は iPhone / iPad（2026-09-19）。
+   *
+   * **Android と分けてある。**触れ方が違う（押す口が無く、端末側にアプリを入れるには
+   * 署名が要る）ので、**証跡を読む人が「Android と同じように操作した」と読まないため。**
+   */
+  kind: 'web' | 'android' | 'ios' | 'desktop';
   /**
    * 実際に見に行った場所（シートの `行き先`）。
    *

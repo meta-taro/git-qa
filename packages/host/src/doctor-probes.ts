@@ -6,7 +6,7 @@ import { browserCandidates, FIREFOX_CANDIDATES } from '@git-qa/adapter-web';
 
 import type { Probe, ProbeResult } from './doctor.js';
 import { parseIosDevices } from './doctor.js';
-import { findInput, findOcr, findRecord, findWinTool } from './ocr-path.js';
+import { findInput, findIos, findOcr, findRecord, findWinTool } from './ocr-path.js';
 
 /**
  * **実際に呼んで、返ってきたものを出す**（C56・見込みを書かない）。
@@ -106,8 +106,8 @@ const iphone = async (): Promise<ProbeResult> => {
     state: 'ok',
     detail:
       devices.length === 0
-        ? '実機はつながっていない（アダプタもまだ無い）'
-        : `${devices.join(' / ')}（つながっているが、アダプタはまだ無い）`,
+        ? '実機はつながっていない（挿せば pnpm run:sheet:ios で見られます・未実測）'
+        : `${devices.join(' / ')}（pnpm run:sheet:ios で見られます・未実測）`,
   };
 };
 
@@ -177,6 +177,15 @@ export const PROBES: readonly Probe[] = [
   { pillar: '見る', run: browsers },
   { pillar: '見る', run: otherBrowsers },
   { pillar: '見る', run: iphone },
+  {
+    pillar: '見る',
+    run: tool(
+      'git-qa-ios（iPhone / iPad）',
+      findIos,
+      'macOS でだけ建ちます。押す口はまだありません',
+      ['darwin'],
+    ),
+  },
   {
     pillar: '読む',
     run: tool('git-qa-ocr', findOcr, 'pnpm build で建ちます。Electron 相手に要ります'),

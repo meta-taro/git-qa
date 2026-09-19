@@ -77,7 +77,8 @@
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "enum": ["web", "android", "desktop"]
+          "enum": ["web", "android", "ios", "desktop"],
+          "description": "ios は iPhone / iPad。Android と分けてある — 触れ方が違う（押す口が無く、端末側にアプリを入れるには署名が要る）ので、証跡を読む人が「Android と同じように操作した」と読まないため。"
         },
         "destination": {
           "description": "実際に見に行った場所（シートの「行き先」）。「何を検証したか」（build.source）と分けて残す — 外部レビュー meta-taro/git-qa#22。",

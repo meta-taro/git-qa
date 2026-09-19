@@ -1,0 +1,17 @@
+{
+  "name": "@git-qa/adapter-ios",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "iPhone / iPad を USB 越しに映して見るアダプタ（押す口はまだ無い）",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@git-qa/core": "workspace:*"
+  }
+}

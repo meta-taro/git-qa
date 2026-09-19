@@ -149,3 +149,33 @@ export async function findWinTool(
   }
   return undefined;
 }
+
+/**
+ * **iPhone / iPad を映す道具**（`git-qa-ios`・2026-09-19）。
+ *
+ * **無ければ、その相手は見られない**（`git-qa-ocr` と違い、代わりの道が無い）。
+ * macOS 専用（AVFoundation で USB の端末を撮る）。
+ */
+export function iosCandidates(fromDir: string): string[] {
+  const beside = join(fromDir, 'git-qa-ios');
+  const inRepo = resolve(fromDir, '..', '..', 'desktop', 'src-tauri', 'resources', 'git-qa-ios');
+  return [...new Set([beside, inRepo])];
+}
+
+/** 実際にあるものを 1 つ返す。**無ければ undefined**（iOS は見られない）。 */
+export async function findIos(
+  fromDir = dirname(fileURLToPath(import.meta.url)),
+): Promise<string | undefined> {
+  const fromEnv = process.env['GIT_QA_IOS'];
+  if (fromEnv !== undefined) return fromEnv;
+
+  for (const path of iosCandidates(fromDir)) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      // ここには無い。次を見る。**無いこと自体は普通**（macOS 以外・建てる前）。
+    }
+  }
+  return undefined;
+}

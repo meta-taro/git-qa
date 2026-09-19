@@ -265,3 +265,23 @@ describe('target.profile（どのプロファイルで見たか）', () => {
     expectValid(validRun());
   });
 });
+
+/**
+ * **iPhone / iPad**（2026-09-19・人の指示）。
+ *
+ * > Android を接続して検証録画できるように、iPhone,iPad の検証録画も必要です
+ *
+ * **Android と同じ語彙に混ぜない。**触れ方が違う（押す口が無い・署名が要る）ので、
+ * **証跡を読む人が「Android と同じように操作した」と読んではいけない。**
+ */
+describe('target.kind に ios が在る', () => {
+  it('ios を受け取る', () => {
+    const run = validRun();
+    expectValid({ ...run, target: { ...run.target, kind: 'ios' } });
+  });
+
+  it('知らない相手は受け取らない', () => {
+    const run = validRun();
+    expectInvalid({ ...run, target: { ...run.target, kind: 'ipados' } }, /kind/);
+  });
+});

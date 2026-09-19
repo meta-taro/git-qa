@@ -48,6 +48,8 @@ const defaultTarget = (kind: Target['kind']): Target => {
   switch (kind) {
     case 'android':
       return { kind, device: 'Fake Android Device', osVersion: '15', build };
+    case 'ios':
+      return { kind, device: 'Fake iPhone', osVersion: '18', build };
     case 'web':
       return { kind, browser: 'Fake Browser', build };
     case 'desktop':

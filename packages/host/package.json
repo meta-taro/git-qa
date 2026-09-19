@@ -14,6 +14,7 @@
   "dependencies": {
     "@git-qa/adapter-android": "workspace:*",
     "@git-qa/adapter-desktop": "workspace:*",
+    "@git-qa/adapter-ios": "workspace:*",
     "@git-qa/adapter-web": "workspace:*",
     "@git-qa/core": "workspace:*",
     "@git-qa/live-bridge": "workspace:*"

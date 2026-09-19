@@ -10,6 +10,7 @@
     { "path": "../adapter-android" },
     { "path": "../adapter-web" },
     { "path": "../adapter-desktop" },
+    { "path": "../adapter-ios" },
     { "path": "../live-bridge" }
   ],
   "include": ["src/**/*.ts", "test/**/*.ts"]
