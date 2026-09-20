@@ -60,6 +60,20 @@ https://github.com/meta-taro/git-qa/releases/tag/dev
 
 ### どの OS でも
 
+**まず引いてください。**古い clone のまま測ると、**直っているはずのものが直っていない**ことになります。
+
+```bash
+git pull --ff-only
+git log --oneline -1        # いまどこに居るか。報告に貼ってください
+```
+
+> **2026-09-20 に実測した例。**Windows の開発機の clone が
+> **`beta.3` で止まっていました**（11 版ぶん・約 5 日）。
+> その機械には **`beta.9` の Windows 起動修正**が入っておらず、
+> **配った版が 368ms で死ぬ**ままでした。`pnpm doctor` も `dev` も、まだ届いていません。
+>
+> **古いまま測った値は、こちらでは使えません。**引いてから測ってください。
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm verify        # format / lint / typecheck / test / build
