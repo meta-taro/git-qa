@@ -36,7 +36,7 @@ git-qa の環境確認 — darwin arm64 / dev
 | | macOS | Windows | Linux |
 |---|---|---|---|
 | デスクトップアプリ | ✅ 実測 | ✅ 実測（録画は無い） | |
-| ウェブ（Chrome / Firefox / Safari） | ✅ 実測 | | |
+| ウェブ（Chrome / Firefox / Safari） | ✅ 実測 | ✅ **実測**（2026-09-20・外部レビュー #37） | |
 | Android 実機 | ✅ 実測 | | |
 | iPhone / iPad 実機 | ⏳ **叩きが入った。誰もまだ実機で流していない** | ❌ 道具が建たない | — |
 | 録画 | ✅ 実測 | ❌ 無い | ❌ 無い |
@@ -104,7 +104,24 @@ pnpm run:sheet:desktop <シート> "<アプリ名>"  # 端から端まで
 pnpm run:sheet:web sheets/web-sample-ja.tsv --no-ui
 ```
 
-**Windows ではまだ誰も流していません。**踏んだものを、そのまま挙げてください。
+**Windows でも通りました**（2026-09-20・外部レビュー #37 の実測）。
+
+| | |
+|---|---|
+| OS | Windows 11 Home 26200 |
+| Node.js | 24.19.0 |
+| pnpm | 11.1.1 |
+| Rust | 1.98.1（stable-x86_64-pc-windows-msvc）／MSVC Build Tools 2022 |
+| WebView2 | 153.0.4234.48（**Edge 同梱のもの。別途インストール不要**） |
+| ブラウザ | Chrome 153.0.8010.52（`fresh` プロファイルで自動起動） |
+| 初回 Rust ビルド | **54.83 秒**（376 クレート） |
+| 1420 番ポート | 競合なし |
+
+**画面も出て、ページも映り、判定待ちで止まりました。**証跡と絵も残っています。
+
+> 終了時に `Failed to unregister class Chrome_WidgetWin_0. Error = 1411` が出ますが、
+> **Chrome が窓を畳むときの行**で、git-qa の後始末とは別です。**こちらからは何もしません**
+> —— 消すために Chrome の終わり方に触ると、**録画や証跡の書き終わりのほうを壊します。**
 
 ### Android を見る
 
