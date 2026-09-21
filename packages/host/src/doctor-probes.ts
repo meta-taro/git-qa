@@ -1,11 +1,12 @@
-import { access } from 'node:fs/promises';
+import { access, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { browserCandidates, FIREFOX_CANDIDATES } from '@git-qa/adapter-web';
 
 import type { Probe, ProbeResult } from './doctor.js';
-import { parseIosDevices } from './doctor.js';
+import { freshnessOf, parseIosDevices } from './doctor.js';
 import { findInput, findIos, findOcr, findRecord, findWinTool } from './ocr-path.js';
 
 /**
@@ -35,6 +36,44 @@ const there = async (path: string | undefined): Promise<boolean> => {
   } catch {
     return false;
   }
+};
+
+/**
+ * **この clone が、どれだけ古いか**（2026-09-21）。
+ *
+ * **ここでは取ってきに行かない。**`doctor` は測る道具で、人の repo を動かす道具ではない
+ * （勝手に `fetch` すると、測っただけのつもりが状態を変える）。
+ * **手元に在る情報だけで言う。**
+ */
+const freshness = async (): Promise<ProbeResult> => {
+  // 上流より何コミット遅れているか。**上流が無ければ測れない。**
+  const behind = await ask('git', ['rev-list', '--count', 'HEAD..@{u}']);
+  /**
+   * **最後に取ってきた時刻は、`.git/FETCH_HEAD` の更新時刻**（2026-09-21）。
+   *
+   * 最初 `git log -1 --format=%ct FETCH_HEAD` で取っていたが、**それは別物** ——
+   * **取ってきた commit が作られた時刻**が返る。
+   * 相手が 2 日前に commit していれば、**さっき取ってきても「2 日前」**になる。
+   *
+   * **1 度も取ってきていない clone では、この file が無い。**
+   * そのときは**遅れの数のほうが確か**なので、日数では言わない。
+   */
+  const gitDir = (await ask('git', ['rev-parse', '--git-dir']))?.trim();
+  const fetchedAt =
+    gitDir === undefined
+      ? undefined
+      : await stat(join(gitDir, 'FETCH_HEAD')).then(
+          (said) => said.mtimeMs,
+          () => undefined,
+        );
+
+  const days =
+    fetchedAt === undefined ? 0 : Math.floor((Date.now() - fetchedAt) / (24 * 60 * 60 * 1000));
+
+  return freshnessOf({
+    behind: behind === undefined ? undefined : Number(behind.trim()),
+    fetchedDaysAgo: days,
+  });
 };
 
 const nodeVersion = (): ProbeResult => {
@@ -172,6 +211,8 @@ const optional =
 
 /** この機械を測る一式。**柱ごとに分けてある。** */
 export const PROBES: readonly Probe[] = [
+  // **いちばん上に置く。**ここが古いと、下の値は全部「古いものの話」になる。
+  { pillar: '見る', run: freshness },
   { pillar: '見る', run: () => Promise.resolve(nodeVersion()) },
   { pillar: '見る', run: android },
   { pillar: '見る', run: browsers },

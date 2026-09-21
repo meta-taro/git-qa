@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  freshnessOf,
   PILLARS,
   parseIosDevices,
   type Probe,
@@ -159,5 +160,47 @@ describe('parseIosDevices', () => {
 
   it('1 台も繋いだことが無いときの出力でも落ちない', () => {
     expect(parseIosDevices('No devices found.')).toEqual([]);
+  });
+});
+
+/**
+ * **この clone が、どれだけ古いか**（2026-09-21）。
+ *
+ * Windows の開発機の clone が **`beta.3` で止まっていた**（11 版・約 5 日）。
+ * **誰も気づかなかった。**`beta.9` の Windows 起動修正すら入っておらず、
+ * **配った版が 368ms で死ぬまま**だった。
+ *
+ * `docs/dev-check.md` に「まず `git pull`」と書いたが、
+ * **手順書は実行者が飛ばせる。**測って出すほうにする。
+ */
+describe('freshnessOf', () => {
+  it('追いついていれば、そう言う', () => {
+    const said = freshnessOf({ behind: 0, fetchedDaysAgo: 0 });
+
+    expect(said.state).toBe('ok');
+  });
+
+  it('遅れているなら、何コミット遅れているかを言う', () => {
+    const said = freshnessOf({ behind: 11, fetchedDaysAgo: 0 });
+
+    expect(said.state).toBe('missing');
+    expect(said.detail).toContain('11');
+  });
+
+  /**
+   * **取ってきていない clone は、遅れを 0 と答える。**
+   * 「追いついている」と「確かめていない」を混ぜない。
+   */
+  it('長く取ってきていないなら、遅れが 0 でも信じない', () => {
+    const said = freshnessOf({ behind: 0, fetchedDaysAgo: 5 });
+
+    expect(said.state).toBe('missing');
+    expect(said.detail).toContain('5');
+  });
+
+  it('上流が無い clone では、測れないと言う（落ちない）', () => {
+    const said = freshnessOf({ behind: undefined, fetchedDaysAgo: 0 });
+
+    expect(said.state).toBe('error');
   });
 });

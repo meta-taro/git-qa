@@ -133,3 +133,50 @@ export function parseIosDevices(stdout: string): string[] {
   }
   return out;
 }
+
+/**
+ * **この clone が、どれだけ古いか**（2026-09-21）。
+ *
+ * Windows の開発機の clone が **`beta.3` で止まっていた**（11 版・約 5 日）。
+ * **誰も気づかなかった。**`beta.9` の Windows 起動修正すら入っておらず、
+ * **配った版が 368ms で死ぬまま**だった。
+ * その機械から返ってくる値は、**こちらでは使えない** —— 何を測っても、古いものの話になる。
+ *
+ * `docs/dev-check.md` に「まず `git pull`」と書いた。
+ * **ただし手順書は、実行者が飛ばせる。**測って出すほうにする。
+ *
+ * **取ってきていない clone は、遅れを 0 と答える。**
+ * だから**いつ取ってきたか**も一緒に見る ——
+ * **「追いついている」と「確かめていない」を混ぜない。**
+ */
+export interface Freshness {
+  /** 上流より何コミット遅れているか。**測れなければ `undefined`**（上流が無い）。 */
+  readonly behind: number | undefined;
+  /** 最後に取ってきてから何日たったか。 */
+  readonly fetchedDaysAgo: number;
+}
+
+/** 取ってきていないと信じない日数。**1 日なら、まだその日の話。** */
+const STALE_FETCH_DAYS = 2;
+
+export function freshnessOf(at: Freshness): ProbeResult {
+  const name = 'この clone の新しさ';
+  if (at.behind === undefined) {
+    return { name, state: 'error', detail: '上流が分からない（clone ではない / 上流が未設定）' };
+  }
+  if (at.behind > 0) {
+    return {
+      name,
+      state: 'missing',
+      detail: `${String(at.behind)} コミット遅れている（git pull --ff-only してから測ってください）`,
+    };
+  }
+  if (at.fetchedDaysAgo >= STALE_FETCH_DAYS) {
+    return {
+      name,
+      state: 'missing',
+      detail: `${String(at.fetchedDaysAgo)} 日、取ってきていない（遅れ 0 は当てにならない。git pull --ff-only）`,
+    };
+  }
+  return { name, state: 'ok', detail: '追いついている' };
+}
