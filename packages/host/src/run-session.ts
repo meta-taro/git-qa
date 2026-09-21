@@ -11,6 +11,7 @@ import {
   executeRun,
   framesToWebmCommand,
   resolveCaseResult,
+  sheetDestination,
   toCaseSubjects,
 } from '@git-qa/core';
 import type {
@@ -491,9 +492,19 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     return true;
   };
 
-  // シートの見出しが宣言した対象アプリ。「アプリを起動する」の行き先になる。
-  // **無ければその手順は保留になる。**こちらで当てにいかない。
-  const app = options.sheet.meta['対象'];
+  /**
+   * シートの見出しが宣言した行き先。「アプリを起動する」「ページを開く」の先になる。
+   * **無ければその手順は保留になる。**こちらで当てにいかない。
+   *
+   * **`行き先` が在ればそちら、無ければ `対象`**（`sheetDestination`・#22）。
+   *
+   * **ここが `対象` を直に読んでいた**（外部レビュー meta-taro/git-qa#37）。
+   * 無人で流す道（`headless.ts`）は `sheetDestination` を見ていたのに、
+   * **人が見ている道だけが揃っていなかった。**
+   * 証跡には `destination` が正しく残るのに、**手順だけが「開く先が決められない」**と言う
+   * —— 書いた人からは、何が効いていないのか分からない。
+   */
+  const app = sheetDestination(options.sheet.meta);
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
     ...(app === undefined ? {} : { app }),

@@ -511,3 +511,32 @@ describe('planExpectation — 鉤括弧の後ろの言い方を見る（#27）',
     expect(wrongShape.kind === 'hold' ? wrongShape.reason : '').toContain('押せる');
   });
 });
+
+/**
+ * **`行き先` が、手順を落とす側へ届いていなかった**（外部レビュー meta-taro/git-qa#37）。
+ *
+ * > 行き先は正しく解決されるのに、1 件目の「ページを開く」で止まります
+ *
+ * `#22` で `行き先` を入れたとき、**起動する側にだけ通して、手順を落とす側へ通し忘れた。**
+ * 証跡には `destination` が正しく残るのに、**手順だけが「開く先が決められない」**と言う ——
+ * **書いた人からは、何が効いていないのか分からない。**
+ */
+describe('止まった理由に、何を見たかを出す（#37）', () => {
+  const reasonFor = (app: string): string => {
+    const [step] = planSteps('ページを開く', { app, appId: 'package-or-url' });
+    return step?.kind === 'hold' ? step.reason : '';
+  };
+
+  it('見た値をそのまま出す（書いた人が、自分の書いたものを探せる）', () => {
+    expect(reasonFor('owner/repo@develop')).toContain('owner/repo@develop');
+  });
+
+  /**
+   * **`行き先` を書いた人に、自分の書いたものが視界に入るようにする。**
+   * いまの文は `対象` しか出していないので、**書いたものが効いていないのか、
+   * 書き方が違うのかが切り分けられない**（報告者の言葉）。
+   */
+  it('どの見出しを見たかが読める', () => {
+    expect(reasonFor('owner/repo@develop')).toMatch(/行き先/);
+  });
+});

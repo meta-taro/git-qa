@@ -123,3 +123,35 @@ export function profileKind(
   if (given === undefined) return 'fresh';
   return isPersonalProfilePlace(given, platform, home) ? 'personal' : 'provided';
 }
+
+/**
+ * **既定の置き場は、そもそも口が開かない**（外部レビュー meta-taro/git-qa#36 の実測）。
+ *
+ *     OS 既定の置き場        → DevToolsActivePort 書かれない（12 秒待機・エラー出力も無し）
+ *     まっさらな一時ディレクトリ → 書かれた（62618）
+ *     --profile-directory の有無は関係しない
+ *
+ * **Chrome 136 以降、既定の置き場に対しては `--remote-debugging-port` が黙って無視される。**
+ * ログイン済みプロファイルからの Cookie 窃取への対策で、**塞がっているのは妥当。**
+ * **こちらでは回避できないし、回避路も作らない。**
+ *
+ * `#35` では「止めない」と決めた。理由は
+ * **「専用に用意したプロファイルは `User Data` の中に居るから」**だった。
+ * **その前提が、この実測で消えた** —— 中に置いても口が開かない。
+ *
+ * **20 秒待って、無関係な理由で落ちるのをやめる**（Chrome の updater が出す
+ * `Failed to open named pipe server process` が添えられ、**原因と無関係な方向を指していた**）。
+ */
+export function unusableProfileMessage(
+  given: string | undefined,
+  platform?: string,
+  home?: string,
+): string | undefined {
+  if (!isPersonalProfilePlace(given, platform, home)) return undefined;
+
+  return (
+    '普段使いのブラウザの置き場所は使えない。' +
+    'Chrome 136 以降、ここに対してはデバッグの口が開かない（ブラウザ側の仕様・git-qa では回避できない）。' +
+    '**専用の置き場を作り、そこへ人が手で一度ログインしてから** GIT_QA_PROFILE に渡す'
+  );
+}

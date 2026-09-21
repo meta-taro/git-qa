@@ -52,3 +52,10 @@ export {
   staleBrowserPids,
   staleReport,
 } from './stale.js';
+export {
+  isPersonalProfilePlace,
+  profileKind,
+  profileNote,
+  shouldRemoveProfile,
+  unusableProfileMessage,
+} from './profile.js';

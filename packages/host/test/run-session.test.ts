@@ -811,3 +811,63 @@ describe('startRunSession — 証跡の保存', () => {
     expect(bridge.states.at(-1)?.saveError).toContain('EROFS');
   });
 });
+
+/**
+ * **`行き先` が、人が見ている実行では効いていなかった**（外部レビュー meta-taro/git-qa#37）。
+ *
+ * 無人で流す道（`headless.ts`）は `sheetDestination` を見ていたのに、
+ * **こちらは `対象` を直に読んでいた。**`#22` で 2 か所を揃え損ねた。
+ *
+ * 証跡には `destination` が正しく残るのに、**手順だけが「開く先が決められない」**と言う ——
+ * **書いた人からは、何が効いていないのか分からない。**
+ */
+describe('行き先（#37）', () => {
+  const sheetWith = (head: readonly string[]) =>
+    parseTestSpecTsv(
+      [
+        '#! md-business:test-spec-tsv/v1',
+        ...head,
+        'No.:number!\t項目!\t手順:multiline!\t期待結果:multiline!',
+        '1\tページが出る\tページを開く\t「ようこそ」と表示される',
+        '',
+      ].join('\n'),
+    );
+
+  const startedWith = async (head: readonly string[]): Promise<string> => {
+    const bridge = fakeBridge();
+    const session = await startRunSession({
+      adapter: stubAdapter({}),
+      sheet: sheetWith(head),
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260921-100000',
+      operator: { handle: 'octocat' },
+      readScreenText: () => Promise.resolve('ようこそ'),
+      startBridge: bridge.start,
+      // **検査では待たせない。**
+      expectation: { waitMs: 0, stepMs: 1 },
+    });
+    // **人が置くまで進まない**ので、1 件だけ置いて終わらせる。
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+
+    const run = await session.done;
+    await session.close();
+    return run.cases[0]?.note ?? '';
+  };
+
+  it('「# 行き先:」が在れば、そちらを開く（対象がリポジトリでも止まらない）', async () => {
+    const note = await startedWith([
+      '# 対象: owner/repo@develop',
+      '# 行き先: http://localhost:3000/',
+    ]);
+
+    // **止まらない。**止まるなら、行き先が手順へ届いていない。
+    expect(note).not.toContain('パッケージ名でも URL でもない');
+  });
+
+  it('「# 行き先:」が無ければ、今までどおり「# 対象:」を見る', async () => {
+    const note = await startedWith(['# 対象: http://localhost:3000/']);
+
+    expect(note).not.toContain('パッケージ名でも URL でもない');
+  });
+});

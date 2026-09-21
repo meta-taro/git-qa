@@ -5,6 +5,7 @@ import {
   profileKind,
   profileNote,
   shouldRemoveProfile,
+  unusableProfileMessage,
 } from '../src/profile.js';
 
 /**
@@ -150,5 +151,57 @@ describe('profileKind', () => {
     expect(profileKind(`${home}/Library/Application Support/Google/Chrome`, 'darwin', home)).toBe(
       'personal',
     );
+  });
+});
+
+/**
+ * **既定の置き場は、そもそも口が開かない**（外部レビュー meta-taro/git-qa#36）。
+ *
+ * > OS 既定の置き場 → `DevToolsActivePort` 書かれない（12 秒待機・エラー出力も無し）
+ * > まっさらな一時ディレクトリ → 書かれた（62618）
+ * > `--profile-directory` の有無は関係しない
+ *
+ * **Chrome 136 以降、既定の置き場に対しては `--remote-debugging-port` が黙って無視される。**
+ * ログイン済みプロファイルからの Cookie 窃取への対策で、**塞がっているのは妥当。**
+ *
+ * `#35` では「止めない」と決めた。理由は
+ * **「専用に用意したプロファイルは `User Data` の中に居るから」**だった。
+ * **その前提が、この実測で消えた** —— 中に置いても口が開かないので、**止めない理由が無い。**
+ *
+ * **20 秒待って、無関係な理由で落ちるのをやめる。**
+ */
+describe('unusableProfileMessage', () => {
+  const home = '/Users/someone';
+
+  it('既定の置き場なら、理由を言って止める', () => {
+    const said = unusableProfileMessage(
+      `${home}/Library/Application Support/Google/Chrome`,
+      'darwin',
+      home,
+    );
+
+    expect(said).toBeDefined();
+    // **ブラウザ側の仕様だと言い切る。**こちらの不具合を探させない。
+    expect(said).toMatch(/Chrome 136|ブラウザ側/);
+    // **どうすればよいかまで言う。**「使えません」だけだと、人は置き場を眺めることになる。
+    expect(said).toContain('GIT_QA_PROFILE');
+  });
+
+  it('その中のプロファイルを指しても同じ（--profile-directory では抜けられない）', () => {
+    const said = unusableProfileMessage(
+      `${home}/Library/Application Support/Google/Chrome/Profile 3`,
+      'darwin',
+      home,
+    );
+
+    expect(said).toBeDefined();
+  });
+
+  it('検証のために作った置き場は、止めない', () => {
+    expect(unusableProfileMessage(`${home}/qa-profile`, 'darwin', home)).toBeUndefined();
+  });
+
+  it('渡されていなければ、止めない（毎回まっさらは今までどおり）', () => {
+    expect(unusableProfileMessage(undefined, 'darwin', home)).toBeUndefined();
   });
 });

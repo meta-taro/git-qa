@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { AdapterError } from '@git-qa/core';
 
 import { browserArgs, browserCandidates, parseActivePort, parseDevToolsUrl } from './launch.js';
-import { profileNote, shouldRemoveProfile } from './profile.js';
+import { profileNote, shouldRemoveProfile, unusableProfileMessage } from './profile.js';
 import { STALE_MARK, closeStaleBrowsers, forgetLaunched, rememberLaunched } from './stale.js';
 import type { BrowserKind } from './launch.js';
 
@@ -96,8 +96,18 @@ export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise
    */
   const cleaned = await closeStaleBrowsers();
   if (cleaned !== undefined) options.onNote?.(cleaned);
+  /**
+   * **行けない道なら、起こす前に止める**（外部レビュー meta-taro/git-qa#36）。
+   *
+   * 既定の置き場に対しては、**Chrome 136 以降デバッグの口が開かない。**
+   * 前はここで警告だけ出して起こしにいき、**20 秒待って
+   * 「繋ぎ先を言ってこない」で落ちていた** —— しかも添えられるのは
+   * Chrome の updater が出す**無関係な行**で、原因と別の方向を指していた。
+   */
+  const unusable = unusableProfileMessage(options.userDataDir);
+  if (unusable !== undefined) throw new AdapterError(KIND, unusable);
+
   // **用意された置き場所を使うなら、そう言う**（#26）。黙って使わない。
-  // **普段使いの置き場所なら、そうと分かるように言う**（#35）。
   const note = profileNote(options.userDataDir);
   if (note !== undefined) options.onNote?.(note);
 
