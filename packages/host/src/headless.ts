@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 import {
   DATE_FORMAT_KEY,
+  sheetWaitMs,
   caseDir,
   createSheetCaseRunner,
   executeRun,
@@ -106,6 +107,10 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<Run> {
     textInput: options.adapter.capabilities.textInput,
     keyInput: options.adapter.capabilities.keyInput,
     appId: options.adapter.capabilities.appId,
+    // **期待結果を待つ長さは、シートが決める**（#39）。**両方の入口へ通す**（#37 の轍）。
+    ...(sheetWaitMs(options.sheet.meta) === undefined
+      ? {}
+      : { expectation: { waitMs: sheetWaitMs(options.sheet.meta) as number } }),
     // **画面の日付の書き方はシートが決める**（#29）。
     ...(options.sheet.meta[DATE_FORMAT_KEY] === undefined
       ? {}

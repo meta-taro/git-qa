@@ -12,6 +12,7 @@ import {
   framesToWebmCommand,
   resolveCaseResult,
   sheetDestination,
+  sheetWaitMs,
   toCaseSubjects,
 } from '@git-qa/core';
 import type {
@@ -191,6 +192,26 @@ function applyHumanTrace(
     }),
   };
 }
+
+/**
+ * **期待結果を待つ長さ。シートが決める**（外部レビュー meta-taro/git-qa#39）。
+ *
+ * **書いていなければ既定のまま**（2 秒）。読めない書き方は `sheetWaitMs` が投げる
+ * —— 黙って既定に落とすと**「8 秒待つつもりで 2 秒だった」**が起きて、気づけない（C20）。
+ *
+ * **呼び側が渡したものが勝つ。**検査は待ちを 0 にして走るので、そこを塞がない。
+ * 実行の道では誰も渡さないので、**実際にはシートが決める。**
+ *
+ * **2 本ある入口の両方へ通す**（#37 —— 片方だけ直して、そちらでだけ再現しない不具合を作った）。
+ */
+const expectationOf = (
+  meta: Record<string, string>,
+  given: { readonly waitMs?: number; readonly stepMs?: number } | undefined,
+): { readonly waitMs?: number; readonly stepMs?: number } | undefined => {
+  const fromSheet = sheetWaitMs(meta);
+  if (fromSheet === undefined) return given;
+  return { waitMs: fromSheet, ...given };
+};
 
 export async function startRunSession(options: StartRunSessionOptions): Promise<RunSession> {
   // 繋ぐ前にシートを見る。繋いでから落ちると、対象を触った跡だけが残る。
@@ -505,13 +526,14 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
    * —— 書いた人からは、何が効いていないのか分からない。
    */
   const app = sheetDestination(options.sheet.meta);
+  const expectation = expectationOf(options.sheet.meta, options.expectation);
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
     ...(app === undefined ? {} : { app }),
     // **相手が名乗った能力をそのまま渡す。**Android の事情を全部の相手に押し付けない。
     textInput: options.adapter.capabilities.textInput,
     keyInput: options.adapter.capabilities.keyInput,
-    ...(options.expectation === undefined ? {} : { expectation: options.expectation }),
+    ...(expectation === undefined ? {} : { expectation }),
     appId: options.adapter.capabilities.appId,
     // **画面の日付の書き方はシートが決める**（外部レビュー meta-taro/git-qa#29）。
     ...(options.sheet.meta[DATE_FORMAT_KEY] === undefined
