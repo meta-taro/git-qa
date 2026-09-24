@@ -44,6 +44,7 @@ import {
   anyWindowScript,
   captureArgs,
   missingWindowMessage,
+  tooManyWindowsMessage,
   notFrontmost,
   parseWindow,
   windowScript,
@@ -146,6 +147,16 @@ export function createDesktopAdapter(options: DesktopAdapterOptions): TargetAdap
 
     async connect(): Promise<TargetSession> {
       const window = parseWindow(await osa(windowScript(options.app)));
+      /**
+       * **同じ名前の窓が 2 つ以上あるなら、黙って選ばない**（2026-09-24・実物で踏んだ）。
+       *
+       * `CGWindowList` は**前にあるほう**を先に返すので、
+       * **前後が入れ替わるたびに、見る窓が変わる。**
+       * 実際に起きたのは —— 枠が一瞬で消える、映像の中でアプリが下へずれる、押しても効かない。
+       */
+      if (window !== undefined && window.sameName > 1) {
+        throw new AdapterError(KIND, tooManyWindowsMessage(options.app, window.sameName));
+      }
       if (window === undefined) {
         // **黙って空の絵を返さない。**見つからないことと、何も映っていないことは別。
         const elsewhere = Number((await osa(anyWindowScript(options.app)).catch(() => '0')).trim());
@@ -221,6 +232,10 @@ function createSession(deps: SessionDeps): TargetSession {
         KIND,
         missingWindowMessage(app, Number.isFinite(elsewhere) ? elsewhere : 0),
       );
+    }
+    // **走行中に増えることもある**（人が 2 つ目を開く）。そこでも黙って選ばない。
+    if (found.sameName > 1) {
+      throw new AdapterError(KIND, tooManyWindowsMessage(app, found.sameName));
     }
     window = found;
     windowAt = Date.now();

@@ -5,6 +5,7 @@ import {
   captureArgs,
   missingWindowMessage,
   parseWindow,
+  tooManyWindowsMessage,
   windowScript,
 } from '../src/window.js';
 
@@ -51,6 +52,8 @@ describe('parseWindow', () => {
       y: 50,
       width: 800,
       height: 600,
+      // **窓の数が無い返り**（古い形）は 1 つとして読む（2026-09-24）。
+      sameName: 1,
     });
   });
 
@@ -128,5 +131,42 @@ describe('missingWindowMessage', () => {
     expect(message).toContain('画面に出ていない');
     expect(message).toContain('デスクトップ');
     expect(message).toContain('最小化');
+  });
+});
+
+/**
+ * **同じ名前の窓が 2 つあると、黙って前の窓を選んでいた**（2026-09-24・実物で踏んだ）。
+ *
+ * 同じアプリを 2 つ開いていると、`CGWindowList` は**前にあるほう**を先に返す。
+ * **前後が入れ替わるたびに、見る窓が変わる。**
+ *
+ * 実際に起きたこと —— 枠が一瞬で消える、映像の中でアプリが下へずれて白い帯が出る、
+ * 押しても効かない。**どれも「別の窓を見ていた」で説明が付いた。**
+ *
+ * **試験導入先でも、同じアプリを 2 つ開いていることは普通にある**（人の指摘）。
+ */
+describe('同じ名前の窓が 2 つ（2026-09-24）', () => {
+  it('窓を数えて返す', () => {
+    expect(parseWindow('12, 345, 0, 0, 800, 600, 1')?.sameName).toBe(1);
+    expect(parseWindow('12, 345, 0, 0, 800, 600, 2')?.sameName).toBe(2);
+  });
+
+  it('数が無い古い返りでも読める（1 つとして扱う）', () => {
+    expect(parseWindow('12, 345, 0, 0, 800, 600')?.sameName).toBe(1);
+  });
+
+  it('数える JXA を出す', () => {
+    expect(windowScript('メモ')).toContain('hit.length');
+  });
+});
+
+describe('tooManyWindowsMessage', () => {
+  it('どちらを見るか決められない、と言う', () => {
+    const said = tooManyWindowsMessage('メモ', 2);
+
+    expect(said).toContain('メモ');
+    expect(said).toContain('2');
+    // **どうすればよいかまで言う。**「決められません」だけだと人は困る。
+    expect(said).toMatch(/1 つ|閉じ/);
   });
 });

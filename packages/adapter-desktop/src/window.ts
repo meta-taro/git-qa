@@ -15,6 +15,14 @@ export interface WindowRef {
   readonly y: number;
   readonly width: number;
   readonly height: number;
+  /**
+   * **同じ名前の窓が、画面にいくつ在るか**（2026-09-24・実物で踏んだ）。
+   *
+   * 2 つ以上あると `CGWindowList` は**前にあるほう**を先に返すので、
+   * **前後が入れ替わるたびに、見る窓が変わる。**
+   * 黙って選ばないために数えて持つ。**古い返りには無いので 1 とみなす。**
+   */
+  readonly sameName: number;
 }
 
 /**
@@ -34,10 +42,12 @@ export function windowScript(app: string): string {
     'var hit = list.filter(function (w) {',
     '  return w.kCGWindowOwnerName === want && w.kCGWindowLayer === 0',
     '    && w.kCGWindowBounds.Width > 1 && w.kCGWindowBounds.Height > 1;',
-    '})[0];',
-    'hit',
-    '  ? [hit.kCGWindowNumber, hit.kCGWindowOwnerPID, hit.kCGWindowBounds.X,',
-    '     hit.kCGWindowBounds.Y, hit.kCGWindowBounds.Width, hit.kCGWindowBounds.Height].join(", ")',
+    '});',
+    'hit[0]',
+    '  ? [hit[0].kCGWindowNumber, hit[0].kCGWindowOwnerPID, hit[0].kCGWindowBounds.X,',
+    '     hit[0].kCGWindowBounds.Y, hit[0].kCGWindowBounds.Width, hit[0].kCGWindowBounds.Height,',
+    // **同じ名前の窓がいくつ在るか**（2026-09-24）。黙って前の窓を選ばないため。
+    '     hit.length].join(", ")',
     '  : "missing value";',
   ].join('\n');
 }
@@ -101,19 +111,24 @@ export function parseWindow(stdout: string): WindowRef | undefined {
     .trim()
     .split(',')
     .map((part) => Number(part.trim()));
-  if (numbers.length !== 6 || numbers.some((n) => !Number.isFinite(n))) return undefined;
+  // 6 つ（古い返り）でも 7 つ（窓の数つき）でも読む。
+  if (numbers.length < 6 || numbers.length > 7 || numbers.some((n) => !Number.isFinite(n))) {
+    return undefined;
+  }
 
-  const [id, pid, x, y, width, height] = numbers as [
+  const [id, pid, x, y, width, height, counted] = numbers as [
     number,
     number,
     number,
     number,
     number,
     number,
+    number | undefined,
   ];
   // 大きさの無い窓は撮れない（畳まれている・出来かけ）。持ち主が分からなければ押せない。
   if (id <= 0 || pid <= 0 || width <= 0 || height <= 0) return undefined;
-  return { id, pid, x, y, width, height };
+  const sameName = counted !== undefined && counted >= 1 ? counted : 1;
+  return { id, pid, x, y, width, height, sameName };
 }
 
 /**
@@ -124,4 +139,21 @@ export function parseWindow(stdout: string): WindowRef | undefined {
  */
 export function captureArgs(windowId: number, path: string): string[] {
   return ['-x', '-o', '-t', 'jpg', '-l', String(windowId), path];
+}
+
+/**
+ * **同じ名前の窓が 2 つ以上あるときの言い分**（2026-09-24・実物で踏んだ）。
+ *
+ * `CGWindowList` は**前にあるほう**を先に返すので、**前後が入れ替わるたびに
+ * 見る窓が変わる。**実際に起きたのは —— 枠が一瞬で消える、映像の中でアプリが
+ * 下へずれて白い帯が出る、押しても効かない。**どれも「別の窓を見ていた」だった。**
+ *
+ * **黙って前の窓を選ばない。**どちらを見るか決められないのだから、そう言う。
+ */
+export function tooManyWindowsMessage(app: string, count: number): string {
+  return (
+    `${app} の窓が ${String(count)} 個あるので、どれを見るか決められない。` +
+    '**前にあるほうが選ばれる**ので、窓を切り替えるたびに見る相手が変わる。' +
+    '**使わないほうを閉じて、1 つにしてから走らせる**'
+  );
 }
