@@ -50,8 +50,10 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
   if (column === null) return;
 
   const existing = column.querySelector<HTMLElement>('.live-pointer');
+  const framed = column.querySelector<HTMLElement>('.live-frame');
   if (at === undefined) {
     existing?.remove();
+    framed?.remove();
     return;
   }
 
@@ -89,6 +91,8 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
    * ところが `key` が相手の窓の中の座標だけだと、**窓を変えても `key` は変わらない** ——
    * **揺れを途切れさせないための番人が、位置直しまで止めていた。**
    */
+  // 枠の中の座標へ置く（column を基準にする）。
+  const box = column.getBoundingClientRect();
   const frame = `${String(Math.round(rect.width))}x${String(Math.round(rect.height))}`;
   const key = `${String(Math.round(aim.x))},${String(Math.round(aim.y))},${at.label ?? ''},${frame}`;
   // **同じ所・同じ枠なら、置き直さない。**置き直すと揺れが最初から始まる。
@@ -96,11 +100,46 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
   existing?.remove();
 
   const doc = root.ownerDocument;
+
+  /**
+   * **見る場所を囲む**（2026-09-24・人の指示）。
+   *
+   * > なんの一覧ですか？矢印の案内はいれられないのですか？たとえば**赤い枠線**を実装するなど。
+   *
+   * 矢印は**どこを指しているか**を示すが、**どこまでが対象か**を示さない。
+   * 判定する人は「この一覧」「この欄」を目で探すことになる。
+   *
+   * **大きさが分からなければ囲まない** —— **当て推量で囲むと、別のものを囲む。**
+   * 元の要望にも入っていた（「該当箇所四角く案内したりできますかね？」）。
+   */
+  framed?.remove();
+  if (at.width !== undefined && at.height !== undefined) {
+    const topLeft = screenPoint({
+      x: at.x - at.width / 2,
+      y: at.y - at.height / 2,
+      rect,
+      canvas: { width: at.screen.x, height: at.screen.y },
+    });
+    const bottomRight = screenPoint({
+      x: at.x + at.width / 2,
+      y: at.y + at.height / 2,
+      rect,
+      canvas: { width: at.screen.x, height: at.screen.y },
+    });
+    if (topLeft !== undefined && bottomRight !== undefined) {
+      const frameMark = doc.createElement('div');
+      frameMark.className = 'live-frame';
+      frameMark.style.left = `${String(Math.round(topLeft.x - box.left))}px`;
+      frameMark.style.top = `${String(Math.round(topLeft.y - box.top))}px`;
+      frameMark.style.width = `${String(Math.max(2, Math.round(bottomRight.x - topLeft.x)))}px`;
+      frameMark.style.height = `${String(Math.max(2, Math.round(bottomRight.y - topLeft.y)))}px`;
+      column.append(frameMark);
+    }
+  }
+
   const mark = doc.createElement('div');
   mark.className = aim.diagonal ? 'live-pointer is-diagonal' : 'live-pointer';
   mark.dataset['at'] = key;
-  // 枠の中の座標へ置く（column を基準にする）。
-  const box = column.getBoundingClientRect();
   mark.style.left = `${String(Math.round(on.x - box.left))}px`;
   mark.style.top = `${String(Math.round(on.y - box.top))}px`;
 

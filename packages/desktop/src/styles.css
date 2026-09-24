@@ -857,6 +857,34 @@ body {
  * **ずっと出ていると、ちゃんと見れない。**だから四角で囲まず、
  * 矢印 1 つを揺らして目を引く。映像そのものは隠さない。
  */
+/*
+ * **見る場所を囲む枠**（2026-09-24・人の指示）。
+ *
+ * > なんの一覧ですか？矢印の案内はいれられないのですか？たとえば**赤い枠線**を実装するなど。
+ *
+ * **ずっと出ていると、ちゃんと見れない**（要望シート No.1 の肝）ので、
+ * **ゆっくり点滅**させる。**中は塗らない** —— 塗ると、見たいものが見えなくなる。
+ */
+.live-frame {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  border: 2px solid #e5484d;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 35%);
+  animation: live-frame-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes live-frame-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .live-pointer {
   position: absolute;
   z-index: 2;

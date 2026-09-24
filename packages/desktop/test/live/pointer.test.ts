@@ -275,3 +275,61 @@ describe('showPointer — 枠の大きさが変わったとき', () => {
     expect(root.querySelector('.live-pointer')).toBe(mark);
   });
 });
+
+/**
+ * **見る場所を、枠で囲む**（2026-09-24・人の指示）。
+ *
+ * > なんの一覧ですか？**矢印の案内はいれられないのですか？**
+ * > たとえば**赤い枠線**を実装するなど。
+ *
+ * 矢印は**どこを指しているか**を示すが、**どこまでが対象か**を示さない。
+ * 判定する人は「この一覧」「この欄」を目で探すことになる。
+ * **大きさが分かっているときは、囲む。**
+ *
+ * 元の要望にも入っていた ——「**該当箇所四角く案内したり**できますかね？」
+ */
+describe('見る場所を囲む（2026-09-24）', () => {
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    const surface = mountLiveView(root, { width: 200, height: 400 });
+    surface.canvas.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 400,
+      right: 400,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  });
+
+  const at = { x: 100, y: 80, screen: { x: 400, y: 300 }, width: 60, height: 20 };
+  const live = (): HTMLElement =>
+    root.querySelector<HTMLElement>('[data-column-id="live"]') as HTMLElement;
+
+  it('大きさが分かっていれば、枠を置く', () => {
+    showPointer(root, at);
+
+    expect(live().querySelector('.live-frame')).not.toBeNull();
+  });
+
+  it('大きさが分からなければ、枠は置かない（当て推量で囲まない）', () => {
+    showPointer(root, { x: 100, y: 80, screen: { x: 400, y: 300 } });
+
+    expect(live().querySelector('.live-frame')).toBeNull();
+  });
+
+  it('指す所が消えたら、枠も消える', () => {
+    showPointer(root, at);
+    showPointer(root, undefined);
+
+    expect(live().querySelector('.live-frame')).toBeNull();
+  });
+});

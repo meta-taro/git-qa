@@ -360,6 +360,24 @@ function createSession(deps: SessionDeps): TargetSession {
       await dispatch(app, action, look, recentWindow, deps.inputPath, deps.onPointed);
     },
 
+    /**
+     * **見る場所を、押さずに指す**（2026-09-24・人の指示）。
+     *
+     * 探し方は押すときと**同じ道**（`resolvePoint`）。別の探し方を作ると、
+     * **指した所と押す所がずれる。**
+     *
+     * **見つからなくても落ちない** —— 指せないだけで、判定はできる。
+     */
+    async locate(ref: string): Promise<boolean> {
+      ensureOpen();
+      try {
+        await resolvePoint({ at: 'element', ref }, look, recentWindow, deps.onPointed);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
     async observe(): Promise<Observation> {
       ensureOpen();
       const seen = await look();

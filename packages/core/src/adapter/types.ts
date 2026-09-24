@@ -73,6 +73,18 @@ export interface TargetSession {
    * 取れない対象（Web など）は持たない。
    */
   screenSize?(): Promise<{ readonly width: number; readonly height: number }>;
+  /**
+   * **見る場所を、押さずに指す**（2026-09-24・人の指示）。
+   *
+   * > なんの一覧ですか？矢印の案内はいれられないのですか？たとえば赤い枠線を実装するなど。
+   *
+   * 矢印と枠は、いままで**AI が押した所にしか出なかった。**
+   * 「画面を見る」だけの行では**何も指さない**ので、**判定する人が目で探すことになる。**
+   *
+   * **期待結果の文字を画面で探して、そこを指す。****押さない。**
+   * **持たない相手もある**ので任意（無ければ、いままでどおり何も指さない）。
+   */
+  locate?(ref: string): Promise<boolean>;
   observe(): Promise<Observation>;
   screenshot(): Promise<Screenshot>;
   /**

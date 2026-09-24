@@ -252,6 +252,20 @@ export function createSheetCaseRunner(
       await sleep(stepMs);
     }
 
+    /**
+     * **見る場所を、人へ渡す前に指す**（2026-09-24・人の指示）。
+     *
+     * > なんの一覧ですか？矢印の案内はいれられないのですか？たとえば赤い枠線を実装するなど。
+     *
+     * 矢印と枠は、いままで**AI が押した所にしか出なかった。**
+     * **判定するのは人**なので、**人が見る場所**を指す。
+     * **通ったときも指す** —— 人はそこを見て置くので、**通った行こそ要る。**
+     *
+     * **見つからなくても進む** —— 指せないことは、判定できないことではない。
+     * **持たない相手もある**（口が任意）。
+     */
+    await ctx.session.locate?.(expectation.text).catch(() => false);
+
     if (aiResult === 'PASS') {
       return withDates({
         aiResult,
