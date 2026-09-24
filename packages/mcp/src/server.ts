@@ -26,6 +26,11 @@ export interface McpServerOptions {
    * **文書を読むのは呼び側**。ここはファイルの場所を知らない。
    */
   readonly readAbout?: (options: { version?: string }) => Promise<string>;
+  /**
+   * 検証シートの書き方を返す（`sheet_guide`・2026-09-24）。
+   * **文書を読むのは呼び側**。ここはファイルの場所を知らない。
+   */
+  readonly readSheetGuide?: () => Promise<string>;
 }
 
 export function createMcpServer(tools: DeviceTools, options: McpServerOptions = {}): McpServer {
@@ -239,6 +244,32 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
         },
       },
       async ({ version }) => ok(await readAbout(version === undefined ? {} : { version })),
+    );
+  }
+
+  /**
+   * **検証シートの書き方を渡す**（2026-09-24・人の指示）。
+   *
+   * > 検証シート作成ノウハウは MCP などでエージェントに共有できる仕組みにしてください
+   *
+   * **同じ日に、同じ相手が 3 回、雑なシートを書いた。**
+   * **文書に書くだけでは、次のエージェントが読まない。****口から渡す。**
+   *
+   * **渡されなければ、この道具は出さない** —— 無いものを在るように見せない。
+   */
+  if (options.readSheetGuide !== undefined) {
+    const readSheetGuide = options.readSheetGuide;
+    server.registerTool(
+      'sheet_guide',
+      {
+        title: '検証シートの書き方（AI エージェント向け）',
+        description:
+          '検証シートを書く前に読む。押す前から在る文字を期待結果にしない、' +
+          '期待結果は人が見る画面から取る、報告された不満をそのまま行にする、など。' +
+          '**シートを書く仕事が来たら、まずこれを呼ぶこと。**',
+        inputSchema: {},
+      },
+      async () => ok(await readSheetGuide()),
     );
   }
 

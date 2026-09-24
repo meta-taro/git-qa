@@ -20,6 +20,7 @@ import { findIosTool, findOcrTool } from './ios-tool.js';
 import { mcpTargetFrom, targetHint } from './target.js';
 
 import { renderAbout } from './about.js';
+import { sheetGuideOr } from './sheet-guide.js';
 import { createWindowCapture } from './screen.js';
 import { createMcpServer, serveOverStdio } from './server.js';
 import { createDeviceTools } from './tools.js';
@@ -193,4 +194,15 @@ const readAbout = async (options: { version?: string }): Promise<string> => {
   });
 };
 
-await serveOverStdio(createMcpServer(tools, { captureWindow, readAbout }));
+/**
+ * **検証シートの書き方を渡す**（`sheet_guide`・2026-09-24）。
+ * `readAbout` と同じで、**文書を正本にして読み出す。**
+ */
+const readSheetGuide = async (): Promise<string> => {
+  const said = await readFile(join(repoRoot, 'docs/sheet-writing.md'), 'utf8').catch(
+    () => undefined,
+  );
+  return sheetGuideOr(said);
+};
+
+await serveOverStdio(createMcpServer(tools, { captureWindow, readAbout, readSheetGuide }));
