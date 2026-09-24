@@ -35,6 +35,14 @@ import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './a
  * 打鍵の受け渡し・遷移）は `@git-qa/core` と `run-session.ts` にあり、そちらは検査してある。
  */
 
+/**
+ * **AI が触った場所・人が見る場所を、画面へ流す道**（要望シート No.1・2026-09-24）。
+ * アダプタは実行器より先に作るので、知らせ先を後から預ける形にする。
+ */
+let reportPointed:
+  | ((at: { x: number; y: number; width?: number; height?: number; label?: string }) => void)
+  | undefined;
+
 const sheetPath = positional(process.argv, 0) ?? process.env['GIT_QA_SHEET'];
 if (sheetPath === undefined) {
   console.error('使い方: pnpm run:sheet:web <検証シート.tsv>');
@@ -121,6 +129,8 @@ const adapter =
             : { firefoxPath: process.env['GIT_QA_BROWSER'] }),
         })
       : createWebAdapter({
+          // **触った場所・見る場所を画面へ流す**（要望シート No.1・2026-09-24）。
+          onPointed: (at) => reportPointed?.(at),
           build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
           /**
            * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、
@@ -210,6 +220,9 @@ if (process.argv.includes('--no-ui')) {
 
 const session = await startRunSession({
   adapter,
+  registerPointing: (report) => {
+    reportPointed = report;
+  },
   // **人が見ている実行でも動画を残す**（#31 の続き）。頼まれたときだけ。
   ...(process.argv.includes('--record') ? { record: true } : {}),
   sheet,

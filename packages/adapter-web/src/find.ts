@@ -96,7 +96,13 @@ export function findElementScript(ref: string): string {
     if (!hit) return null;
     hit.el.scrollIntoView({ block: 'center', inline: 'center' });
     const box = hit.el.getBoundingClientRect();
-    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    // **大きさも返す**（2026-09-24）。枠で囲むのに要る —— 中心だけでは描けない。
+    return {
+      x: box.left + box.width / 2,
+      y: box.top + box.height / 2,
+      width: box.width,
+      height: box.height,
+    };
   };
 
   /**
@@ -221,6 +227,9 @@ export function parseElementNames(value: unknown): string[] {
 export interface FoundPoint {
   readonly x: number;
   readonly y: number;
+  /** 見つけたものの大きさ。**枠で囲むのに要る。**古い返りには無い。 */
+  readonly width?: number;
+  readonly height?: number;
 }
 
 /** 返ってきた位置を読む。**当て推量で触らない**ので、読めなければ undefined。 */
@@ -229,7 +238,16 @@ export function parseFoundPoint(value: unknown): FoundPoint | undefined {
   const point = value as { x?: unknown; y?: unknown };
   if (typeof point.x !== 'number' || typeof point.y !== 'number') return undefined;
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined;
-  return { x: Math.round(point.x), y: Math.round(point.y) };
+
+  const size = value as { width?: unknown; height?: unknown };
+  const box =
+    typeof size.width === 'number' &&
+    typeof size.height === 'number' &&
+    Number.isFinite(size.width) &&
+    Number.isFinite(size.height)
+      ? { width: Math.round(size.width), height: Math.round(size.height) }
+      : {};
+  return { x: Math.round(point.x), y: Math.round(point.y), ...box };
 }
 
 /**

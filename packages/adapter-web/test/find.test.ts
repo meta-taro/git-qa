@@ -203,3 +203,36 @@ describe('disabledElementMessage', () => {
     expect(said).toMatch(/押せない状態/);
   });
 });
+
+/**
+ * **ウェブでも、見る場所を指す**（2026-09-24・人の指示）。
+ *
+ * > ウェブ側はまだですってのは実装なら実装してください。
+ *
+ * **ウェブには矢印の口そのものが無かった** —— デスクトップと Android は
+ * 「AI が触った場所」を画面へ流していたのに、**ウェブは 1 度も指していなかった。**
+ *
+ * **囲むには大きさが要る。**中心だけでは枠を描けない
+ * （当て推量で広げると、別のものを囲む）。
+ */
+describe('見つけた所の大きさも返す（2026-09-24）', () => {
+  it('探す道が、大きさも返す', () => {
+    const script = findElementScript('保存');
+
+    expect(script).toContain('width: box.width');
+    expect(script).toContain('height: box.height');
+  });
+
+  it('返ってきた大きさを読む', () => {
+    expect(parseFoundPoint({ x: 10, y: 20, width: 60, height: 24 })).toEqual({
+      x: 10,
+      y: 20,
+      width: 60,
+      height: 24,
+    });
+  });
+
+  it('大きさが無くても、場所は読める（古い返りでも落ちない）', () => {
+    expect(parseFoundPoint({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
+  });
+});

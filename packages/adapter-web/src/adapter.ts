@@ -63,6 +63,20 @@ export interface WebAdapterOptions {
   /** **その中の、どのプロファイルか**（外部レビュー meta-taro/git-qa#35）。 */
   readonly profileDirectory?: string;
   /**
+   * **AI が触った場所・人が見る場所を、画面へ流す**（要望シート No.1・2026-09-24）。
+   *
+   * **ウェブにはこの口が無かった** —— デスクトップと Android は流していたのに、
+   * **ウェブは 1 度も指していなかった。**
+   * 座標は**画面の中の画素**（映像と同じ数え方）。
+   */
+  readonly onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void;
+  /**
    * **既に起きているブラウザの繋ぎ先**（meta-taro/git-qa#30）。
    *
    * 渡すと**起こさない・閉じない。**Playwright が起こしたブラウザに繋いで、
@@ -207,6 +221,7 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
           ...(options.destination === undefined ? {} : { destination: options.destination }),
           browserLabel: label,
           profile: profileKind(options.userDataDir),
+          ...(options.onPointed === undefined ? {} : { onPointed: options.onPointed }),
           ...(options.settleMs === undefined ? {} : { settleMs: options.settleMs }),
           ...(options.loadTimeoutMs === undefined ? {} : { loadTimeoutMs: options.loadTimeoutMs }),
         });
@@ -231,6 +246,14 @@ interface SessionDeps {
   readonly browserLabel: string;
   /** **どのプロファイルで見たか**（外部レビュー meta-taro/git-qa#35）。 */
   readonly profile?: BrowserProfileKind;
+  /** 触った場所・見る場所を画面へ流す（要望シート No.1・2026-09-24）。 */
+  readonly onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void;
   readonly settleMs?: number;
   readonly loadTimeoutMs?: number;
 }
@@ -322,11 +345,29 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action: Action): Promise<void> {
       ensureOpen();
-      await dispatch(cdp, action);
+      await dispatch(cdp, action, deps.onPointed);
       // **押した直後の画面は、まだ前の画面。**落ち着くのを待ってから次へ。
       await new Promise((resolve) => setTimeout(resolve, deps.settleMs ?? DEFAULT_SETTLE_MS));
       // 行き先が変わったなら、描き終わるまで待つ。
       await waitForLoad(cdp, deps.loadTimeoutMs ?? DEFAULT_LOAD_TIMEOUT_MS);
+    },
+
+    /**
+     * **見る場所を、押さずに指す**（2026-09-24・人の指示）。
+     *
+     * > ウェブ側はまだですってのは実装なら実装してください。
+     *
+     * 探し方は押すときと**同じ道**（`resolvePoint`）。別の探し方を作ると、
+     * **指した所と押す所がずれる。**
+     */
+    async locate(ref: string): Promise<boolean> {
+      ensureOpen();
+      try {
+        await resolvePoint(cdp, { at: 'element', ref }, deps.onPointed);
+        return true;
+      } catch {
+        return false;
+      }
     },
 
     async observe(): Promise<Observation> {
@@ -405,7 +446,17 @@ function createSession(deps: SessionDeps): TargetSession {
  * 実物の検証シートは「「保存」をクリックする」と書く。**座標では書かない。**
  * 見つからなければ、Android 側と同じ言い方で落ちる（人が次に何をすればよいか分かる形）。
  */
-async function resolvePoint(cdp: CdpClient, ref: PointerRef): Promise<{ x: number; y: number }> {
+async function resolvePoint(
+  cdp: CdpClient,
+  ref: PointerRef,
+  onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void,
+): Promise<{ x: number; y: number }> {
   if (ref.at === 'point') return { x: ref.x, y: ref.y };
 
   const result = await cdp.send('Runtime.evaluate', {
@@ -426,11 +477,30 @@ async function resolvePoint(cdp: CdpClient, ref: PointerRef): Promise<{ x: numbe
     // **探した所を言う**（#28）。「そんな要素は無い」だけだと、実物を見ている人と食い違う。
     throw new AdapterError(KIND, missingElementMessage(ref.ref));
   }
+
+  // **見つけた所を知らせる**（要望シート No.1）。枠で囲むために大きさも渡す。
+  onPointed?.({
+    x: point.x,
+    y: point.y,
+    ...(point.width === undefined ? {} : { width: point.width }),
+    ...(point.height === undefined ? {} : { height: point.height }),
+    label: ref.ref,
+  });
   return point;
 }
 
 /** 人と AI の操作を、ブラウザの言葉へ移す。 */
-async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
+async function dispatch(
+  cdp: CdpClient,
+  action: Action,
+  onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void,
+): Promise<void> {
   if (action.kind === 'launch') {
     // **行き先はシートが宣言したものだけ**（C40）。表示名からの推測はしない。
     await cdp.send('Page.navigate', { url: action.app });
@@ -440,7 +510,7 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   if (action.kind === 'type') {
     // 入力先が書かれていれば、そこを触ってから送る（欄が違うと、打った文字が消える）。
     if (action.target !== undefined) {
-      const point = await resolvePoint(cdp, action.target);
+      const point = await resolvePoint(cdp, action.target, onPointed);
       for (const type of ['mousePressed', 'mouseReleased'] as const) {
         await cdp.send('Input.dispatchMouseEvent', {
           type,
@@ -472,8 +542,8 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
      * **1 回で運ばない。**掴んだ先が動きを追うのは「途中の動き」を見てからなので、
      * 押して即離すと**何も起きない**（並べ替えの UI で実際にそうなる）。
      */
-    const from = await resolvePoint(cdp, action.from);
-    const to = await resolvePoint(cdp, action.to);
+    const from = await resolvePoint(cdp, action.from, onPointed);
+    const to = await resolvePoint(cdp, action.to, onPointed);
 
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x, y: from.y });
     await cdp.send('Input.dispatchMouseEvent', {
@@ -506,7 +576,7 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   }
 
   if (action.kind === 'tap') {
-    const point = await resolvePoint(cdp, action.target);
+    const point = await resolvePoint(cdp, action.target, onPointed);
     // **触る前に、そこへポインタを動かす。**hover でしか出ないものがある。
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
     for (const type of ['mousePressed', 'mouseReleased'] as const) {
@@ -522,8 +592,8 @@ async function dispatch(cdp: CdpClient, action: Action): Promise<void> {
   }
 
   // swipe。ブラウザではスクロールとして送る（指でなぞる相手ではない）。
-  const from = await resolvePoint(cdp, action.from);
-  const to = await resolvePoint(cdp, action.to);
+  const from = await resolvePoint(cdp, action.from, onPointed);
+  const to = await resolvePoint(cdp, action.to, onPointed);
   await cdp.send('Input.dispatchMouseEvent', {
     type: 'mouseWheel',
     x: from.x,

@@ -86,6 +86,16 @@ const runIdFrom = (at: Date): string => {
 
 const winToolPath = await findWinTool();
 
+/**
+ * **AI が触った場所・人が見る場所を、画面へ流す道**（要望シート No.1・2026-09-24）。
+ *
+ * **画面から始める道には、この配線が無かった** —— `pnpm run:sheet:*`（CLI）だけが
+ * 流していて、**配布物で使われるこちらでは、どの相手でも矢印が出ていなかった。**
+ */
+let reportPointed:
+  | ((at: { x: number; y: number; width?: number; height?: number; label?: string }) => void)
+  | undefined;
+
 /** デスクトップアプリを見るアダプタ。**OS ごとに別のもの。** */
 const desktopAdapterFor = (app: string) => {
   const why = whyNoDesktop(process.platform, winToolPath);
@@ -94,10 +104,16 @@ const desktopAdapterFor = (app: string) => {
   const build = { source: app, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' };
   if (process.platform === 'win32') {
     // `whyNoDesktop` が通っているので、道具は在る。
-    return createWindowsDesktopAdapter({ app, build, toolPath: winToolPath as string });
+    return createWindowsDesktopAdapter({
+      app,
+      build,
+      toolPath: winToolPath as string,
+      onPointed: (at) => reportPointed?.(at),
+    });
   }
   return createDesktopAdapter({
     app,
+    onPointed: (at) => reportPointed?.(at),
     build,
     // **同梱の OCR を既定で使う**（段 2・C55）。無ければ段 1 だけで動く。
     ...(ocrPath === undefined ? {} : { ocrPath }),
@@ -237,6 +253,9 @@ const setup = await startSetupServer({
         : undefined;
 
     session = await startRunSession({
+      registerPointing: (report) => {
+        reportPointed = report;
+      },
       adapter:
         app !== undefined
           ? desktopAdapterFor(app)
@@ -261,6 +280,7 @@ const setup = await startSetupServer({
                 })
               : web && url !== undefined
                 ? createWebAdapter({
+                    onPointed: (at) => reportPointed?.(at),
                     build: {
                       source: subject ?? url,
                       label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
