@@ -369,14 +369,56 @@ const SHOWN_AFTER: readonly string[] = [
  */
 const NOT_SHOWN = /^(?:ない|ず|ません|なくなる|なくなっている|ていない)/;
 
-/** 鉤括弧の後ろが、画面の文字を指しているか。 */
-function pointsAtScreenText(after: string): boolean {
+/**
+ * **打ち消しが混じっていないか**（文のどこにあっても見る・2026-09-24）。
+ *
+ * 前は「鉤括弧の直後が `と表示される` か」だけを見ていた。
+ * **人が読んで分かる文を書けるようにした**ので、**否定は文全体から探す。**
+ *
+ * `「保存しました」と表示されない` / `「定休日」の日は押せない` / `「送信」が押せません`
+ */
+const DENIES = /(?:ない|ず(?:に)?$|ません|なくなる|なくなっている|ていない|不可|できず)/;
+
+/**
+ * **鉤括弧の中を機械が見て、前後の文はそのまま人に見せる**（2026-09-24・人の指示）。
+ *
+ * > 「日本語」と表示される **は、「どこに」が無いです。**
+ * > **プルダウンが開閉し、2 番目に「日本語」が選択できる。**
+ *
+ * 前は**鉤括弧の直後が「と表示される」などのときだけ**受け取っていた。
+ * そのため **「どこに」「どうなったか」「何ができるか」が 1 文字も書けず**、
+ * **判定する人は、画面のどこを見ればよいか分からなかった**（4〜5 回指摘された）。
+ *
+ * **機械が見るのは、いまも鉤括弧の中の文字が在るかだけ。**そこは変えない。
+ * **変えたのは、人が読む分を書けるようにしたこと。**
+ *
+ * **否定だけは弾く**（#27）。**言っていることの逆**を判定させない ——
+ * 「「定休日」の日は押せない」が**文字探しに化ける**と、**押せることを確かめずに合格が付く。**
+ */
+function readableAsScreenText(whole: string, after: string): boolean {
+  /**
+   * **1. 鉤括弧の直後が「と表示される」なら、今までどおり。**
+   *
+   * その言い方のときだけ、**打ち消しはその直後**を見る ——
+   * `「本文を入力してください」と表示され、保存されない` は
+   * **「表示される」ことを言っている。**後ろの「保存されない」は別の話なので通す。
+   */
   const rest = after.trimStart();
   for (const word of SHOWN_AFTER) {
     if (!rest.startsWith(word)) continue;
     return !NOT_SHOWN.test(rest.slice(word.length));
   }
-  return false;
+
+  /**
+   * **2. それ以外は、人が読む文として受け取る**（2026-09-24・人の指示）。
+   *
+   * `プルダウンが開閉し、2 番目に「日本語」が選択できる`
+   *
+   * **打ち消しが文のどこかに在れば受け取らない** ——
+   * 「「定休日」の日は押せない」が**文字探しに化ける**と、
+   * **押せることを確かめずに合格が付く**（#27）。
+   */
+  return !DENIES.test(whole);
 }
 
 /**
@@ -404,7 +446,7 @@ export function planExpectation(expectedText: string): ExpectationCheck {
   if (matches.length === 1) {
     const hit = matches[0] as RegExpMatchArray;
     const after = expectedText.slice((hit.index ?? 0) + hit[0].length);
-    if (pointsAtScreenText(after)) {
+    if (readableAsScreenText(expectedText, after)) {
       return { kind: 'contains', text: hit[1] as string };
     }
     /**
@@ -412,21 +454,22 @@ export function planExpectation(expectedText: string): ExpectationCheck {
      *
      * > **但し書きに従うほど、判定が間違った方向に確定します。**
      *
-     * 「鉤括弧を足せば通る」と読ませると、**hold（正直に放棄した状態）から、
+     * 「書き換えれば通る」と読ませると、**hold（正直に放棄した状態）から、
      * 言っていることの逆を判定する状態へ移る。**
      */
     return {
       kind: 'hold',
       reason:
-        '期待結果に鉤括弧はあるが、**画面に出る文字**を指しているか判断できないので人が見る' +
-        `（押せる・選べる・状態になっている、は画面の文字ではないので言い換えても判定できない）: ${expectedText.trim()}`,
+        '期待結果に打ち消し（〜ない／〜ません）が入っているので人が見る。' +
+        'この道具は**画面に出る文字**が在るかしか見られないので、' +
+        `**出ないこと・できないこと**は確かめられない: ${expectedText.trim()}`,
     };
   }
 
   const reason =
     matches.length === 0
       ? '期待結果を機械で判定できないので人が見る' +
-        `（**画面に出る文字**を「…」で囲んで「と表示される」と書けるものだけ判定できる。押せる・選べるは判定できない）: ${expectedText.trim()}`
+        `（**画面に出る文字**を「…」で囲むと、そこだけを機械が見る。前後は人が読む文でよい）: ${expectedText.trim()}`
       : `期待結果に鉤括弧が ${String(matches.length)} 個あり、どれを見るか決められない: ${expectedText.trim()}`;
   return { kind: 'hold', reason };
 }

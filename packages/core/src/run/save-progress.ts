@@ -1,3 +1,4 @@
+import { writeBackToSheet } from './fill-sheet.js';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 
 import { runDir, runJsonPath } from './layout.js';
@@ -40,5 +41,18 @@ export async function saveRunProgress(runsRoot: string, run: Run): Promise<strin
   const staging = `${path}.writing`;
   await writeFile(staging, `${JSON.stringify(run, null, 2)}\n`, 'utf8');
   await rename(staging, path);
+
+  /**
+   * **正本のシートへ書き戻す**（2026-09-24・人の判断・C3 を覆した）。
+   *
+   * > だれがいつどう検査したか正本が更新されないなら、なにが便利なんですか？
+   *
+   * **ここに置いたのは、合流点だから。**実行の入口は 9 か所あり、
+   * **1 か所ずつ足すと、足し忘れた道でだけ書かれない**（#37 で実際に踏んだ）。
+   *
+   * **落ちない。**書けなくても証跡は既に書き終わっている。
+   * **書けなかったことは、呼び側が言う**（`writeBackToSheet` が理由を返す）。
+   */
+  await writeBackToSheet(run).catch(() => undefined);
   return path;
 }

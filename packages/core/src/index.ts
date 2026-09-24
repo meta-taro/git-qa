@@ -128,6 +128,8 @@ export {
 export { DATE_FORMAT_KEY, expandDates, formatDate } from './run/dates.js';
 export { WAIT_KEY, sheetWaitMs } from './run/wait.js';
 export { alreadyThereMessage, wasAlreadyThere } from './run/already-there.js';
+export { RESULT_COLUMN, fillSheetResults, writeBackToSheet } from './run/fill-sheet.js';
+export type { FillSheetOptions, FilledCase, FilledSheet } from './run/fill-sheet.js';
 export type { ResolvedDate } from './run/dates.js';
 // 1 枚ずつの絵を動画にする（外部レビュー #31）。
 export { framesToWebmCommand } from './adapter/frames-to-webm.js';
