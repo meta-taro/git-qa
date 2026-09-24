@@ -1,3 +1,4 @@
+import { fakeScreenPerCase } from './fake-screen.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,7 +103,7 @@ describe('一本道（端末だけ代役・橋も打鍵も本物）', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-153000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
     });
     const screen = await watch(session.controlUrl);
 
@@ -158,7 +159,7 @@ describe('一本道（端末だけ代役・橋も打鍵も本物）', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-153100',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
     });
     const screen = await watch(session.controlUrl);
 

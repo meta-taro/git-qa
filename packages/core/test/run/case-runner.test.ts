@@ -54,14 +54,29 @@ const failingAct = (session: TargetSession, error: Error): TargetSession => ({
   close: () => session.close(),
 });
 
-const runner = (screenText: string | Error) =>
-  createSheetCaseRunner({
-    readScreenText: () =>
-      screenText instanceof Error ? Promise.reject(screenText) : Promise.resolve(screenText),
+/**
+ * 偽の画面。**押す前は空、押したあとに文字が出る**（2026-09-24）。
+ *
+ * **前は押す前も後も同じ文字を返していた。**それだと
+ * 「押す前から在る文字は確かめたことにならない」という守り（`wasAlreadyThere`）に
+ * 引っかかる —— **引っかかるのが正しい。**実物の画面は、押して初めて変わる。
+ *
+ * **押す前の画面も見たい検査は、`before` を渡す。**
+ */
+const runner = (screenText: string | Error, before = '') => {
+  let asked = 0;
+  return createSheetCaseRunner({
+    readScreenText: () => {
+      // 1 回目は押す前。2 回目から押したあと。
+      asked += 1;
+      if (asked === 1) return Promise.resolve(before);
+      return screenText instanceof Error ? Promise.reject(screenText) : Promise.resolve(screenText);
+    },
     // **ここでは待たせない。**画面が変わらないことは分かっているので、
     // 落ちる判定のたびに本当に 2 秒待っても、確かめられることは増えない。
     expectation: { waitMs: 0, stepMs: 1 },
   });
+};
 
 describe('createSheetCaseRunner — 手順を実行して AI の判定を出す', () => {
   it('手順が全部落とせれば、順に操作する', async () => {
@@ -241,8 +256,13 @@ describe('createSheetCaseRunner — 起動', () => {
         return session.isClosed;
       },
     };
+    // **1 回目は押す前の画面**（2026-09-24）。起動前にホーム画面は出ていない。
+    let asked = 0;
     const run = createSheetCaseRunner({
-      readScreenText: () => Promise.resolve('ホーム画面'),
+      readScreenText: () => {
+        asked += 1;
+        return Promise.resolve(asked === 1 ? '' : 'ホーム画面');
+      },
       app: 'com.android.settings',
       expectation: { waitMs: 0, stepMs: 1 },
     });
@@ -287,8 +307,12 @@ describe('createSheetCaseRunner — 出るまで少し待つ', () => {
     waitMs = 2000,
   ): Promise<{ verdict: CaseVerdict; reads: number }> => {
     let reads = 0;
+    let asked = 0;
     const runner = createSheetCaseRunner({
       readScreenText: () => {
+        // **1 回目は押す前の画面**（2026-09-24）。`reads` は押したあとの回数を数える。
+        asked += 1;
+        if (asked === 1) return Promise.resolve('');
         const said = texts[Math.min(reads, texts.length - 1)] ?? '';
         reads += 1;
         return Promise.resolve(said);

@@ -1,3 +1,4 @@
+import { fakeScreenPerCase } from './fake-screen.js';
 import { describe, expect, it } from 'vitest';
 
 import { parseTestSpecTsv } from '@git-qa/core';
@@ -68,7 +69,7 @@ const start = (bridge: ReturnType<typeof fakeBridge>, screenText = '保存しま
     sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
     runId: '20260902-150000',
     operator: { handle: 'octocat' },
-    readScreenText: () => Promise.resolve(screenText),
+    readScreenText: fakeScreenPerCase(screenText),
     startBridge: bridge.start,
     // **検査では待たせない。**落ちる判定のたびに 2 秒待つと、検査が待ち切れない。
     expectation: { waitMs: 0, stepMs: 1 },
@@ -219,7 +220,7 @@ describe('人が端末を触る', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-200000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -249,7 +250,7 @@ describe('人が端末を触る', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-200100',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -276,7 +277,7 @@ describe('人がなぞる（スワイプ / フリック）', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-210000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -317,7 +318,7 @@ describe('小さく流した映像の座標を、端末の実寸へ戻す', () =
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-220000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -357,7 +358,7 @@ describe('手数を数える（Issue 008）', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260904-180000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -450,7 +451,7 @@ describe('判定の置き直し（Issue 013）', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-230000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -532,7 +533,7 @@ describe('人が触った操作を証跡に残す', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260903-100000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -574,7 +575,7 @@ describe('人が触った操作を証跡に残す', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260903-100100',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -600,7 +601,7 @@ describe('長押し', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260903-110000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -646,7 +647,7 @@ describe('文字を端末へ送る', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260903-120000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -687,7 +688,7 @@ describe('映像が止まった理由を画面へ伝える', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260903-130000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
       reconnect: { intervalMs: 1, limitMs: 5, sleep: () => Promise.resolve() },
     });
@@ -737,7 +738,7 @@ describe('startRunSession — 対象アプリ', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-150000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
     });
 
@@ -767,7 +768,7 @@ describe('startRunSession — 証跡の保存', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-150000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
       saveRun: (run) => {
         saved.push(run);
@@ -794,7 +795,7 @@ describe('startRunSession — 証跡の保存', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260902-150000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('保存しました'),
+      readScreenText: fakeScreenPerCase('保存しました'),
       startBridge: bridge.start,
       saveRun: () => Promise.reject(new Error('EROFS: read-only file system')),
     });
@@ -841,7 +842,7 @@ describe('行き先（#37）', () => {
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
       runId: '20260921-100000',
       operator: { handle: 'octocat' },
-      readScreenText: () => Promise.resolve('ようこそ'),
+      readScreenText: fakeScreenPerCase('ようこそ'),
       startBridge: bridge.start,
       // **検査では待たせない。**
       expectation: { waitMs: 0, stepMs: 1 },

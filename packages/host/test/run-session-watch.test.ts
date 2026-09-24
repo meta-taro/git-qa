@@ -1,3 +1,4 @@
+import { fakeScreenPerCase } from './fake-screen.js';
 import { describe, expect, it } from 'vitest';
 
 import { parseTestSpecTsv } from '@git-qa/core';
@@ -72,7 +73,7 @@ const start = (
     sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
     runId: '20260911-190000',
     operator: { handle: 'octocat' },
-    readScreenText: () => Promise.resolve('保存しました'),
+    readScreenText: fakeScreenPerCase('保存しました'),
     startBridge: bridge.start,
     // **検査では待たせない。**落ちる判定のたびに 2 秒待つと、検査が待ち切れない。
     expectation: { waitMs: 0, stepMs: 1 },

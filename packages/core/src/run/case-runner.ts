@@ -4,6 +4,7 @@ import type { AiResult } from './types.js';
 import type { CaseContext, CaseVerdict } from './execute.js';
 import type { PlannedAction, PlannedStep } from './steps.js';
 import { expandDates } from './dates.js';
+import { alreadyThereMessage, wasAlreadyThere } from './already-there.js';
 import { judgeExpectation, planExpectation, planSteps } from './steps.js';
 
 /**
@@ -175,6 +176,20 @@ export function createSheetCaseRunner(
 
     // ここまで来た時点で hold は無い。型の上でも落として、キャストを持ち込まない。
     const actions = planned.filter((step): step is PlannedAction => step.kind === 'action');
+
+    /**
+     * **押す前の画面を読んでおく**（2026-09-24・人の指示）。
+     *
+     * > この指摘をずっとしています。3 回以上。
+     *
+     * 期待結果は「在るか」しか見ないので、**押す前から在る文字を書くと、
+     * 何も起きなくても通る。**同じ日に同じ相手が 3 回それを書いた。
+     * **文書に書いても、書いた本人が踏んだ。****機械で止める。**
+     *
+     * **読めなくても止めない** —— 読めないことを落第にしない（C20）。
+     */
+    const before = await options.readScreenText(ctx.session).catch(() => undefined);
+
     const failure = await actAll(ctx, actions);
     if (failure !== undefined) {
       return withDates({ aiResult: 'BLOCKED', note: failure });
@@ -212,7 +227,20 @@ export function createSheetCaseRunner(
       }
       tries += 1;
       aiResult = judgeExpectation(expectation, screenText);
-      if (aiResult === 'PASS') break;
+      if (aiResult === 'PASS') {
+        /**
+         * **押す前から在ったなら、その行は何も確かめていない**（2026-09-24）。
+         *
+         * **落第にはしない** —— 製品は悪くない。**判断保留にして、シートを直させる。**
+         */
+        if (wasAlreadyThere(expectation, before)) {
+          return withDates({
+            aiResult: 'BLOCKED',
+            note: alreadyThereMessage(expectation.text),
+          });
+        }
+        break;
+      }
       /**
        * **落ちると言う前に、必ずもう一度見る**（2026-09-14）。
        *
