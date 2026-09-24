@@ -333,3 +333,56 @@ describe('見る場所を囲む（2026-09-24）', () => {
     expect(live().querySelector('.live-frame')).toBeNull();
   });
 });
+
+/**
+ * **枠が一瞬で消えていた**（2026-09-24・実物で人が見つけた）。
+ *
+ * > あ、なんかちょっとミスってる 4 番の時。**いっしゅんしかでない**
+ *
+ * 矢印は「同じ所なら置き直さない」（揺れが途切れるため）。
+ * **その見張りが、枠まで止めていた** —— **誰かが枠を消すと、二度と戻らない。**
+ *
+ * **枠は毎回、在ることを確かめる。**枠は揺れないので、置き直しても困らない。
+ */
+describe('枠が消えたまま戻らない（2026-09-24）', () => {
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    root = document.createElement('div');
+    document.body.append(root);
+    renderColumns(root);
+    const surface = mountLiveView(root, { width: 200, height: 400 });
+    surface.canvas.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 400,
+      right: 400,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  });
+
+  const at = { x: 100, y: 80, screen: { x: 400, y: 300 }, width: 60, height: 20 };
+  const live = (): HTMLElement =>
+    root.querySelector<HTMLElement>('[data-column-id="live"]') as HTMLElement;
+
+  it('同じ所を続けて指しても、枠は在り続ける', () => {
+    showPointer(root, at);
+    live().querySelector('.live-frame')?.remove(); // 誰かが消した
+    showPointer(root, at);
+
+    expect(live().querySelector('.live-frame')).not.toBeNull();
+  });
+
+  it('同じ所なら、矢印は置き直さない（揺れを途切れさせない）', () => {
+    showPointer(root, at);
+    const first = live().querySelector('.live-pointer');
+    showPointer(root, at);
+
+    expect(live().querySelector('.live-pointer')).toBe(first);
+  });
+});

@@ -93,26 +93,17 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
    */
   // 枠の中の座標へ置く（column を基準にする）。
   const box = column.getBoundingClientRect();
-  const frame = `${String(Math.round(rect.width))}x${String(Math.round(rect.height))}`;
-  const key = `${String(Math.round(aim.x))},${String(Math.round(aim.y))},${at.label ?? ''},${frame}`;
-  // **同じ所・同じ枠なら、置き直さない。**置き直すと揺れが最初から始まる。
-  if (existing !== null && existing.dataset['at'] === key) return;
-  existing?.remove();
-
   const doc = root.ownerDocument;
 
   /**
-   * **見る場所を囲む**（2026-09-24・人の指示）。
+   * **枠は毎回、在ることを確かめる**（2026-09-24・実物で人が見つけた）。
    *
-   * > なんの一覧ですか？矢印の案内はいれられないのですか？たとえば**赤い枠線**を実装するなど。
+   * > あ、なんかちょっとミスってる 4 番の時。**いっしゅんしかでない**
    *
-   * 矢印は**どこを指しているか**を示すが、**どこまでが対象か**を示さない。
-   * 判定する人は「この一覧」「この欄」を目で探すことになる。
-   *
-   * **大きさが分からなければ囲まない** —— **当て推量で囲むと、別のものを囲む。**
-   * 元の要望にも入っていた（「該当箇所四角く案内したりできますかね？」）。
+   * 矢印は「同じ所なら置き直さない」（揺れが途切れるため）。
+   * **その見張りが、枠まで止めていた** —— **誰かが枠を消すと、二度と戻らなかった。**
+   * **枠は揺れない**ので、置き直しても困らない。
    */
-  framed?.remove();
   if (at.width !== undefined && at.height !== undefined) {
     const topLeft = screenPoint({
       x: at.x - at.width / 2,
@@ -127,15 +118,35 @@ export function showPointer(root: HTMLElement, at: Pointing | undefined): void {
       canvas: { width: at.screen.x, height: at.screen.y },
     });
     if (topLeft !== undefined && bottomRight !== undefined) {
-      const frameMark = doc.createElement('div');
-      frameMark.className = 'live-frame';
-      frameMark.style.left = `${String(Math.round(topLeft.x - box.left))}px`;
-      frameMark.style.top = `${String(Math.round(topLeft.y - box.top))}px`;
-      frameMark.style.width = `${String(Math.max(2, Math.round(bottomRight.x - topLeft.x)))}px`;
-      frameMark.style.height = `${String(Math.max(2, Math.round(bottomRight.y - topLeft.y)))}px`;
-      column.append(frameMark);
+      const left = Math.round(topLeft.x - box.left);
+      const top = Math.round(topLeft.y - box.top);
+      const width = Math.max(2, Math.round(bottomRight.x - topLeft.x));
+      const height = Math.max(2, Math.round(bottomRight.y - topLeft.y));
+      const want = [left, top, width, height].join(',');
+
+      // 同じ形で既に在るなら、置き直さない（点滅を最初から始めない）。
+      if (framed === null || framed.dataset['box'] !== want) {
+        framed?.remove();
+        const frameMark = doc.createElement('div');
+        frameMark.className = 'live-frame';
+        frameMark.dataset['box'] = want;
+        frameMark.style.left = `${String(left)}px`;
+        frameMark.style.top = `${String(top)}px`;
+        frameMark.style.width = `${String(width)}px`;
+        frameMark.style.height = `${String(height)}px`;
+        column.append(frameMark);
+      }
     }
+  } else {
+    // **大きさが分からなければ囲まない。**前の枠も残さない（別のものを囲む）。
+    framed?.remove();
   }
+
+  const frame = `${String(Math.round(rect.width))}x${String(Math.round(rect.height))}`;
+  const key = `${String(Math.round(aim.x))},${String(Math.round(aim.y))},${at.label ?? ''},${frame}`;
+  // **同じ所・同じ枠なら、置き直さない。**置き直すと揺れが最初から始まる。
+  if (existing !== null && existing.dataset['at'] === key) return;
+  existing?.remove();
 
   const mark = doc.createElement('div');
   mark.className = aim.diagonal ? 'live-pointer is-diagonal' : 'live-pointer';
