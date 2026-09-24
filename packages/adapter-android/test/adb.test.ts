@@ -291,3 +291,41 @@ describe('入力先の欄を読む', () => {
     expect(focusedField(dump('text="x" focused="false" password="false"'))).toBeUndefined();
   });
 });
+
+/**
+ * **押せない部品に当たっていた**（外部レビュー meta-taro/git-qa#41・ウェブ側で報告）。
+ *
+ * 同じ穴が Android にもある —— `findElementCenter` は**最初に当たったもの**を取るので、
+ * **`TextView` が `Button` より先に出てくれば、押せないほうを押す。**
+ * 押しても何も起きないのに、**手順は成功として記録される。**
+ *
+ * uiautomator は `clickable` を持っているので、**そこを先に見る。**
+ */
+describe('findElementCenter — 押せるものを先に（#41）', () => {
+  const node = (attrs: Record<string, string>): string =>
+    `<node ${Object.entries(attrs)
+      .map(([k, v]) => `${k}="${v}"`)
+      .join(' ')} />`;
+
+  it('同じ文字なら、押せるほうを選ぶ（先に出てくるのが押せなくても）', () => {
+    const xml = [
+      node({ text: 'ログイン', clickable: 'false', bounds: '[0,0][100,50]' }),
+      node({ text: 'ログイン', clickable: 'true', bounds: '[0,200][100,250]' }),
+    ].join('\n');
+
+    // 押せるほう（下）の中心
+    expect(findElementCenter(xml, 'ログイン')).toEqual({ x: 50, y: 225 });
+  });
+
+  it('押せるものが無ければ、今までどおり最初のものを押す', () => {
+    const xml = node({ text: 'ログイン', clickable: 'false', bounds: '[0,0][100,50]' });
+
+    expect(findElementCenter(xml, 'ログイン')).toEqual({ x: 50, y: 25 });
+  });
+
+  it('clickable を持たない dump でも動く（古い端末）', () => {
+    const xml = node({ text: 'ログイン', bounds: '[0,0][100,50]' });
+
+    expect(findElementCenter(xml, 'ログイン')).toEqual({ x: 50, y: 25 });
+  });
+});

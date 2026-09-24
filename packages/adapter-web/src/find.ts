@@ -41,7 +41,48 @@ export function findElementScript(ref: string): string {
     ].filter((v) => typeof v === 'string' && v.trim() !== '');
     const text = (el.innerText || el.textContent || '').trim();
     const children = el.children.length;
-    seen.push({ el, box, labels: labels.map((v) => v.trim()), text, children });
+
+    /**
+     * **押せるものかどうか**（外部レビュー meta-taro/git-qa#41）。
+     *
+     * 同じ文字が**カードの見出し**（押せない）と**送信ボタン**（押せる）の
+     * 2 箇所にある画面で、**見出しに当たっていた。**
+     * 押しても何も起きないのに、**手順は成功として記録されていた。**
+     *
+     * シートに「「保存」をクリックする」と書く人は、**押せるものを指している。**
+     */
+    const role = (el.getAttribute('role') || '').toLowerCase();
+    const tag = el.tagName.toLowerCase();
+    const pressable =
+      tag === 'button' ||
+      tag === 'summary' ||
+      (tag === 'a' && el.hasAttribute('href')) ||
+      (tag === 'input' && ['submit', 'button', 'reset', 'checkbox', 'radio'].includes(el.type)) ||
+      tag === 'select' ||
+      tag === 'textarea' ||
+      (tag === 'input') ||
+      role === 'button' ||
+      role === 'link' ||
+      role === 'tab' ||
+      role === 'menuitem' ||
+      role === 'option' ||
+      role === 'checkbox' ||
+      role === 'radio' ||
+      typeof el.onclick === 'function' ||
+      el.hasAttribute('onclick');
+
+    /**
+     * **押せない状態のもの**（#41 の提案 2）。
+     *
+     * **押していないのに手順が成功として残る**のが、この道具がいちばんやってはいけない形。
+     * 候補から外し、**そればかりだったときは、そう言って止める。**
+     */
+    const blocked =
+      el.disabled === true ||
+      el.getAttribute('aria-disabled') === 'true' ||
+      style.pointerEvents === 'none';
+
+    seen.push({ el, box, labels: labels.map((v) => v.trim()), text, children, pressable, blocked });
   }
 
   /**
@@ -58,31 +99,61 @@ export function findElementScript(ref: string): string {
     return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
   };
 
+  /**
+   * **押せるものを先に**（#41）。
+   *
+   * 「いちばん内側」は**入れ子の話**で、**押せるかどうかの前に置くものではなかった。**
+   * 見出しもボタンも子を持たなければ children は同じ 0 なので、
+   * **文書に先に出てくるほう（見出し）が勝っていた。**
+   *
+   * **押せない状態のものは、この時点で外す**（候補にしない）。
+   */
+  const inner = (a, b) => a.children - b.children;
+  const smaller = (a, b) => a.box.width * a.box.height - b.box.width * b.box.height;
+  // 同じ種類の候補どうしの順位。内側・小さいほう（#28 で決めたこと）。
+  const ranked = (list) => list.slice().sort((a, b) => inner(a, b) || smaller(a, b));
+
+  /**
+   * 段ごとの選び方（2026-09-24 に実物で踏んで作り直した）。
+   *
+   * 1. 押せる ＆ 塞がっていない  → 押す
+   * 2. 押せる ＆ 塞がっている    → 押さない。**塞がっていると言う**
+   * 3. 押せない ＆ 塞がっていない → 押す（文字しか無い相手はここ）
+   *
+   * **2 で 3 へ落ちてはいけない。**落ちると、**ボタンが disabled のときに見出しを押して
+   * 「成功」にする** —— #41 が言っている形を、直した側で作ることになる。
+   */
+  const pick = (list) => {
+    const openPress = ranked(list.filter((h) => h.pressable && !h.blocked));
+    if (openPress.length > 0) return point(openPress[0]);
+    if (list.some((h) => h.pressable && h.blocked)) return { disabledOnly: true };
+    const plain = ranked(list.filter((h) => !h.blocked));
+    return plain.length > 0 ? point(plain[0]) : null;
+  };
+
   // 1. 名乗りが完全に一致
-  const byLabel = seen.find((h) => h.labels.includes(want));
-  if (byLabel) return point(byLabel);
+  const byLabel = pick(seen.filter((h) => h.labels.includes(want)));
+  if (byLabel) return byLabel;
 
-  // 2. 読める文字が完全に一致。**いちばん内側**を選ぶ（親を押すと別の所が反応する）。
-  const exact = seen.filter((h) => h.text === want).sort((a, b) => a.children - b.children);
-  if (exact.length > 0) return point(exact[0]);
+  // 2. 読める文字が完全に一致
+  const exact = pick(seen.filter((h) => h.text === want));
+  if (exact) return exact;
 
-  // 3. 含まれる。ここでも内側を優先し、面積の小さいものを選ぶ。
-  const partial = seen
-    .filter((h) => h.text.includes(want))
-    .sort((a, b) => a.children - b.children || a.box.width * a.box.height - b.box.width * b.box.height);
-  if (partial.length > 0) return point(partial[0]);
+  // 3. 含まれる
+  const partial = pick(seen.filter((h) => h.text.includes(want)));
+  if (partial) return partial;
 
   /**
    * 4. 名乗りに含まれる（外部レビュー meta-taro/git-qa#28）。
    *
    * **画面に文字が出ていない部品は、名乗りでしか指せない。**そしてその名乗りは
-   * たいてい合成された 1 本（\`2026-09-20 定休日\`）なので、**完全一致では当たらない。**
+   * たいてい合成された 1 本（例: 2026-09-20 定休日）なので、**完全一致では当たらない。**
    * 並べ方は 3 段目と同じ（内側・小さいほう）。
    */
-  const byLabelPartial = seen
-    .filter((h) => h.labels.some((v) => v.includes(want)))
-    .sort((a, b) => a.children - b.children || a.box.width * a.box.height - b.box.width * b.box.height);
-  return point(byLabelPartial[0]);
+  const byLabelPartial = pick(seen.filter((h) => h.labels.some((v) => v.includes(want))));
+  if (byLabelPartial) return byLabelPartial;
+
+  return null;
 })()`;
 }
 
@@ -170,6 +241,26 @@ export function parseFoundPoint(value: unknown): FoundPoint | undefined {
  * 画面に出ていない部品は名乗り（`aria-label` 等）にしか無いので、
  * **そこも探したうえで無かった**のか、**書き方が違う**のかを、人が切り分けられる。
  */
+/**
+ * **見つかったが、押せない状態だった**（外部レビュー meta-taro/git-qa#41）。
+ *
+ * **「見つからない」と混ぜない。**混ぜると、
+ * **シートの書き方が悪いのか、画面がその状態なのか**が分からない。
+ */
+export function foundDisabledOnly(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  return (value as { disabledOnly?: unknown }).disabledOnly === true;
+}
+
+/** 押せない状態のものしか無かったときの言い分。**次に何をすればよいかまで言う。** */
+export function disabledElementMessage(ref: string): string {
+  return (
+    `${JSON.stringify(ref)} は在るが、押せない状態だった` +
+    '（disabled / aria-disabled / pointer-events: none）。' +
+    '**押したことにしない。**その画面でそれが押せるようになる条件を、手順の前に置く'
+  );
+}
+
 export function missingElementMessage(ref: string): string {
   return (
     `画面に見つからない要素: ${JSON.stringify(ref)}` +

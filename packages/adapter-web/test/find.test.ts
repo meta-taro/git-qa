@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { findElementScript, missingElementMessage, parseFoundPoint } from '../src/find.js';
+import {
+  disabledElementMessage,
+  findElementScript,
+  foundDisabledOnly,
+  missingElementMessage,
+  parseFoundPoint,
+} from '../src/find.js';
 
 /**
  * 画面の文字から、触る場所を決める（Issue 015）。
@@ -78,12 +84,25 @@ describe('findElementScript — 名乗りの部分一致（#28）', () => {
   });
 
   /** **並べ方は 3 段目と同じ。**内側・小さいほうを選ぶ（親を押すと別の所が反応する）。 */
+  /**
+   * **並べ方は 4 段すべて同じ**（#28 で決めたこと）。
+   *
+   * **2026-09-24 に字面が変わった**（#41）—— 選び方を 1 本（`pick`）にまとめ、
+   * **押せるものを先に**する段を足したため。
+   * **守っているものは同じ**なので、`pick` を通っていることと、
+   * その中が内側・小さいほうで並ぶことを見る。
+   */
   it('内側の小さいものを選ぶ並べ方は、読める文字のときと同じ', () => {
     const script = findElementScript('定休日');
-    const fourth = script.slice(script.indexOf('labels.some'));
+    const fourth = script
+      .split('\n')
+      .find((line) => line.includes('labels.some((v) => v.includes(want))'));
 
-    expect(fourth).toContain('children - b.children');
-    expect(fourth).toContain('box.width * a.box.height');
+    // 4 段目も、他の段と同じ選び方を通る（押せるものが先・その中で内側・小さいほう）
+    expect(fourth).toContain('pick(');
+    // その並べ方は、内側・小さいほう（押せるかどうかのあと）
+    expect(script).toContain('a.children - b.children');
+    expect(script).toContain('a.box.width * a.box.height');
   });
 });
 
@@ -108,5 +127,79 @@ describe('missingElementMessage（#28）', () => {
   /** **画面に出ていない文字は、名乗りにしか無い**ことを、その場で示す。 */
   it('名乗りにしか無い場合が在ることを言う', () => {
     expect(missingElementMessage('定休日')).toContain('aria-label');
+  });
+});
+
+/**
+ * **押せない見出しに当たっていた**（外部レビュー meta-taro/git-qa#41）。
+ *
+ * > `Enter キーを押す` → 見つかる ／ `「ログイン」をクリックする` → 見つからない
+ *
+ * 同じ文字が**カードの見出し**（押せない）と**送信ボタン**（押せる）の 2 箇所にある画面で、
+ * **見出しに当たっていた。**押しても何も起きないのに、**手順は成功として記録される。**
+ *
+ * 2 段目は「いちばん内側」で並べていたが、
+ * **見出しもボタンも子を持たなければ `children` は同じ 0** なので、
+ * **文書に先に出てくるほう（見出し）が勝っていた。**
+ *
+ * 「いちばん内側」は**入れ子の話**で、**押せるかどうかの前に置くものではなかった。**
+ */
+describe('押せるものを先に選ぶ（#41）', () => {
+  it('押せる候補を、押せないものより先に見る', () => {
+    const script = findElementScript('ログイン');
+
+    // 押せるかどうかを見ている（役割・タグ・無効の状態）
+    expect(script).toMatch(/button/i);
+    expect(script).toMatch(/role/i);
+  });
+
+  it('押せない状態のものは候補から外す（押していないのに成功にしない）', () => {
+    const script = findElementScript('ログイン');
+
+    expect(script).toMatch(/disabled/);
+    expect(script).toMatch(/pointer-events|pointerEvents/);
+  });
+
+  /**
+   * **「見つからない」と「見つかったが押せない」を混ぜない**（C20）。
+   * 混ぜると、**シートの書き方が悪いのか、画面がその状態なのか**が分からない。
+   */
+  /**
+   * **押せるものが「押せない状態」なら、見出しへ逃げない**（2026-09-24 に実物で踏んだ）。
+   *
+   * 報告者の画面は**見出し（押せない）＋ ボタン（押せる）**だった。
+   * そのボタンが `disabled` のとき、**見出しを押して「成功」にしていた** ——
+   * #41 が言っている形そのままを、直した側で作っていた。
+   */
+  it('押せるものが押せない状態なら、押せない見出しへ落ちない', () => {
+    const script = findElementScript('送信');
+
+    // 押せる候補が塞がっていることを、押せない候補より先に見る
+    expect(script).toMatch(/pressable[\s\S]*blocked|blocked[\s\S]*pressable/);
+    expect(script).toContain('disabledOnly');
+  });
+
+  it('押せない状態のものしか無かったときは、そう言える形で返す', () => {
+    const script = findElementScript('ログイン');
+
+    expect(script).toContain('disabledOnly');
+  });
+});
+
+describe('parseFoundPoint（押せない状態のとき）', () => {
+  it('押せないものしか無かったことを読み取れる', () => {
+    expect(parseFoundPoint({ disabledOnly: true })).toBeUndefined();
+    expect(foundDisabledOnly({ disabledOnly: true })).toBe(true);
+    expect(foundDisabledOnly({ x: 1, y: 2 })).toBe(false);
+    expect(foundDisabledOnly(null)).toBe(false);
+  });
+});
+
+describe('disabledElementMessage', () => {
+  it('何が起きたかと、次に何をすればよいかを言う', () => {
+    const said = disabledElementMessage('ログイン');
+
+    expect(said).toContain('ログイン');
+    expect(said).toMatch(/押せない状態/);
   });
 });

@@ -23,6 +23,8 @@ import { profileKind } from './profile.js';
 import {
   findElementScript,
   listElementsScript,
+  disabledElementMessage,
+  foundDisabledOnly,
   missingElementMessage,
   parseElementNames,
   parseFoundPoint,
@@ -410,8 +412,17 @@ async function resolvePoint(cdp: CdpClient, ref: PointerRef): Promise<{ x: numbe
     expression: findElementScript(ref.ref),
     returnByValue: true,
   });
-  const point = parseFoundPoint((result['result'] as { value?: unknown } | undefined)?.value);
+  const said = (result['result'] as { value?: unknown } | undefined)?.value;
+  const point = parseFoundPoint(said);
   if (point === undefined) {
+    /**
+     * **「見つからない」と「見つかったが押せない状態」を分ける**
+     * （外部レビュー meta-taro/git-qa#41）。
+     *
+     * 混ぜると、**シートの書き方が悪いのか、画面がその状態なのか**が分からない。
+     * **押していないのに手順が成功として残る**のは、いちばんやってはいけない形（C20）。
+     */
+    if (foundDisabledOnly(said)) throw new AdapterError(KIND, disabledElementMessage(ref.ref));
     // **探した所を言う**（#28）。「そんな要素は無い」だけだと、実物を見ている人と食い違う。
     throw new AdapterError(KIND, missingElementMessage(ref.ref));
   }

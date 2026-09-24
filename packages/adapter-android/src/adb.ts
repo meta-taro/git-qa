@@ -140,6 +140,17 @@ export function findElementCenter(xml: string, ref: string): Point | undefined {
   // 当たってしまう。しかも「最初に見つかった何か」を掴むので、間違いに気づけない。
   if (ref === '') return undefined;
 
+  /**
+   * **押せるものを先に**（外部レビュー meta-taro/git-qa#41・ウェブ側で報告された同じ穴）。
+   *
+   * 前は**最初に当たったもの**を取っていた。**`TextView` が `Button` より先に
+   * 出てくれば、押せないほうを押す** —— 押しても何も起きないのに、
+   * **手順は成功として記録される。**
+   *
+   * uiautomator は `clickable` を持っているので、そこを見る。
+   * **持たない dump（古い端末）でも動くように、押せるものが無ければ今までどおり。**
+   */
+  let fallback: Point | undefined;
   for (const node of xml.match(/<node\b[^>]*>/g) ?? []) {
     const hit =
       ATTR(node, 'resource-id') === ref ||
@@ -147,9 +158,11 @@ export function findElementCenter(xml: string, ref: string): Point | undefined {
       ATTR(node, 'content-desc') === ref;
     if (!hit) continue;
     const center = boundsCenter(ATTR(node, 'bounds'));
-    if (center !== undefined) return center;
+    if (center === undefined) continue;
+    if (ATTR(node, 'clickable') === 'true') return center;
+    fallback ??= center;
   }
-  return undefined;
+  return fallback;
 }
 
 /**

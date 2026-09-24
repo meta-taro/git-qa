@@ -21,7 +21,9 @@ export type { BrowserTarget } from './launch.js';
 export { listWebElements, readWebScreenText } from './screen-text.js';
 export type { WebObservation } from './screen-text.js';
 export {
+  disabledElementMessage,
   findElementScript,
+  foundDisabledOnly,
   listElementsScript,
   missingElementMessage,
   parseElementNames,
