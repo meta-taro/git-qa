@@ -32,8 +32,8 @@ use std::time::Duration;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput, VIRTUAL_KEY, VK_CONTROL,
-    VK_LWIN, VK_MENU, VK_SHIFT,
+    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, SendInput,
+    VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowThreadProcessId, IsWindow, SetForegroundWindow,
@@ -49,7 +49,69 @@ const SETTLE: Duration = Duration::from_millis(250);
 pub fn press_key(hwnd: &str, key: &str) -> Result<String, String> {
     let hwnd = crate::parse_hwnd(hwnd)?;
     let (modifiers, main) = parse(key)?;
+    // SAFETY: 送るのは、前面に出たことを確かめた後だけ（`in_front` の中）。
+    in_front(hwnd, || unsafe { send(&modifiers, main) })
+}
 
+/// **焦点のある欄へ、1 文字ずつ打つ**（meta-taro/git-qa#42）。
+///
+/// `type`（`ValuePattern.SetValue`）は欄の値を丸ごと置き換えるので、
+/// **1 キーごとに走る制限を通らない**（日付欄の年を 4 桁で止める、など）。
+/// 確かめたいのがその制限なら、**人が打つのと同じ道で打つしかない。**
+///
+/// `KEYEVENTF_UNICODE` で送るので、**キー配列にも IME にも左右されない**
+/// （`2` を打って全角の `２` が入る、を起こさない）。
+///
+/// **1 文字ごとに間を置く。**まとめて積むと、相手が 1 文字ずつ処理する前に
+/// 次が届き、**人の打ち方とは違う順で制限が走る**かもしれない（確かめていないので、寄せておく）。
+pub fn type_focused(hwnd: &str, text: &str) -> Result<String, String> {
+    let hwnd = crate::parse_hwnd(hwnd)?;
+    let units = unicode_strokes(text);
+    // SAFETY: 送るのは、前面に出たことを確かめた後だけ（`in_front` の中）。
+    in_front(hwnd, || unsafe {
+        for pair in units.chunks_exact(2) {
+            SendInput(pair, std::mem::size_of::<INPUT>() as i32);
+            sleep(BETWEEN_CHARS);
+        }
+    })
+}
+
+/// 1 文字ずつの間。**人が速く打つくらい**にしてある。
+const BETWEEN_CHARS: Duration = Duration::from_millis(15);
+
+/// 文字を、押して離すの組に直す。**UTF-16 の 1 単位ずつ**（サロゲートは 2 組になる。OS がつなぐ）。
+fn unicode_strokes(text: &str) -> Vec<INPUT> {
+    let mut events = Vec::new();
+    for unit in text.encode_utf16() {
+        events.push(unicode(unit, false));
+        events.push(unicode(unit, true));
+    }
+    events
+}
+
+fn unicode(unit: u16, up: bool) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: unit,
+                dwFlags: if up {
+                    KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+                } else {
+                    KEYEVENTF_UNICODE
+                },
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+/// 相手を前面に出し、**出たことを確かめてから**送り、終わったら前面を返す。
+///
+/// キーを押すのも、文字を打つのも、**ここを通る**（出ていないのに送る道を作らない）。
+fn in_front(hwnd: HWND, deliver: impl FnOnce()) -> Result<String, String> {
     // SAFETY: 触るのは渡された窓と、いま前面にある窓だけ。
     unsafe {
         if !IsWindow(hwnd).as_bool() {
@@ -76,7 +138,7 @@ pub fn press_key(hwnd: &str, key: &str) -> Result<String, String> {
                 .into());
         }
 
-        send(&modifiers, main);
+        deliver();
 
         /*
          * **積んだだけでは、まだ届いていない**（2026-09-14・実測）。
@@ -179,8 +241,9 @@ fn parse(key: &str) -> Result<(Vec<VIRTUAL_KEY>, VIRTUAL_KEY), String> {
         modifiers.push(modifier(one).ok_or_else(|| format!("知らない修飾キー: {one}"))?);
     }
 
-    let main = code(last)
-        .ok_or_else(|| format!("知らないキー: {last}（当てずっぽうで打つと、別の文字が入ります）"))?;
+    let main = code(last).ok_or_else(|| {
+        format!("知らないキー: {last}（当てずっぽうで打つと、別の文字が入ります）")
+    })?;
     Ok((modifiers, main))
 }
 
@@ -269,5 +332,36 @@ fn stroke(key: VIRTUAL_KEY, up: bool) -> INPUT {
                 dwExtraInfo: 0,
             },
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **サロゲートは 2 単位に分けて送る**（絵文字や一部の漢字）。OS がつなぐ。
+    #[test]
+    fn strokes_are_utf16_units_pressed_then_released() {
+        let events = unicode_strokes("2𠮷");
+        let seen: Vec<(u16, bool)> = events
+            .iter()
+            .map(|e| unsafe {
+                (
+                    e.Anonymous.ki.wScan,
+                    e.Anonymous.ki.dwFlags.contains(KEYEVENTF_KEYUP),
+                )
+            })
+            .collect();
+        assert_eq!(
+            seen,
+            vec![
+                (0x32, false),
+                (0x32, true),
+                (0xD842, false),
+                (0xD842, true),
+                (0xDFB7, false),
+                (0xDFB7, true),
+            ]
+        );
     }
 }

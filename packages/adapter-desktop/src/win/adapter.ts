@@ -285,8 +285,8 @@ interface DispatchDeps {
 /**
  * 操作を 1 つ送る。
  *
- * **いまは押すだけ。**なぞる・文字を打つ・回すは、押すが実物で効いてから足す ——
- * **確かめていないものを「できる」と言わない。**
+ * 押す・入れる・回す・キー。**確かめていないものを「できる」と言わない**
+ * （入れない操作は、下で「送れない」と言って止まる）。
  */
 async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
   if (action.kind === 'tap') {
@@ -296,22 +296,25 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
   }
 
   /**
-   * 文字を入れる（meta-taro/git-qa#9）。
+   * 文字を入れる。**欄を指すかどうかで、入れ方が違う。**
    *
-   * **`SetValue` は欄の中身を置き換える。**1 文字ずつ打つのではないので、
+   * **欄を指す（#9）—— `SetValue` で欄の中身を置き換える。**1 文字ずつ打つのではないので、
    * **焦点も要らず、相手も前面に出ない。**IME を通らないので日本語もそのまま入る
    * （2026-09-14・実測。検索欄に日本語を入れたら候補が反応した ＝
    * 値を置いただけでなく、アプリ側にイベントが届いている）。
    *
-   * **どこへ入れるかが要る。**欄を指していない手順は受けない ——
-   * 焦点のある所へ黙って入れると、**人が見ていない欄が書き変わる。**
+   * **欄を指さない（#42）—— 焦点のある欄へ 1 文字ずつ打つ**（macOS の `keystroke` と同じ意味）。
+   * 日付欄の年を 4 桁で止める、のような**1 キーごとに走る制限**は、`SetValue` では通らない ——
+   * **確かめたいものを迂回してしまう。**だから打つ。**前面に一瞬出る**（`key` と同じ仕組み）。
+   *
+   * 以前はここを断っていた（「焦点のある所へ黙って入れると、人が見ていない欄が書き変わる」）。
+   * **欄を指さずに書いたのはシートの書き手で、焦点を置く手順はその前の行に在る。**
+   * macOS では最初からこの意味で通しており、**Windows だけが止まっていた。**
    */
   if (action.kind === 'type') {
     if (action.target === undefined) {
-      throw new AdapterError(
-        KIND,
-        'どの欄へ入れるかが分からない（Windows では、入れる欄を指してください）',
-      );
+      await deps.tool(winArgs.keys(deps.window().hwnd, action.text));
+      return;
     }
     const { window, point } = await aim(action.target, deps);
     await deps.tool(winArgs.type(window.hwnd, point.x, point.y, action.text));
@@ -338,8 +341,8 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
    * `SendInput` は**焦点のある窓へ届く**仕組みなので、出すしかない（2026-09-14・実測）。
    * 送り終えたら**前面は元へ返す。**
    *
-   * **キーは、その窓で焦点のある所へ行く。**`type` は焦点を動かさないので、
-   * 「入力してから Enter」と書いても、**その欄に焦点があるとは限らない。**
+   * **キーは、その窓で焦点のある所へ行く。**欄を指した `type`（`SetValue`）は焦点を動かさないので、
+   * 「欄に入力してから Enter」と書いても、**その欄に焦点があるとは限らない。**
    */
   if (action.kind === 'key') {
     await deps.tool(winArgs.key(deps.window().hwnd, action.key));

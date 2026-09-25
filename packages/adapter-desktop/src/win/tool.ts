@@ -47,6 +47,12 @@ export const winArgs = {
    * UI Automation にキーを送る口が無く、`SendInput` は焦点のある窓へ届く仕組みのため。
    */
   key: (hwnd: number, key: string): string[] => ['key', String(hwnd), key],
+  /**
+   * **焦点のある欄へ 1 文字ずつ打つ**（meta-taro/git-qa#42）。`type` と違い、値を置き換えない。
+   * 1 キーごとに走る制限（日付欄の年 4 桁など）を、人が打ったときと同じ道で通すため。
+   * **前面に一瞬出る**（`key` と同じ仕組み）。
+   */
+  keys: (hwnd: number, text: string): string[] => ['keys', String(hwnd), text],
   exe: (pid: number): string[] => ['exe', String(pid)],
 } as const;
 
