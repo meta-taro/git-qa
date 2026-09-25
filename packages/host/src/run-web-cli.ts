@@ -106,6 +106,8 @@ const kind = process.env['GIT_QA_BROWSER_KIND'];
 const adapter =
   kind === 'safari'
     ? createSafariAdapter({
+        // **触った場所・見る場所を画面へ流す**（要望シート No.1・2026-09-25）。
+        onPointed: (at) => reportPointed?.(at),
         build: { source: subject ?? target, label: process.env['GIT_QA_APP_LABEL'] ?? 'dev' },
         /**
          * **何処を見に行くか**（#22）。`build.source` は「何を検証したか」なので、

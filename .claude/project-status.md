@@ -44,8 +44,19 @@
 | `adapter-desktop`（mac / win） | 答える前に窓を取り直す |
 | `adapter-web` | `screenSize` を新設（`innerWidth/innerHeight`・CSS 画素） |
 
-**まだ無い所**: Firefox / Safari / iOS のアダプタは `onPointed` も `screenSize` も無い。
-**これらの相手では、赤い枠も矢印もまだ出ない。**
+### ③ Safari にも入れた（同日・人の指示）
+
+> Firefox は優先度低いですが、**Safari はひつようでしょうね。**
+
+要るものは WebDriver に両方在った（`execute/sync` と要素の矩形）。**足りなかったのは配線だけ。**
+`onPointed` / `screenSize` / `locate` を生やし、`run-web-cli` と `app-cli` で繋いだ。
+
+**Safari のアダプタには試験が 1 本も無かった**（`safaridriver` を起こすので、
+ブラウザの在る機械でしか確かめられない形だった）。`createSafariSession` を出して
+繋ぐ先を渡せるようにし、**起こさずに 5 本置いた。**
+
+**まだ無い所**: Firefox / iOS のアダプタは `onPointed` も `screenSize` も無い。
+**これらの相手では、赤い枠も矢印もまだ出ない。**Firefox は**人の判断で後回し。**
 
 ### 未着手のまま残っているもの
 

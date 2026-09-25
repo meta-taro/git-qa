@@ -271,6 +271,8 @@ const setup = await startSetupServer({
               })
             : web && url !== undefined && browser === 'safari'
               ? createSafariAdapter({
+                  // **触った場所・見る場所を画面へ流す**（要望シート No.1・2026-09-25）。
+                  onPointed: (at) => reportPointed?.(at),
                   build: {
                     source: subject ?? url,
                     label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',

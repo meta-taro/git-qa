@@ -15,7 +15,7 @@ import type {
   TargetSession,
 } from '@git-qa/core';
 
-import { findElementScript, parseFoundPoint } from './find.js';
+import { findElementScript, parseFoundPoint, parseViewport, viewportScript } from './find.js';
 import { createWebDriverClient, w3cDrag, w3cPointer, w3cType } from './webdriver.js';
 import type { WebDriverClient } from './webdriver.js';
 
@@ -60,6 +60,17 @@ export interface SafariAdapterOptions {
   readonly settleMs?: number;
   readonly startTimeoutMs?: number;
   readonly now?: () => Date;
+  /**
+   * 触る場所・見る場所が決まったら知らせる（要望シート No.1）。
+   * **人が「ここ」と見られるように。**Chrome と同じ形で渡す。
+   */
+  readonly onPointed?: (at: {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    label?: string;
+  }) => void;
 }
 
 /** 空いている番号を OS に選ばせる。**決め打ちにすると、2 本目が起きない。** */
@@ -109,7 +120,7 @@ export function createSafariAdapter(options: SafariAdapterOptions): TargetAdapte
           typeof agent === 'string' ? (/Version\/[\d.]+/.exec(agent)?.[0] ?? undefined) : undefined;
         const label = version === undefined ? 'Safari' : `Safari（${version}）`;
 
-        return createSession({ client, cleanup, options, now, label });
+        return createSafariSession({ client, cleanup, options, now, label });
       } catch (error) {
         await cleanup();
         // **人が何をすればよいかを、そのまま渡す。**言い換えると原因が絞れなくなる。
@@ -152,7 +163,14 @@ interface SessionDeps {
   readonly label: string;
 }
 
-function createSession(deps: SessionDeps): TargetSession {
+/**
+ * **口を差し替えて検査できる形にする**（product-baseline §4）。
+ *
+ * `createSafariAdapter` は `safaridriver` を起こすので、そのままでは
+ * **ブラウザの在る機械でしか確かめられない。**繋ぐ先（`WebDriverClient`）を
+ * 外から渡せるようにして、**起こさずに確かめる。**
+ */
+export function createSafariSession(deps: SessionDeps): TargetSession {
   const { client, now } = deps;
   let closed = false;
   let liveOpen = false;
@@ -176,6 +194,14 @@ function createSession(deps: SessionDeps): TargetSession {
     if (point === undefined) {
       throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
     }
+    // **見つけた所を知らせる**（要望シート No.1）。枠で囲むために大きさも渡す。
+    deps.options.onPointed?.({
+      x: point.x,
+      y: point.y,
+      ...(point.width === undefined ? {} : { width: point.width }),
+      ...(point.height === undefined ? {} : { height: point.height }),
+      label: ref.ref,
+    });
     return point;
   };
 
@@ -229,6 +255,40 @@ function createSession(deps: SessionDeps): TargetSession {
     recording,
     get isClosed() {
       return closed;
+    },
+
+    /**
+     * **見える大きさ**（CSS 画素・2026-09-25・人の指示）。
+     *
+     * > Firefox は優先度低いですが、**Safari はひつようでしょうね。**
+     *
+     * 無いと実行側が**指した場所を丸ごと捨てる** —— 赤い枠も矢印も出ない。
+     * **覚えない。**窓は走っている間に大きさが変わる（C87）。
+     */
+    async screenSize(): Promise<{ width: number; height: number }> {
+      ensureOpen();
+      const size = parseViewport(await evaluate(viewportScript()));
+      if (size === undefined) {
+        // 握り潰さない。**当て推量の大きさは、見当違いの所を押させる。**
+        throw new AdapterError(KIND, 'ブラウザの見える大きさを読めなかった');
+      }
+      return size;
+    },
+
+    /**
+     * **見る場所を、押さずに指す**（C85）。
+     *
+     * 探し方は押すときと**同じ道**（`resolvePoint`）。別の探し方を作ると、
+     * **指した所と押す所がずれる。**
+     */
+    async locate(ref: string): Promise<boolean> {
+      ensureOpen();
+      try {
+        await resolvePoint({ at: 'element', ref });
+        return true;
+      } catch {
+        return false;
+      }
     },
 
     async act(action: Action): Promise<void> {

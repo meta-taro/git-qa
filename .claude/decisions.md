@@ -2961,7 +2961,23 @@ C85 でウェブ側に `locate` を実装したのに、**配線の先が無か�
 `screenSize` が重い相手が出てきたら（毎回 250 ms 以上）、**その相手の中で覚える。**
 実行側には戻さない。
 
+**【同日 追記】Safari にも入れた**
+
+> Firefox は優先度低いですが、**Safari はひつようでしょうね。**
+
+Safari は WebDriver（HTTP）だが、**要るものは両方そこに在った** ——
+`execute/sync` で `innerWidth/innerHeight` が読め、要素の矩形も
+**Chrome と同じ `findElementScript` / `parseFoundPoint` をすでに通していた。**
+足りなかったのは**配線だけ**で、`onPointed` を `resolvePoint` から呼び、
+`screenSize` と `locate` を生やした。実行側（`run-web-cli` / `app-cli`）で
+`onPointed` を渡していなかった所も繋いだ。
+
+**ついでに検査の口を開けた。**`createSafariAdapter` は `safaridriver` を起こすので、
+**ブラウザの在る機械でしか確かめられなかった**（Safari のアダプタには試験が 1 本も無かった）。
+`createSafariSession` を出して繋ぐ先を渡せるようにし、**起こさずに 5 本置いた。**
+
 **まだ無い所**
 
-Firefox / Safari / iOS のアダプタは `onPointed` も `screenSize` も持っていない ——
+Firefox / iOS のアダプタは `onPointed` も `screenSize` も持っていない ——
 **これらの相手では、赤い枠も矢印もまだ出ない。**
+Firefox は**人の判断で後回し**（同日）。
