@@ -286,3 +286,32 @@ export function missingElementMessage(ref: string): string {
     '完全一致と部分一致で探した。見えていない要素は探していない）'
   );
 }
+
+/**
+ * **ブラウザの見える大きさ**（CSS 画素・2026-09-25・人が実物で見つけた）。
+ *
+ * > デスクトップアプリ、うぇbのブラウザサイズとかも。
+ *
+ * 実行側はこれを 2 つに使う。
+ *
+ * 1. **赤い枠と矢印を置く**ための、映像の中の座標の数え方（`run-session` の `pointing`）
+ * 2. **人が映像を押した所**を、ブラウザへ渡す CSS 画素へ戻す
+ *
+ * **持ち回さない。**窓の大きさは走っている間に変わるので、聞かれるたびに聞き直す。
+ */
+export function viewportScript(): string {
+  return '({ width: window.innerWidth, height: window.innerHeight })';
+}
+
+/**
+ * 返りを数に直す。**測れなければ `undefined`** ——
+ * 当て推量の大きさを返すと、**見当違いの所を押す。**
+ */
+export function parseViewport(value: unknown): { width: number; height: number } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const size = value as { width?: unknown; height?: unknown };
+  if (typeof size.width !== 'number' || typeof size.height !== 'number') return undefined;
+  if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) return undefined;
+  if (size.width <= 0 || size.height <= 0) return undefined;
+  return { width: Math.round(size.width), height: Math.round(size.height) };
+}

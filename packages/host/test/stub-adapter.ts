@@ -37,7 +37,11 @@ export function stubAdapter(options: {
    * （n 回落ちて、その後は流れる）。省略すると毎回落ちる。
    */
   failFramesTimes?: number;
-  screen?: { width: number; height: number };
+  /**
+   * 映像の実寸。**関数で渡せる** —— 相手の窓は**走っている間に大きさが変わる**
+   * （人が掴んで広げる）ので、変わる相手を検査で作れないと、ずれに気づけない。
+   */
+  screen?: { width: number; height: number } | (() => { width: number; height: number });
 }): TargetAdapter & StubTrace {
   const opened: string[] = [];
   const closed: string[] = [];
@@ -46,6 +50,14 @@ export function stubAdapter(options: {
   let frameStarts = 0;
   const mode = options.mode ?? 'h264-stream';
   const chunks = options.chunks ?? [nal(7), nal(8), nal(5), nal(1)];
+
+  /** 聞かれるたびに数える。**掴んで広げた窓**を、検査でも作れるように。 */
+  const asked = options.screen;
+  const screenSize =
+    asked === undefined
+      ? undefined
+      : (): Promise<{ width: number; height: number }> =>
+          Promise.resolve(typeof asked === 'function' ? asked() : asked);
 
   const liveView: LiveView = {
     isOpen: false,
@@ -97,9 +109,7 @@ export function stubAdapter(options: {
       stop: () => Promise.resolve({ state: 'not_requested' as const }),
     },
     isClosed: false,
-    ...(options.screen === undefined
-      ? {}
-      : { screenSize: () => Promise.resolve(options.screen as { width: number; height: number }) }),
+    ...(screenSize === undefined ? {} : { screenSize }),
     act: (action: Action) => {
       actions.push(action);
       return Promise.resolve();

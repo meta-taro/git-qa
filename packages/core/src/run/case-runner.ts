@@ -69,6 +69,16 @@ export interface SheetCaseRunnerOptions {
    * 落ちる場合だけ、ここに書いた分だけ余計にかかる。
    */
   readonly expectation?: { readonly waitMs?: number; readonly stepMs?: number };
+  /**
+   * **手順が終わり、見る番になった**（2026-09-25・人の指摘）。
+   *
+   * > 案内がでるけど、**タイミングがちがって、挙動が惜しい**
+   *
+   * 押した所の枠が、**期待結果を待っている間ずっと居座っていた。**
+   * 待ちは最大で数秒あるので、**人はその間、押した所を見ることになる。**
+   * **手順が終わった時点で消す** —— そのあと、**見る所に出し直す。**
+   */
+  readonly onJudging?: () => void;
   /** 行き先の書き方。**アダプタが名乗ったものをそのまま渡す。** */
   readonly appId?: 'package-or-url' | 'name';
   readonly stepsColumn?: string;
@@ -194,6 +204,14 @@ export function createSheetCaseRunner(
     if (failure !== undefined) {
       return withDates({ aiResult: 'BLOCKED', note: failure });
     }
+
+    /**
+     * **押した所の案内を、ここで消す**（2026-09-25・人の指摘）。
+     *
+     * ここから先は「**人が見る番**」。**押した所を指したままだと、
+     * 見るべき所と食い違う。**見る所は、見つかった時点で出し直す。
+     */
+    options.onJudging?.();
 
     const expectation = planExpectation(expectedText.text);
     if (expectation.kind === 'hold') {

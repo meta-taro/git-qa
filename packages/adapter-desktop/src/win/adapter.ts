@@ -216,7 +216,16 @@ function createSession(deps: SessionDeps): TargetSession {
     get isClosed() {
       return closed;
     },
-    screenSize: () => Promise.resolve({ width: window.width, height: window.height }),
+    /**
+     * **映像の実寸。**取り直してから答える（2026-09-25・人が実物で見つけた）。
+     *
+     * **窓は走っている間に大きさが変わる。**覚えた値を返すと、映像は新しい大きさで
+     * 流れているのに、赤い枠と矢印だけが古い大きさで置かれる。
+     */
+    async screenSize(): Promise<{ width: number; height: number }> {
+      const target = await refresh();
+      return { width: target.width, height: target.height };
+    },
 
     async act(action: Action): Promise<void> {
       ensureOpen();

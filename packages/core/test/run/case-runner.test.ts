@@ -63,9 +63,10 @@ const failingAct = (session: TargetSession, error: Error): TargetSession => ({
  *
  * **押す前の画面も見たい検査は、`before` を渡す。**
  */
-const runner = (screenText: string | Error, before = '') => {
+const runner = (screenText: string | Error, before = '', onJudging?: () => void) => {
   let asked = 0;
   return createSheetCaseRunner({
+    ...(onJudging === undefined ? {} : { onJudging }),
     readScreenText: () => {
       // 1 回目は押す前。2 回目から押したあと。
       asked += 1;
@@ -100,6 +101,52 @@ describe('createSheetCaseRunner — 手順を実行して AI の判定を出す'
     ]);
     // 足跡は手順の原文で残す。動画の頭出しに使う。
     expect(steps).toEqual(['保存をタップする', '完了をタップする']);
+  });
+
+  /**
+   * **押した所の案内は、判定へ移る所で消す**（2026-09-25・人の指摘）。
+   *
+   * > 6 番の元の言語に戻せるも、案内がでるけど、**タイミングがちがって、挙動が惜しい**
+   *
+   * 押した所を指したまま期待結果を待つと（`# 待つ:` で最大 120 秒）、
+   * **人はその間ずっと「押した所」を見せられる。**見るべき所はもう別の所にある。
+   */
+  it('操作が終わった時点で、押した所の案内を消す', async () => {
+    const { session } = await connect();
+    const order: string[] = [];
+
+    await runner('保存しました', '', () => order.push('判定へ'))(
+      context(
+        session,
+        {
+          [STEPS_COLUMN]: '1. 保存をタップする',
+          [EXPECTATION_COLUMN]: '「保存しました」と表示される',
+        },
+        [],
+      ),
+    );
+
+    expect(order).toEqual(['判定へ']);
+  });
+
+  /** **触れていないなら、消さない。**操作が落ちた所（BLOCKED）は、指したまま人へ渡す。 */
+  it('手順が落ちたときは、案内を消さない', async () => {
+    const { session } = await connect();
+    const order: string[] = [];
+
+    const verdict = await runner('', '', () => order.push('判定へ'))(
+      context(
+        failingAct(session, new Error('端末に届かない')),
+        {
+          [STEPS_COLUMN]: '1. 保存をタップする',
+          [EXPECTATION_COLUMN]: '「保存しました」と表示される',
+        },
+        [],
+      ),
+    );
+
+    expect(verdict.aiResult).toBe('BLOCKED');
+    expect(order).toEqual([]);
   });
 
   it('落とせない手順があれば、端末に触らずに BLOCKED を返す', async () => {

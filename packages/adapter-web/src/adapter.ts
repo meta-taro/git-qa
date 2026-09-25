@@ -28,6 +28,8 @@ import {
   missingElementMessage,
   parseElementNames,
   parseFoundPoint,
+  parseViewport,
+  viewportScript,
 } from './find.js';
 import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
 import type { BrowserKind, BrowserTarget } from './launch.js';
@@ -341,6 +343,32 @@ function createSession(deps: SessionDeps): TargetSession {
     recording,
     get isClosed() {
       return closed;
+    },
+
+    /**
+     * **見える大きさ**（CSS 画素・2026-09-25・人が実物で見つけた）。
+     *
+     * > デスクトップアプリ、うぇbのブラウザサイズとかも。
+     *
+     * 無かったので 2 つ壊れていた ——
+     * **赤い枠と矢印がウェブでは一度も出ず**（実行側が実寸を聞けずに捨てていた）、
+     * **人が映像を押した所が、画素のままブラウザへ届いていた**
+     * （映像は画素、`Input.dispatchMouseEvent` は CSS 画素）。
+     *
+     * **覚えない。**窓は走っている間に大きさが変わる。
+     */
+    async screenSize(): Promise<{ width: number; height: number }> {
+      ensureOpen();
+      const result = await cdp.send('Runtime.evaluate', {
+        expression: viewportScript(),
+        returnByValue: true,
+      });
+      const size = parseViewport((result['result'] as { value?: unknown } | undefined)?.value);
+      if (size === undefined) {
+        // 握り潰さない。**当て推量の大きさは、見当違いの所を押させる。**
+        throw new AdapterError(KIND, 'ブラウザの見える大きさを読めなかった');
+      }
+      return size;
     },
 
     async act(action: Action): Promise<void> {

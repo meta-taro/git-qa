@@ -268,16 +268,32 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
    * ケースが始まるたびに消す —— 前のケースの矢印が残っていると、人が別の所を見る。
    */
   let pointing: Pointing | undefined;
-  /** 映像の実寸。**毎回は聞かない**（1 回 250 ms かかる相手がいる）。 */
-  let screen: { x: number; y: number } | undefined;
-
   options.registerPointing?.((at) => {
     void (async () => {
-      if (screen === undefined) {
-        const size = await live.session.screenSize?.();
-        if (size === undefined) return;
-        screen = { x: size.width, y: size.height };
-      }
+      /**
+       * **実寸は、指すたびに聞き直す**（2026-09-25・人が実物で見つけた）。
+       *
+       * > デスクトップアプリを拡大しました。するとおそらくクリック位置がずれます。
+       * > 元のサイズにすると押せるので。
+       *
+       * 前は 1 回だけ聞いて持ち続けていた（「1 回 250 ms かかる相手がいる」ため）。
+       * ところが**デスクトップとブラウザの窓は、走っている間に大きさが変わる。**
+       * 映像は新しい大きさで流れているのに、矢印と赤い枠だけが古い大きさで置かれ、
+       * **人は何も無い所を見に行っていた**（実測 1280x800 → 900x620 で 1.42 倍ずれる）。
+       *
+       * **持ち方をこちらで決めない。**変わらない相手（端末の画面）は
+       * アダプタ側が覚えている（`adapter-android` の `cachedScreen`）ので、
+       * **変わるかどうかを知っている側に任せる。**
+       */
+      /**
+       * **測れなければ指さない。**見当違いの所を指すより、指さないほうがよい。
+       *
+       * ここで落ちても実行は止めない —— 同じ相手に触る所（`act`）が
+       * すぐ後で同じ理由で落ちるので、**言い分はそこから人へ届く。**
+       */
+      const size = await live.session.screenSize?.().catch(() => undefined);
+      if (size === undefined) return;
+      const screen = { x: size.width, y: size.height };
       pointing = {
         x: at.x,
         y: at.y,
@@ -529,6 +545,14 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   const expectation = expectationOf(options.sheet.meta, options.expectation);
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
+    /**
+     * **手順が終わったら、押した所の案内を消す**（2026-09-25・人の指摘）。
+     * 見る所は、見つかった時点で出し直す（`session.locate`）。
+     */
+    onJudging: () => {
+      pointing = undefined;
+      publish();
+    },
     ...(app === undefined ? {} : { app }),
     // **相手が名乗った能力をそのまま渡す。**Android の事情を全部の相手に押し付けない。
     textInput: options.adapter.capabilities.textInput,

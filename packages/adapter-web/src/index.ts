@@ -28,6 +28,8 @@ export {
   missingElementMessage,
   parseElementNames,
   parseFoundPoint,
+  parseViewport,
+  viewportScript,
 } from './find.js';
 export type { FoundPoint } from './find.js';
 export { createBidiClient, fromRemoteValue } from './bidi.js';

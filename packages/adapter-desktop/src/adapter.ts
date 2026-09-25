@@ -368,7 +368,19 @@ function createSession(deps: SessionDeps): TargetSession {
     get isClosed() {
       return closed;
     },
-    screenSize: () => Promise.resolve({ width: window.width, height: window.height }),
+    /**
+     * **映像の実寸。**取り直してから答える（2026-09-25・人が実物で見つけた）。
+     *
+     * > デスクトップアプリを拡大しました。するとおそらくクリック位置がずれます。
+     *
+     * **窓は走っている間に大きさが変わる。**覚えた値を返すと、
+     * 赤い枠と矢印だけが古い大きさで置かれる。
+     * `recentWindow` は 400 ms 以内なら撮り直さないので、映像が流れている間はただ同然。
+     */
+    async screenSize(): Promise<{ width: number; height: number }> {
+      const target = await recentWindow();
+      return { width: target.width, height: target.height };
+    },
 
     async act(action: Action): Promise<void> {
       ensureOpen();
