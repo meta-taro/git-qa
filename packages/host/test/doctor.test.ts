@@ -138,6 +138,28 @@ describe('parseIosDevices', () => {
     expect(said).not.toContain('BBBB');
   });
 
+  /**
+   * **状態は 1 語とは限らない**（2026-09-25・実機を挿して分かった）。
+   *
+   * 実物はこう返してきた ——
+   *
+   *     …   available (paired)   iPhone18,3
+   *
+   * 状態の語の**後ろを全部**機種としていたので、`(paired)   iPhone18,3` になり、
+   * doctor が **`✓ iPhone — (paired)   iPhone18,3`** と出していた。
+   * **実物を挿すまで出ない崩れ方。**
+   */
+  it('状態に注釈が付いていても、機種だけを出す', () => {
+    const real = [
+      'Devices:',
+      'Name          Hostname             Identifier   State                 Model',
+      '-----------   ------------------   ----------   -------------------   ----------',
+      '人の iPhone    c.coredevice.local   CCCC         available (paired)    iPhone18,3',
+    ].join('\n');
+
+    expect(parseIosDevices(real)).toEqual(['iPhone18,3']);
+  });
+
   it('1 台もつながっていなければ空（「測れなかった」と混ぜない）', () => {
     const none = [
       'Devices:',

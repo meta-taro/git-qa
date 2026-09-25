@@ -117,10 +117,19 @@ export async function reportOf(probes: readonly Probe[], context: ReportContext)
  *
  * **列の幅で切らない。**端末名は人が付けるので**日本語が入る**（実測で崩れた）。
  * **状態の語を探して、その後ろを機種とする。**
+ *
+ * **状態は 1 語とは限らない**（2026-09-25・実機を挿して分かった）。実物はこう返してきた ——
+ *
+ *     …   available (paired)   iPhone18,3
+ *
+ * 後ろを全部機種としていたので `(paired)   iPhone18,3` になり、
+ * doctor が **`✓ iPhone — (paired)   iPhone18,3`** と出していた。
+ * **実物を挿すまで出ない崩れ方。**注釈（`(…)`）は状態側として読み飛ばす。
  */
 export function parseIosDevices(stdout: string): string[] {
   /** `devicectl` が返す状態。**`unavailable` 以外は、いま触れる。** */
-  const STATE = /\s(unavailable|available|connected|connecting|disconnected|paired)\s+(\S.*)$/;
+  const STATE =
+    /\s(unavailable|available|connected|connecting|disconnected|paired)(?:\s+\([^)]*\))*\s+(\S.*)$/;
 
   const out: string[] = [];
   for (const line of stdout.split('\n')) {

@@ -143,10 +143,16 @@ const iphone = async (): Promise<ProbeResult> => {
   return {
     name: 'iPhone',
     state: 'ok',
+    /**
+     * **「未実測」を外した**（2026-09-25・実機で測った・C88）。
+     *
+     * **人にしかできない所を、道具が言う**（§29）。iOS は押せないので、
+     * **端末を触るのは人**になる —— 映している最中に画面が落ちると、そこで切れる。
+     */
     detail:
       devices.length === 0
-        ? '実機はつながっていない（挿せば pnpm run:sheet:ios で見られます・未実測）'
-        : `${devices.join(' / ')}（pnpm run:sheet:ios で見られます・未実測）`,
+        ? '実機はつながっていない（挿して「このコンピュータを信頼」→ pnpm run:sheet:ios）'
+        : `${devices.join(' / ')}（pnpm run:sheet:ios。**自動ロックは「なし」に**。押す口はまだ無いので、端末は人が触ります）`,
   };
 };
 
