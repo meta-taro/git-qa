@@ -14,7 +14,18 @@
       property="og:description"
       content="AI が操作し、人が判定を置く。誰が見て保証したかが証跡に残る。"
     />
-    <meta property="og:image" content="./icon.png" />
+    <!--
+      SNS のカード。**画像と URL は絶対 URL で書く**（2026-09-25）。
+      相対パス（./icon.png）だと X / Facebook は取りに行かず、カードに絵が出なかった。
+      絵は 1200x630。アイコンだと小さな正方形で出るので、アプリの画面を使う。
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://meta-taro.github.io/git-qa/og.png" />
     <style>
       /*
        * 色は DESIGN.md から採る（2026-09-03・持ち主が決めた緑）。
