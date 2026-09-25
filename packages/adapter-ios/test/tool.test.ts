@@ -41,7 +41,25 @@ describe('iosArgs', () => {
   });
 
   it('端末を指すときは識別子を渡す', () => {
-    expect(iosArgs.stream('00008120-001')).toEqual(['stream', '00008120-001']);
+    expect(iosArgs.stream('00008120-001')).toEqual(['stream', '00008120-001', '125']);
+  });
+
+  /**
+   * **端末が出すまま全部は要らない**（2026-09-25・実機で測った）。
+   *
+   * 絞らずに流したら **6 秒で 298 枚＝49.7 枚/秒・1 枚 104 KB・毎秒およそ 5 MB** だった。
+   * 人が見て判断するのに 50 枚/秒は要らないし、**橋と復号がその分だけ重くなる。**
+   * 他の相手（デスクトップ 8 枚/秒・ウェブ 5 枚/秒）と揃える。
+   */
+  it('流す間隔を渡す（既定は 8 枚/秒）', () => {
+    expect(iosArgs.stream(undefined)).toEqual(['stream', '-', '125']);
+    expect(iosArgs.stream(undefined, 200)).toEqual(['stream', '-', '200']);
+  });
+
+  /** **0 や負を渡さない。**絞らないつもりの値が、絞りの計算を壊す。 */
+  it('間隔が 0 以下なら既定に戻す', () => {
+    expect(iosArgs.stream(undefined, 0)).toEqual(['stream', '-', '125']);
+    expect(iosArgs.stream(undefined, -5)).toEqual(['stream', '-', '125']);
   });
 });
 

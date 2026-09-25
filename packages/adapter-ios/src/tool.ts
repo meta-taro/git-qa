@@ -33,10 +33,29 @@ export function parseIosToolDevices(stdout: string): IosDevice[] {
 /** **端末を指さないときは `-`。**最初に見つかったものを使う。 */
 const which = (device: string | undefined): string => device ?? '-';
 
+/**
+ * 流す間隔（ミリ秒）。**8 枚/秒。**
+ *
+ * **端末が出すまま全部は要らない**（2026-09-25・実機で測った）。
+ * 絞らずに流したら **6 秒で 298 枚＝49.7 枚/秒・1 枚 104 KB・毎秒およそ 5 MB** だった。
+ * 人が見て判断するのに 50 枚/秒は要らず、**橋と復号がその分だけ重くなる。**
+ * デスクトップ（8 枚/秒）と揃える。
+ */
+export const IOS_FRAME_INTERVAL_MS = 125;
+
 export const iosArgs = {
   devices: (): string[] => ['devices'],
   shoot: (device: string | undefined, path: string): string[] => ['shoot', which(device), path],
-  stream: (device: string | undefined): string[] => ['stream', which(device)],
+  /**
+   * 撮り続けて流す。**間隔を渡す**（道具側で間引く）。
+   *
+   * **0 以下は受けない。**「絞らない」つもりの値が、そのまま割り算へ行くと壊れる。
+   */
+  stream: (device: string | undefined, intervalMs = IOS_FRAME_INTERVAL_MS): string[] => [
+    'stream',
+    which(device),
+    String(intervalMs > 0 ? Math.round(intervalMs) : IOS_FRAME_INTERVAL_MS),
+  ],
 } as const;
 
 const NEWLINE = 0x0a;

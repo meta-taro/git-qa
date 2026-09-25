@@ -4,7 +4,7 @@
 //
 //   git-qa-ios devices                 つながっている端末を並べる
 //   git-qa-ios shoot <識別子> <出力.jpg>  1 枚撮る
-//   git-qa-ios stream <識別子>           撮り続けて標準出力へ流す
+//   git-qa-ios stream <識別子> [間隔ms]   撮り続けて標準出力へ流す（既定 125ms＝8 枚/秒）
 //
 // **押す口はここに無い。**iOS を押すには端末側にアプリ（WebDriverAgent）が要り、
 // **署名が要る＝人の作業**（product-baseline §14）。**見る・読むだけを持つ。**
@@ -54,8 +54,50 @@ func allowScreenCaptureDevices() {
   }
 }
 
+/// カメラの許可。**取れていないなら、その理由を返す**（`nil` なら使える）。
+///
+/// **ここを黙ると、一番分からない形で止まる**（2026-09-25・実機で踏んだ）。
+/// 許可が無いと `DiscoverySession` は**例外も警告も出さずに 0 台を返す**ので、
+/// 「端末が繋がっていない」と区別がつかなかった。実際は USB でも `devicectl` でも
+/// 見えていて、QuickTime では映っていた —— **止めていたのは許可だけ。**
+///
+/// 許可の画面は、**使用目的（`NSCameraUsageDescription`）が書いてあるアプリ**から
+/// でないと出ない。道具単体で走らせると出ないので、そのときはそう言う。
+func cameraAccess() -> String? {
+  switch AVCaptureDevice.authorizationStatus(for: .video) {
+  case .authorized:
+    return nil
+  case .notDetermined:
+    // **聞く。**返事が来るまで待つ（人が押すので、短すぎる待ちにしない）。
+    let sem = DispatchSemaphore(value: 0)
+    var granted = false
+    AVCaptureDevice.requestAccess(for: .video) { ok in
+      granted = ok
+      sem.signal()
+    }
+    if sem.wait(timeout: .now() + 60) == .timedOut {
+      return "カメラの許可を聞く画面が出なかった。"
+        + "道具を単体で走らせたときは出ません（使用目的が書いてあるアプリから走らせてください）"
+    }
+    if granted { return nil }
+    return "カメラの許可が下りなかった"
+  case .denied:
+    return "カメラの許可が切られている"
+      + "（システム設定 → プライバシーとセキュリティ → カメラ で git-qa を入れてください）"
+  case .restricted:
+    return "カメラを使えない設定になっている（機能制限・管理プロファイル）"
+  @unknown default:
+    return "カメラの許可の状態を読めなかった"
+  }
+}
+
 /// 映せる端末。**iPhone / iPad は「muxed」（映像と音が 1 本）として現れる。**
 func captureDevices() -> [AVCaptureDevice] {
+  // **許可が無いなら、0 台を返さずに言って止まる。**
+  // 「端末が無い」と「見せてもらえない」は、人がやることが全く違う。
+  if let reason = cameraAccess() {
+    fail("\(reason)。iPhone / iPad の画面は、カメラの許可が無いと一覧に出てきません")
+  }
   allowScreenCaptureDevices()
   // **少し待つ。**開放した直後は、まだ一覧に載っていないことがある。
   Thread.sleep(forTimeInterval: 0.6)
@@ -114,9 +156,20 @@ final class Frames: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
   private let once: Bool
   private var done = false
 
-  init(quality: CGFloat, once: Bool, onFrame: @escaping (Data) -> Void) {
+  /// **間引く幅**（秒）。0 なら間引かない。
+  ///
+  /// **端末が出すまま全部は要らない**（2026-09-25・実機で測った）。
+  /// 絞らずに流したら **6 秒で 298 枚＝49.7 枚/秒・1 枚 104 KB・毎秒およそ 5 MB** だった。
+  /// 人が見て判断するのに 50 枚/秒は要らず、**橋と復号がその分だけ重くなる。**
+  ///
+  /// **捨てるのは JPEG にする前。**符号化が一番高いので、そこへ持って行かない。
+  private let gap: TimeInterval
+  private var lastAt: TimeInterval = 0
+
+  init(quality: CGFloat, once: Bool, gap: TimeInterval = 0, onFrame: @escaping (Data) -> Void) {
     self.quality = quality
     self.once = once
+    self.gap = gap
     self.onFrame = onFrame
   }
 
@@ -125,6 +178,11 @@ final class Frames: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     from connection: AVCaptureConnection
   ) {
     if done { return }
+    if gap > 0 {
+      let now = Date.timeIntervalSinceReferenceDate
+      if now - lastAt < gap { return }
+      lastAt = now
+    }
     guard let data = jpeg(from: sampleBuffer, quality: quality) else { return }
     onFrame(data)
     if once {
@@ -161,7 +219,7 @@ func usage() -> Never {
     使い方:
       git-qa-ios devices                      つながっている端末を並べる
       git-qa-ios shoot  <識別子|-> <出力.jpg>   1 枚撮る
-      git-qa-ios stream <識別子|->             撮り続けて標準出力へ流す
+      git-qa-ios stream <識別子|-> [間隔ms]     撮り続けて標準出力へ流す（既定 125）
 
     識別子に `-` を渡すと、最初に見つかった端末を使う。
     **押す口はありません**（WebDriverAgent が要る＝署名が要る＝人の作業）。
@@ -203,8 +261,10 @@ case "shoot":
 case "stream":
   guard args.count >= 3 else { usage() }
   let target = device(matching: args[2])
+  // **間隔は呼ぶ側が決める**（`iosArgs.stream`）。省かれたら既定の 8 枚/秒。
+  let everyMs = args.count >= 4 ? (Double(args[3]) ?? 125) : 125
   let out = FileHandle.standardOutput
-  let frames = Frames(quality: 0.7, once: false) { data in
+  let frames = Frames(quality: 0.7, once: false, gap: max(everyMs, 0) / 1000) { data in
     // **長さを先に書く。**境界を探させない（JPEG の中に区切りが出ても壊れない）。
     out.write("\(data.count)\n".data(using: .utf8)!)
     out.write(data)

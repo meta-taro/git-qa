@@ -58,13 +58,36 @@ describe('Info.plist（macOS の使用目的）', () => {
     'NSDocumentsFolderUsageDescription',
     'NSDesktopFolderUsageDescription',
     'NSDownloadsFolderUsageDescription',
+    /**
+     * **iPhone / iPad は「撮影機器」として現れる**（2026-09-25・実機で踏んだ）。
+     *
+     * これが無いと **OS は許可を聞く画面すら出さず、端末の一覧が黙って 0 台になる。**
+     * USB でも `devicectl` でも見えていて、QuickTime では映っていたのに、
+     * git-qa からだけ「端末が無い」に見えていた。
+     */
+    'NSCameraUsageDescription',
   ])('%s がある', (key) => {
     expect(plist).toContain(`<key>${key}</key>`);
   });
 
+  /**
+   * **使っていない許可を、先に求めない。**
+   *
+   * カメラはここから外した（**本当に使うようになった**ため・2026-09-25）。
+   * **マイクは外さない** —— iPhone は映像と音が 1 本（muxed）で来るが、
+   * git-qa が取り出しているのは映像だけ。
+   */
   it('使っていない許可を求めない', () => {
-    expect(plist).not.toContain('NSCameraUsageDescription');
     expect(plist).not.toContain('NSMicrophoneUsageDescription');
+    expect(plist).not.toContain('NSLocationWhenInUseUsageDescription');
+    expect(plist).not.toContain('NSContactsUsageDescription');
+  });
+
+  /** **何に使うかを書く。**カメラは「Mac のカメラではない」ことまで書く。 */
+  it('カメラの記述に、iPhone / iPad のためだと書いてある', () => {
+    const said = /<key>NSCameraUsageDescription<\/key>\s*<string>([^<]*)<\/string>/.exec(plist);
+    expect(said?.[1]).toMatch(/iPhone/);
+    expect(said?.[1]).toMatch(/iPad/);
   });
 
   it('記述は「何に使うか」を書く（既定の空文字にしない）', () => {
