@@ -39,12 +39,12 @@ beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'git-qa-win-fake-'));
   log = join(dir, 'calls.log');
   toolPath = join(dir, 'git-qa-win');
-  // 1 回の呼び出しを 1 行（引数は \x1f 区切り）で残す。`windows` にだけ窓を 1 つ返す。
+  // 1 回の呼び出しを 1 行（引数はタブ区切り。\x1f は Linux の sh（dash）の printf が解さない）で残す。`windows` にだけ窓を 1 つ返す。
   await writeFile(
     toolPath,
     [
       '#!/bin/sh',
-      `printf '%s\\x1f' "$@" >> '${log}'`,
+      `printf '%s\\t' "$@" >> '${log}'`,
       `printf '\\n' >> '${log}'`,
       `if [ "$1" = windows ]; then printf '%s\\n' '${WINDOW_LINE}'; fi`,
       `if [ "$1" = text ]; then printf '年\\t10\\t20\\t30\\t12\\n'; fi`,
@@ -62,7 +62,7 @@ async function calls(): Promise<string[][]> {
   return raw
     .split('\n')
     .filter((l) => l !== '')
-    .map((l) => l.split('\x1f').slice(0, -1));
+    .map((l) => l.split('\t').slice(0, -1));
 }
 
 describe.skipIf(process.platform === 'win32')('Windows の「入力する」', () => {
