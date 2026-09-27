@@ -55,10 +55,11 @@ use crate::wake::ensure_awake;
 /// 別の窓を押すことは無い。**押せないよりは、今までどおり押すほうがよい。**
 pub fn press(hwnd: &str, x: &str, y: &str) -> Result<String, String> {
     let (target, px, py) = place(hwnd, x, y)?;
+    // **どちらで押したかを言う**（#42）。証跡の手順の足跡に付く。
     if crate::click::click_at(target, px, py).is_ok() {
-        return Ok(String::new());
+        return Ok("click".into());
     }
-    invoke(target, px, py)
+    invoke(target, px, py).map(|_| "invoke".into())
 }
 
 /// `Invoke` で押す。**その窓の中で**、その場所にある押せるものに伝える。

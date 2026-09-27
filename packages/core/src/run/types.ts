@@ -126,6 +126,11 @@ export interface RunStep {
   index: number;
   at: string;
   label?: string;
+  /**
+   * **何をどう操作したか**（meta-taro/git-qa#42）。アダプタが言えるときだけ付く。
+   * 押し方（本物のクリック／Invoke）・選んだ要素・候補の数、打ったあとの欄の値など。
+   */
+  detail?: string;
 }
 
 /** 端末の画面の位置（画素）。 */

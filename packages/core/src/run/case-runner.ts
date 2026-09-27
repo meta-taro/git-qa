@@ -134,7 +134,9 @@ async function actAll(ctx: CaseContext, steps: PlannedAction[]): Promise<string 
   for (const step of steps) {
     ctx.step(step.text);
     try {
-      await ctx.session.act(step.action);
+      const report = await ctx.session.act(step.action);
+      // **何をどう押したか**を足跡へ（#42）。言えない相手は何も返さない。
+      if (report !== undefined) ctx.note?.(report.detail);
     } catch (error: unknown) {
       return `「${step.text}」で止まった: ${errorMessage(error)}`;
     }

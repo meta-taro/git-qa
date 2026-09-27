@@ -66,6 +66,7 @@ export type { AccessUnit, AnnexBSplitter } from './live/annexb.js';
 export { AdapterError, humanMessage } from './adapter/errors.js';
 export type {
   Action,
+  ActReport,
   AdapterCapabilities,
   LiveView,
   LiveViewTransport,

@@ -24,6 +24,11 @@ export interface OcrLine {
    */
   readonly width?: number;
   readonly height?: number;
+  /**
+   * **要素の種類**（Windows の UI Automation の `ControlType`。`Button` / `Window` など・#42）。
+   * 絵から読んだ文字には無い。
+   */
+  readonly role?: string;
 }
 
 /** `文字<TAB>x<TAB>y` を 1 行ずつ読む。**半端な行は捨てる。** */
@@ -46,7 +51,9 @@ export function parseOcr(stdout: string): OcrLine[] {
         ? { width, height }
         : {};
 
-    found.push({ text, x, y, ...size });
+    // **種類は Windows の道具だけが返す**（6 列目・#42）。無くても捨てない。
+    const role = (parts[5] ?? '').trim();
+    found.push({ text, x, y, ...size, ...(role === '' ? {} : { role }) });
   }
   return found;
 }
@@ -75,14 +82,24 @@ const sizeOf = (line: OcrLine): number =>
 
 /** 読めた文字から触る場所を決める。完全一致を先に見て、無ければ**含むもののうち最小**。 */
 export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undefined {
-  const want = squeeze(ref);
+  const [best] = matchesInOcr(lines, ref);
+  if (best === undefined) return undefined;
+  return {
+    x: best.x,
+    y: best.y,
+    ...(best.width === undefined ? {} : { width: best.width }),
+    ...(best.height === undefined ? {} : { height: best.height }),
+  };
+}
 
-  const of = (line: OcrLine): Point => ({
-    x: line.x,
-    y: line.y,
-    ...(line.width === undefined ? {} : { width: line.width }),
-    ...(line.height === undefined ? {} : { height: line.height }),
-  });
+/**
+ * 当たった行を、**採る順に**並べて返す（#42）。先頭が {@link findInOcr} の答え。
+ *
+ * **候補が何個あって、どれを採ったか**を証跡に書くために、全部を返す口を分けてある。
+ * 完全一致があれば完全一致だけ、無ければ部分一致。どちらも小さい順。
+ */
+export function matchesInOcr(lines: readonly OcrLine[], ref: string): OcrLine[] {
+  const want = squeeze(ref);
 
   /**
    * **完全一致が複数あるときも、いちばん小さいもの**（meta-taro/git-qa#42）。
@@ -94,7 +111,7 @@ export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undef
   const exact = lines
     .filter((line) => squeeze(line.text) === want)
     .sort((a, b) => sizeOf(a) - sizeOf(b));
-  if (exact[0] !== undefined) return of(exact[0]);
+  if (exact.length > 0) return exact;
 
   /**
    * **いちばん小さいものを採る**（外部レビュー meta-taro/git-qa#11）。
@@ -105,8 +122,7 @@ export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undef
    *
    * **長い行にたまたま含まれる短い語を掴むのは、たいてい間違い。**
    */
-  const partial = lines
+  return lines
     .filter((line) => squeeze(line.text).includes(want))
     .sort((a, b) => sizeOf(a) - sizeOf(b));
-  return partial[0] === undefined ? undefined : of(partial[0]);
 }

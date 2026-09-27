@@ -68,3 +68,22 @@ describe('executeRun — 映像の記録', () => {
     expect(result.errors.join('\n')).toContain('/liveView/0/kind');
   });
 });
+
+describe('executeRun — 手順の足跡に detail を残す（#42）', () => {
+  it('ctx.note で付けたものが、直前の手順の detail になり、形も通る', async () => {
+    const run = await executeRun(
+      options({
+        runCase: (ctx) => {
+          ctx.step('「開く」をクリックする');
+          ctx.note?.('「開く」（Button）を本物のクリックで押した（560, 390）');
+          return Promise.resolve({ aiResult: 'PASS' as const });
+        },
+      }),
+    );
+
+    expect(run.cases[0]?.steps[0]?.detail).toBe(
+      '「開く」（Button）を本物のクリックで押した（560, 390）',
+    );
+    expect(validateRun(run)).toEqual({ valid: true, errors: [] });
+  });
+});

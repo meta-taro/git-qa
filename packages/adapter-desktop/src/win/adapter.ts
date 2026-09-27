@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { AdapterError, encodeFrame } from '@git-qa/core';
 import type {
   Action,
+  ActReport,
   AdapterCapabilities,
   LiveView,
   Observation,
@@ -17,7 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { fingerprintOf } from '../fingerprint.js';
-import { findInOcr, parseOcr } from '../ocr.js';
+import { matchesInOcr, parseOcr } from '../ocr.js';
 import type { OcrLine } from '../ocr.js';
 import { parseWinWindows, pickWindow, whyUnusable, winArgs } from './tool.js';
 import type { WinWindow } from './tool.js';
@@ -83,11 +84,19 @@ function run(command: string, args: readonly string[]): Promise<string> {
 export interface WindowsDesktopAdapterOptions extends DesktopAdapterOptions {
   /** `git-qa-win` の場所。**無ければ何もできない**（macOS の OCR と違い、これが本体）。 */
   readonly toolPath: string;
+  /**
+   * 道具の呼び方を差し替える（**試験のため**）。渡さなければ `toolPath` を起こす。
+   *
+   * 試験で偽の道具（シェルスクリプト）を起こしていたら、**macOS では新しい実行ファイルを
+   * 初めて起こすときの OS の検査で 5 秒を超え、時々落ちた**（2026-09-27）。
+   */
+  readonly runTool?: (args: readonly string[]) => Promise<string>;
 }
 
 export function createWindowsDesktopAdapter(options: WindowsDesktopAdapterOptions): TargetAdapter {
   const now = options.now ?? (() => new Date());
-  const tool = (args: readonly string[]): Promise<string> => run(options.toolPath, args);
+  const tool =
+    options.runTool ?? ((args: readonly string[]): Promise<string> => run(options.toolPath, args));
 
   return {
     kind: KIND,
@@ -227,9 +236,9 @@ function createSession(deps: SessionDeps): TargetSession {
       return { width: target.width, height: target.height };
     },
 
-    async act(action: Action): Promise<void> {
+    async act(action: Action): Promise<ActReport | void> {
       ensureOpen();
-      await dispatch(action, {
+      return dispatch(action, {
         tool,
         window: () => window,
         read: readText,
@@ -288,7 +297,7 @@ interface DispatchDeps {
  * 押す・入れる・回す・キー。**確かめていないものを「できる」と言わない**
  * （入れない操作は、下で「送れない」と言って止まる）。
  */
-async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
+async function dispatch(action: Action, deps: DispatchDeps): Promise<ActReport | void> {
   /**
    * **起動する**（meta-taro/git-qa#42）。**窓が出ていれば、何もしない**（macOS と同じ）。
    *
@@ -311,9 +320,11 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
   }
 
   if (action.kind === 'tap') {
-    const { window, point } = await aim(action.target, deps);
-    await deps.tool(winArgs.press(window.hwnd, point.x, point.y));
-    return;
+    const aimed = await aim(action.target, deps);
+    const said = (
+      await deps.tool(winArgs.press(aimed.window.hwnd, aimed.point.x, aimed.point.y))
+    ).trim();
+    return { detail: pressReport(action.target, aimed, said) };
   }
 
   /**
@@ -379,14 +390,21 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
  */
 const SCROLL_STEP_PX = 10;
 
+interface Aimed {
+  readonly window: WinWindow;
+  readonly point: { x: number; y: number };
+  /** 文字で指したとき、**当たった行を採る順に**（先頭が押したもの）。 */
+  readonly candidates?: readonly OcrLine[];
+}
+
 /** 指す先を画面の座標に直し、**触った場所を画面へ知らせる**（要望シート No.1）。 */
-async function aim(
-  at: PointerRef,
-  deps: DispatchDeps,
-): Promise<{ window: WinWindow; point: { x: number; y: number } }> {
+async function aim(at: PointerRef, deps: DispatchDeps): Promise<Aimed> {
   const window = deps.window();
-  const point =
-    at.at === 'point' ? { x: window.x + at.x, y: window.y + at.y } : await byText(at.ref, deps);
+  const found = at.at === 'point' ? undefined : await byText(at.ref, deps);
+  const point = found?.point ?? {
+    x: window.x + (at.at === 'point' ? at.x : 0),
+    y: window.y + (at.at === 'point' ? at.y : 0),
+  };
 
   // 座標は窓の中のもの。
   deps.onPointed?.({
@@ -395,17 +413,44 @@ async function aim(
     ...(at.at === 'element' ? { label: at.ref } : {}),
   });
 
-  return { window, point };
+  return { window, point, ...(found === undefined ? {} : { candidates: found.candidates }) };
 }
 
 /** 文字で指された所を探す。**見つからないものを、当てずっぽうで押さない。** */
-async function byText(text: string, deps: DispatchDeps): Promise<{ x: number; y: number }> {
-  const found = findInOcr(await deps.read(), text);
-  if (found === undefined) {
+async function byText(
+  text: string,
+  deps: DispatchDeps,
+): Promise<{ point: { x: number; y: number }; candidates: readonly OcrLine[] }> {
+  const candidates = matchesInOcr(await deps.read(), text);
+  const [best] = candidates;
+  if (best === undefined) {
     throw new AdapterError(KIND, `画面に「${text}」が見つからない`);
   }
   // UI Automation は画面の座標で返す。窓の中へ直さずそのまま使う（押すのも画面の座標）。
-  return found;
+  return { point: { x: best.x, y: best.y }, candidates };
+}
+
+/**
+ * **何をどう押したか**を 1 行で言う（meta-taro/git-qa#42）。証跡の手順の足跡に付く。
+ *
+ * > 候補が 2 つ以上あったら、選んだものを証跡に書く（種類・名前・座標）。
+ * > 本物のクリックは…証跡に残しておくと、人が触っていたときの誤作動を切り分けやすくなります。
+ */
+function pressReport(target: PointerRef, aimed: Aimed, said: string): string {
+  const how =
+    said === 'invoke'
+      ? 'Invoke で押した（本物のクリックは確かめられなかった）'
+      : '本物のクリックで押した';
+  const at = `（${String(Math.round(aimed.point.x))}, ${String(Math.round(aimed.point.y))}）`;
+  const picked = aimed.candidates?.[0];
+  if (target.at === 'point' || picked === undefined) return `座標${at}を${how}`;
+
+  const kind = picked.role === undefined ? '' : `（${picked.role}）`;
+  const head = `「${picked.text}」${kind}を${how}${at}`;
+  const all = aimed.candidates ?? [];
+  if (all.length < 2) return head;
+  const roles = all.map((one) => one.role ?? '種類不明').join(' / ');
+  return `${head}。同じ名前が ${String(all.length)} つ（${roles}）。いちばん小さいものを採った`;
 }
 
 export { KIND as WINDOWS_DESKTOP_KIND };

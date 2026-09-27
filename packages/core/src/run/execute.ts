@@ -47,6 +47,8 @@ export interface CaseContext {
   readonly session: TargetSession;
   /** 動画の頭出しに使う足跡を 1 つ置く。 */
   readonly step: (label?: string) => void;
+  /** **直前の足跡に、何をどう操作したかを付ける**（#42）。アダプタが言ったものをそのまま。 */
+  readonly note?: (detail: string) => void;
 }
 
 /** AI が出す判定。`VERIFIED` は型として書けない（C17）。 */
@@ -221,6 +223,10 @@ async function runOneCase(
       steps.push(
         label === undefined ? { index: steps.length, at } : { index: steps.length, at, label },
       );
+    },
+    note: (detail: string): void => {
+      const last = steps.at(-1);
+      if (last !== undefined && detail !== '') last.detail = detail;
     },
   };
 

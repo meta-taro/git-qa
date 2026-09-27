@@ -1,8 +1,4 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createWindowsDesktopAdapter } from '../../src/win/adapter.js';
 
@@ -31,46 +27,48 @@ const WINDOW_LINE = [
 
 const build = { source: 'md-business', label: 'test' };
 
-let dir: string;
-let log: string;
-let toolPath: string;
+/**
+ * **偽の道具。プロセスは起こさない**（2026-09-27）。
+ *
+ * 前はシェルスクリプトを置いて起こしていた。**macOS では新しい実行ファイルを初めて起こすときの
+ * OS の検査で 5 秒を超え、時々落ちた**（CI の Linux では通るので、手元でだけ落ちる形だった）。
+ * 呼ばれた引数を残し、`text` と `press` には決めた文字を返す。`windows` は md-business にだけ窓を返す。
+ */
+let sent: string[][];
+let output: { text: string; press: string };
 
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'git-qa-win-fake-'));
-  log = join(dir, 'calls.log');
-  toolPath = join(dir, 'git-qa-win');
-  // 1 回の呼び出しを 1 行（引数はタブ区切り。\x1f は Linux の sh（dash）の printf が解さない）で残す。`windows` にだけ窓を 1 つ返す。
-  await writeFile(
-    toolPath,
-    [
-      '#!/bin/sh',
-      `printf '%s\\t' "$@" >> '${log}'`,
-      `printf '\\n' >> '${log}'`,
-      `if [ "$1" = windows ] && [ "$2" = md-business ]; then printf '%s\\n' '${WINDOW_LINE}'; fi`,
-      `if [ "$1" = text ]; then printf '年\\t10\\t20\\t30\\t12\\n'; fi`,
-    ].join('\n'),
-  );
-  await chmod(toolPath, 0o755);
+const runTool = (args: readonly string[]): Promise<string> => {
+  sent.push([...args]);
+  if (args[0] === 'windows')
+    return Promise.resolve(args[1] === 'md-business' ? `${WINDOW_LINE}\n` : '');
+  if (args[0] === 'text') return Promise.resolve(output.text);
+  if (args[0] === 'press') return Promise.resolve(output.press);
+  return Promise.resolve('');
+};
+
+const toolPath = '（試験では起こさない）';
+
+beforeEach(() => {
+  sent = [];
+  output = { text: '年\t10\t20\t30\t12\n', press: '' };
 });
 
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
-});
-
-async function calls(): Promise<string[][]> {
-  const raw = await readFile(log, 'utf8').catch(() => '');
-  return raw
-    .split('\n')
-    .filter((l) => l !== '')
-    .map((l) => l.split('\t').slice(0, -1));
+/** 道具が `text` と `press` に何を返すか。 */
+function says(out: { text: string; press: string }): void {
+  output = out;
 }
 
-describe.skipIf(process.platform === 'win32')('Windows の「入力する」', () => {
+function calls(): Promise<string[][]> {
+  return Promise.resolve(sent);
+}
+
+describe('Windows の「入力する」', () => {
   it('欄を指さなければ、焦点のある欄へ 1 文字ずつ打つ（窓を添えて）', async () => {
     const session = await createWindowsDesktopAdapter({
       app: 'md-business',
       toolPath,
       build,
+      runTool,
     }).connect();
 
     await session.act({ kind: 'type', text: '20260903' });
@@ -86,6 +84,7 @@ describe.skipIf(process.platform === 'win32')('Windows の「入力する」', (
       app: 'md-business',
       toolPath,
       build,
+      runTool,
     }).connect();
 
     await session.act({ kind: 'type', text: 'abc', target: { at: 'element', ref: '年' } });
@@ -102,12 +101,13 @@ describe.skipIf(process.platform === 'win32')('Windows の「入力する」', (
  * macOS と同じく、**窓が出ていれば何もしない。**出ていなければ起動はせず、理由を言って止まる
  * （名前から実行ファイルを当てにいくと、別のものを起こしかねない・C40）。
  */
-describe.skipIf(process.platform === 'win32')('Windows の「アプリを起動する」', () => {
+describe('Windows の「アプリを起動する」', () => {
   it('窓がもう出ていれば、何も起こさずに通る', async () => {
     const session = await createWindowsDesktopAdapter({
       app: 'md-business',
       toolPath,
       build,
+      runTool,
     }).connect();
 
     await session.act({ kind: 'launch', app: 'md-business' });
@@ -120,10 +120,53 @@ describe.skipIf(process.platform === 'win32')('Windows の「アプリを起動�
       app: 'md-business',
       toolPath,
       build,
+      runTool,
     }).connect();
 
     await expect(session.act({ kind: 'launch', app: 'よそのアプリ' })).rejects.toThrow(
       /起動していない/,
     );
+  });
+});
+
+/**
+ * **何をどう押したかを返す**（meta-taro/git-qa#42）。
+ *
+ * > 候補が 2 つ以上あったら、選んだものを証跡に書く（種類・名前・座標）。
+ * > 本物のクリックは…「画面を使う手順」だと証跡に残しておくと、人が触っていたときの誤作動を切り分けやすくなります。
+ */
+describe('Windows の「押す」が言うこと', () => {
+  const withTool = async (text: string, pressSays: string): Promise<string> => {
+    says({ text, press: pressSays });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+    const report = await session.act({ kind: 'tap', target: { at: 'element', ref: '開く' } });
+    return report === undefined ? '' : report.detail;
+  };
+
+  it('本物のクリックで押したら、種類・名前・座標とともにそう言う', async () => {
+    const detail = await withTool('開く\t560\t390\t80\t28\tButton\n', 'click');
+
+    expect(detail).toBe('「開く」（Button）を本物のクリックで押した（560, 390）');
+  });
+
+  it('Invoke に落ちたら、そう言う', async () => {
+    const detail = await withTool('開く\t560\t390\t80\t28\tButton\n', 'invoke');
+
+    expect(detail).toContain('Invoke で押した');
+  });
+
+  it('同じ名前が 2 つあれば、候補の数と選び方も言う', async () => {
+    const detail = await withTool(
+      '開く\t400\t300\t480\t240\tWindow\n開く\t560\t390\t80\t28\tButton\n',
+      'click',
+    );
+
+    expect(detail).toContain('（Button）');
+    expect(detail).toContain('同じ名前が 2 つ（Button / Window）。いちばん小さいものを採った');
   });
 });

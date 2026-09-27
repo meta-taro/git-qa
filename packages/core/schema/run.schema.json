@@ -333,6 +333,11 @@
         },
         "label": {
           "type": "string"
+        },
+        "detail": {
+          "description": "アダプタが言った、何をどう操作したか（#42）。押し方・選んだ要素・候補の数、打ったあとの欄の値など。",
+          "type": "string",
+          "minLength": 1
         }
       }
     },

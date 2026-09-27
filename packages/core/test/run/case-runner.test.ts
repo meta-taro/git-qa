@@ -456,3 +456,40 @@ describe('createSheetCaseRunner — 遅い相手でも、もう一度見る', ()
     expect(verdict.aiResult).toBe('PASS');
   });
 });
+
+/**
+ * **何をどう押したかを、手順の足跡に残す**（meta-taro/git-qa#42）。
+ *
+ * > 候補が 2 つ以上あったら、選んだものを証跡に書く（種類・名前・座標）。
+ *
+ * アダプタが言えることを `act` の戻り値で返し、実行器がそのまま足跡に付ける。
+ */
+describe('createSheetCaseRunner — アダプタの言い分を足跡に残す', () => {
+  it('act が detail を返したら、その手順に付ける', async () => {
+    const { session } = await connect();
+    const steps: string[] = [];
+    const notes: string[] = [];
+    const reporting: TargetSession = {
+      ...session,
+      target: session.target,
+      liveView: session.liveView,
+      recording: session.recording,
+      isClosed: false,
+      act: () => Promise.resolve({ detail: '「開く」（Button）を本物のクリックで押した' }),
+    };
+
+    await runner('開いた')({
+      ...context(
+        reporting,
+        {
+          [STEPS_COLUMN]: '1. 「開く」をクリックする',
+          [EXPECTATION_COLUMN]: '「開いた」と表示される',
+        },
+        steps,
+      ),
+      note: (detail) => notes.push(detail),
+    });
+
+    expect(notes).toEqual(['「開く」（Button）を本物のクリックで押した']);
+  });
+});

@@ -61,13 +61,22 @@ export interface AdapterCapabilities {
 
 export type ObservationKind = 'accessibility-tree' | 'dom' | 'ui-automation' | 'none';
 
+/** アダプタが言う、何をどう操作したか（#42）。 */
+export interface ActReport {
+  readonly detail: string;
+}
+
 export interface TargetSession {
   /** そのまま run.json の `target` に入る。ここで作り直さない。 */
   readonly target: Target;
   readonly liveView: LiveView;
   readonly recording: RecordingControl;
   readonly isClosed: boolean;
-  act(action: Action): Promise<void>;
+  /**
+   * 操作を 1 つ送る。**何をどう操作したかを言えるなら、`detail` で返す**（#42）。
+   * 証跡の手順の足跡に、そのまま付く。言えない相手は何も返さない。
+   */
+  act(action: Action): Promise<ActReport | void>;
   /**
    * 端末の画面の実寸。**映像を縮めて流している場合に、座標を戻すために要る。**
    * 取れない対象（Web など）は持たない。
