@@ -3150,3 +3150,29 @@ macOS は使用目的が書かれていないと**許可を聞く画面すら出
 **実行状況**
 
 - Windows 向けのビルド（`cargo check`）と TS の単体試験まで。**本物のクリックは Windows 機で踏んでいない**
+
+### C92: commit の前に `pnpm verify` を走らせる（2026-09-27・**自分の失敗から**）
+
+**決めたこと**
+
+`.githooks/pre-commit` で `pnpm verify` を走らせる。`pnpm install` のとき `prepare` が `core.hooksPath` を向ける。
+
+**根拠**
+
+- **product-baseline §5 の仕組みが、最初から一度も入っていなかった**（履歴にも無い）
+- 2026-09-27、**`pnpm verify` の出力を `grep` で絞って見て、落ちた試験のまま commit した**（C59 で禁じた形そのもの）。
+  push 前に気づいて直したが、**止める仕組みが無かった**
+- 所要 64 秒（この Mac で実測）。commit ごとに払ってよい長さ
+
+**採らなかった案とその理由**
+
+- **CI だけに任せる** —— CI は push の後。**push は人がするので、人が落ちた commit を外へ出すことになる**
+- **lint と typecheck だけにする** —— 今回すり抜けたのは試験だった
+
+**これを止めるべき条件**
+
+- verify が数分を超えて、commit を細かく切らなくなったら（そのときは試験を速くするのが先）
+
+**実行状況**
+
+- この Mac で有効にした（`git config core.hooksPath` → `.githooks`）。**他の開発機は `pnpm install` をやり直すまで効かない**
