@@ -120,6 +120,8 @@ const capabilities: AdapterCapabilities = {
   textInput: 'any',
   // 番号まで載せるようにして、実物で効くことを確かめた（外部レビュー #6・2026-09-13）。
   keyInput: true,
+  // **種類で絞れる**（#42）。要素の tag と role を見る。
+  elementKinds: true,
   // 行き先は URL。
   appId: 'package-or-url',
 };
@@ -488,7 +490,7 @@ async function resolvePoint(
   if (ref.at === 'point') return { x: ref.x, y: ref.y };
 
   const result = await cdp.send('Runtime.evaluate', {
-    expression: findElementScript(ref.ref),
+    expression: findElementScript(ref.ref, ref.kind),
     returnByValue: true,
   });
   const said = (result['result'] as { value?: unknown } | undefined)?.value;

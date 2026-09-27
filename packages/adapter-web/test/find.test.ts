@@ -1,3 +1,5 @@
+import { Script } from 'node:vm';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -234,5 +236,41 @@ describe('見つけた所の大きさも返す（2026-09-24）', () => {
 
   it('大きさが無くても、場所は読める（古い返りでも落ちない）', () => {
     expect(parseFoundPoint({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
+  });
+});
+
+/**
+ * **種類つきで押す**（meta-taro/git-qa#42 の改善案）。
+ * 種類を渡したら、**その種類のものだけ**を候補にする文になる。渡さなければ今までどおり。
+ */
+describe('findElementScript — 種類で絞る', () => {
+  it('種類を渡したら、それを埋め込んで絞る', () => {
+    const script = findElementScript('開く', 'button');
+
+    expect(script).toContain(JSON.stringify('button'));
+    expect(script).toContain('kindOf');
+  });
+
+  /**
+   * **組み立てた文が、JavaScript として読める**（2026-09-27）。
+   * この文はページの中で初めて走るので、**書き損じは実物でしか出ない。**ここで読めるかだけは留める。
+   */
+  it('組み立てた文が、どの種類でも JavaScript として読める', () => {
+    for (const kind of [
+      undefined,
+      'button',
+      'link',
+      'menuitem',
+      'tab',
+      'checkbox',
+      'cell',
+    ] as const) {
+      // **走らせない。**読めるか（構文）だけを見る。
+      expect(() => new Script(findElementScript('開"く', kind))).not.toThrow();
+    }
+  });
+
+  it('種類を渡さなければ、絞らない', () => {
+    expect(findElementScript('開く')).toContain('const kind = null');
   });
 });

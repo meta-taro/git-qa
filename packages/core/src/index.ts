@@ -68,6 +68,7 @@ export type {
   Action,
   ActReport,
   AdapterCapabilities,
+  ElementKind,
   LiveView,
   LiveViewTransport,
   Observation,

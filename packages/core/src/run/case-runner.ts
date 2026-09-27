@@ -58,6 +58,8 @@ export interface SheetCaseRunnerOptions {
   readonly textInput?: 'none' | 'ascii-only' | 'any';
   /** キーを送れるか（`AdapterCapabilities.keyInput`）。ここで推し量らない。 */
   readonly keyInput?: boolean;
+  /** 種類で絞れるか（`AdapterCapabilities.elementKinds`・#42）。ここで推し量らない。 */
+  readonly elementKinds?: boolean;
   /**
    * **期待結果が出るまで、少し読み直す**（外部レビュー meta-taro/git-qa#12）。
    *
@@ -181,6 +183,7 @@ export function createSheetCaseRunner(
       // **相手が名乗った能力をそのまま使う。**ここで推し量らない。
       ...(options.textInput === undefined ? {} : { textInput: options.textInput }),
       ...(options.keyInput === undefined ? {} : { keyInput: options.keyInput }),
+      ...(options.elementKinds === undefined ? {} : { elementKinds: options.elementKinds }),
       ...(options.appId === undefined ? {} : { appId: options.appId }),
     });
     const held = holdBeforeTouching(planned);

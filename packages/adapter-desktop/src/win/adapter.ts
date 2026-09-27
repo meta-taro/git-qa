@@ -8,6 +8,7 @@ import type {
   Action,
   ActReport,
   AdapterCapabilities,
+  ElementKind,
   LiveView,
   Observation,
   PointerRef,
@@ -61,6 +62,8 @@ const capabilities: AdapterCapabilities = {
   textInput: 'any',
   // **前面に一瞬出るが、届く**（2026-09-14・実測。#10）。
   keyInput: true,
+  // **種類で絞れる**（#42）。UI Automation の ControlType を道具が返す。
+  elementKinds: true,
   // 窓の持ち主の名前そのもの。**パッケージ名は無い。**
   appId: 'name',
 };
@@ -400,7 +403,7 @@ interface Aimed {
 /** 指す先を画面の座標に直し、**触った場所を画面へ知らせる**（要望シート No.1）。 */
 async function aim(at: PointerRef, deps: DispatchDeps): Promise<Aimed> {
   const window = deps.window();
-  const found = at.at === 'point' ? undefined : await byText(at.ref, deps);
+  const found = at.at === 'point' ? undefined : await byText(at.ref, deps, at.kind);
   const point = found?.point ?? {
     x: window.x + (at.at === 'point' ? at.x : 0),
     y: window.y + (at.at === 'point' ? at.y : 0),
@@ -420,15 +423,48 @@ async function aim(at: PointerRef, deps: DispatchDeps): Promise<Aimed> {
 async function byText(
   text: string,
   deps: DispatchDeps,
+  kind?: ElementKind,
 ): Promise<{ point: { x: number; y: number }; candidates: readonly OcrLine[] }> {
-  const candidates = matchesInOcr(await deps.read(), text);
+  const named = matchesInOcr(await deps.read(), text);
+  // **種類が書いてあれば、その種類のものだけ**（#42）。名前が同じ窓を押さない。
+  const candidates =
+    kind === undefined ? named : named.filter((one) => ROLES_OF[kind].includes(one.role ?? ''));
   const [best] = candidates;
+  if (best === undefined && kind !== undefined && named.length > 0) {
+    const seen = [...new Set(named.map((one) => one.role ?? '種類不明'))].join(' / ');
+    throw new AdapterError(
+      KIND,
+      `「${text}」という${KIND_WORDS[kind]}が見つからない（同じ名前は ${seen} に在る）`,
+    );
+  }
   if (best === undefined) {
     throw new AdapterError(KIND, `画面に「${text}」が見つからない`);
   }
   // UI Automation は画面の座標で返す。窓の中へ直さずそのまま使う（押すのも画面の座標）。
   return { point: { x: best.x, y: best.y }, candidates };
 }
+
+/**
+ * 種類と、UI Automation の ControlType の名前（#42）。
+ * **セル（`DataItem`）は実物で確かめていない**（Chromium の `gridcell` がそう出る、という前提）。
+ */
+const ROLES_OF: Readonly<Record<ElementKind, readonly string[]>> = {
+  button: ['Button', 'SplitButton'],
+  link: ['Hyperlink'],
+  menuitem: ['MenuItem'],
+  tab: ['TabItem'],
+  checkbox: ['CheckBox'],
+  cell: ['DataItem'],
+};
+
+const KIND_WORDS: Readonly<Record<ElementKind, string>> = {
+  button: 'ボタン',
+  link: 'リンク',
+  menuitem: 'メニュー',
+  tab: 'タブ',
+  checkbox: 'チェックボックス',
+  cell: 'セル',
+};
 
 /**
  * **何をどう押したか**を 1 行で言う（meta-taro/git-qa#42）。証跡の手順の足跡に付く。

@@ -610,3 +610,58 @@ describe('期待結果に、人が読む文を書ける（2026-09-24）', () => 
     expect(textOf('うまくいく')).toBeUndefined();
   });
 });
+
+/**
+ * **種類つきで押す**（meta-taro/git-qa#42 の改善案）。
+ *
+ * > 案: 種類を指定して書けるようにする。例: `「開く」ボタンをクリックする`。
+ *
+ * 確認欄で**窓とボタンが両方「開く」**だった。名前だけでは、押したい方を言い切れない。
+ */
+describe('planSteps — 種類つきで押す', () => {
+  it('「開く」ボタンをクリックする は、種類つきの要素として読む', () => {
+    const [planned] = planSteps('1. 「開く」ボタンをクリックする', { elementKinds: true });
+
+    expect(planned?.kind === 'action' && planned.action).toEqual({
+      kind: 'tap',
+      target: { at: 'element', ref: '開く', kind: 'button' },
+    });
+  });
+
+  it('リンク・メニュー・タブ・チェックボックス・セルも読む。「押す」でも同じ', () => {
+    for (const [line, kind] of [
+      ['1. 「詳細」リンクをクリックする', 'link'],
+      ['1. 「保存」メニューをクリックする', 'menuitem'],
+      ['1. 「設定」タブをクリックする', 'tab'],
+      ['1. 「同意する」チェックボックスをクリックする', 'checkbox'],
+      ['1. 「2026/09/03」セルをクリックする', 'cell'],
+      ['1. 「開く」ボタンを押す', 'button'],
+    ] as const) {
+      const [planned] = planSteps(line, { elementKinds: true });
+      expect(
+        planned?.kind === 'action' && planned.action.kind === 'tap' && planned.action.target,
+      ).toMatchObject({ kind });
+    }
+  });
+
+  /**
+   * **種類で絞れない相手には回さない。**種類を黙って捨てて名前だけで押すと、
+   * シートが「ボタン」と言っているのに窓を押しかねない。**書き方を案内して人へ回す。**
+   */
+  it('種類で絞れない相手なら、書き方を添えて人に回す', () => {
+    const [planned] = planSteps('1. 「開く」ボタンをクリックする', { elementKinds: false });
+
+    expect(planned?.kind).toBe('hold');
+    expect(planned?.kind === 'hold' && planned.reason).toContain('「開く」をクリックする');
+  });
+
+  /** 種類の語が付いていなければ、今までどおり。 */
+  it('種類の語が無ければ、今までどおり名前だけで探す', () => {
+    const [planned] = planSteps('1. 「開く」をクリックする', { elementKinds: true });
+
+    expect(planned?.kind === 'action' && planned.action).toEqual({
+      kind: 'tap',
+      target: { at: 'element', ref: '開く' },
+    });
+  });
+});

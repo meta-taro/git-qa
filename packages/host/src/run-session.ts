@@ -571,6 +571,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     // **相手が名乗った能力をそのまま渡す。**Android の事情を全部の相手に押し付けない。
     textInput: options.adapter.capabilities.textInput,
     keyInput: options.adapter.capabilities.keyInput,
+    // **種類で絞れるか**は相手が名乗る（#42）。
+    ...(options.adapter.capabilities.elementKinds === true ? { elementKinds: true } : {}),
     ...(expectation === undefined ? {} : { expectation }),
     appId: options.adapter.capabilities.appId,
     // **画面の日付の書き方はシートが決める**（外部レビュー meta-taro/git-qa#29）。

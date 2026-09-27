@@ -1,4 +1,4 @@
-import type { Action } from '../adapter/types.js';
+import type { Action, ElementKind } from '../adapter/types.js';
 
 /**
  * 検証シートの日本語の手順・期待結果を、機械が扱える形へ落とす。
@@ -44,6 +44,8 @@ export interface PlanOptions {
    * **送れない相手には回さない** —— 走らせて落ちるより、人へ回すほうが読める。
    */
   readonly keyInput?: boolean;
+  /** **種類で絞れるか**（`AdapterCapabilities.elementKinds`・#42）。無ければ絞れない。 */
+  readonly elementKinds?: boolean;
   /**
    * 行き先の書き方。
    *
@@ -63,6 +65,22 @@ const NUMBERING = /^\s*(?:\d+\s*[.)．、]|[-・*])\s*/;
 const TYPE_INTO = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))に「(?<text>[^」]*)」と入力する$/;
 /** 入力先を書かない形。直前にどこかを触っている前提。 */
 const TYPE_ONLY = /^「(?<text>[^」]*)」と入力する$/;
+/**
+ * `「開く」ボタンをクリックする` / `「開く」ボタンを押す`（meta-taro/git-qa#42）。
+ * **種類の語は閉じた一覧だけ。**知らない語を種類として読むと、名前の一部を捨てることになる。
+ */
+const TAP_KIND =
+  /^「(?<target>[^」]+)」(?<kind>ボタン|リンク|メニュー|タブ|チェックボックス|セル)を(?:(?:タップ|クリック)する?|押(?:す|下する))$/;
+
+const KIND_WORDS: Readonly<Record<string, ElementKind>> = {
+  ボタン: 'button',
+  リンク: 'link',
+  メニュー: 'menuitem',
+  タブ: 'tab',
+  チェックボックス: 'checkbox',
+  セル: 'cell',
+};
+
 /** `「X」をタップする` / `X をタップする`（クリックも同じ扱い） */
 const TAP = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:タップ|クリック)する?$/;
 /**
@@ -223,7 +241,11 @@ function planOneStep(
   textInput: 'none' | 'ascii-only' | 'any',
   appId: 'package-or-url' | 'name',
   keyInput: boolean,
+  elementKinds: boolean,
 ): PlannedStep {
+  const kinded = TAP_KIND.exec(text);
+  if (kinded?.groups) return planKindTap(text, kinded.groups, elementKinds);
+
   const into = TYPE_INTO.exec(text);
   if (into?.groups) {
     const target = into.groups['target'] ?? into.groups['bare'];
@@ -323,7 +345,10 @@ export function planSteps(stepsText: string, options: PlanOptions = {}): Planned
   const appId = options.appId ?? 'package-or-url';
   // **キーを送れるかは相手が名乗る**（外部レビュー #6）。ここで推し量らない。
   const keyInput = options.keyInput ?? true;
-  return lines.map((line) => planOneStep(line, options.app, textInput, appId, keyInput));
+  const elementKinds = options.elementKinds ?? false;
+  return lines.map((line) =>
+    planOneStep(line, options.app, textInput, appId, keyInput, elementKinds),
+  );
 }
 
 /** 画面に在るかどうかで決まる期待結果。 */
@@ -484,4 +509,28 @@ export function planExpectation(expectedText: string): ExpectationCheck {
  */
 export function judgeExpectation(check: ExpectationContains, screenText: string): 'PASS' | 'FAIL' {
   return screenText.includes(check.text) ? 'PASS' : 'FAIL';
+}
+
+/**
+ * 種類つきで押す（#42）。**種類で絞れない相手には回さない。**
+ * 種類を黙って捨てて名前だけで押すと、シートが「ボタン」と言っているのに窓を押しかねない。
+ */
+function planKindTap(
+  text: string,
+  groups: Record<string, string | undefined>,
+  elementKinds: boolean,
+): PlannedStep {
+  const ref = groups['target'] ?? '';
+  const word = groups['kind'] ?? '';
+  const kind = KIND_WORDS[word];
+  if (kind === undefined || !elementKinds) {
+    return {
+      kind: 'hold',
+      text,
+      reason:
+        `この相手は種類（${word}）で絞れない。` +
+        `名前だけで探すなら「${ref}」をクリックする、と書いてください`,
+    };
+  }
+  return { kind: 'action', text, action: { kind: 'tap', target: { at: 'element', ref, kind } } };
 }

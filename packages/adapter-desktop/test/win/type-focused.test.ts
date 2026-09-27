@@ -170,3 +170,44 @@ describe('Windows の「押す」が言うこと', () => {
     expect(detail).toContain('同じ名前が 2 つ（Button / Window）。いちばん小さいものを採った');
   });
 });
+
+/**
+ * **種類つきで押す**（#42 の改善案）。名前が同じでも、**書かれた種類のものだけ**を候補にする。
+ * 窓のほうを小さくしておき、「小さいほう」ではなく「種類」で選んでいることを確かめる。
+ */
+describe('Windows の「「開く」ボタンをクリックする」', () => {
+  const lines = '開く\t400\t300\t40\t20\tWindow\n開く\t560\t390\t80\t28\tButton\n';
+
+  it('書かれた種類（Button）のものを押す', async () => {
+    says({ text: lines, press: 'click' });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+
+    const report = await session.act({
+      kind: 'tap',
+      target: { at: 'element', ref: '開く', kind: 'button' },
+    });
+
+    expect(sent.find((c) => c[0] === 'press')).toEqual(['press', '4242', '560', '390']);
+    expect(report === undefined ? '' : report.detail).toContain('（Button）');
+  });
+
+  it('その種類のものが無ければ、押さずに何が在ったかを言う', async () => {
+    says({ text: '開く\t400\t300\t40\t20\tWindow\n', press: 'click' });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+
+    await expect(
+      session.act({ kind: 'tap', target: { at: 'element', ref: '開く', kind: 'button' } }),
+    ).rejects.toThrow(/ボタン.*Window/);
+    expect(sent.some((c) => c[0] === 'press')).toBe(false);
+  });
+});

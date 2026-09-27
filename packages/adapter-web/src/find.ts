@@ -1,3 +1,5 @@
+import type { ElementKind } from '@git-qa/core';
+
 /**
  * 画面の文字から、触る場所を決める（Issue 015）。
  *
@@ -21,12 +23,30 @@
  * 4. **名乗りに含まれる**（外部レビュー meta-taro/git-qa#28）。画面に文字が出ていない部品は
  *    名乗りでしか指せず、その名乗りは合成された 1 本（`2026-09-20 定休日`）のことが多い
  */
-export function findElementScript(ref: string): string {
+export function findElementScript(ref: string, kind?: ElementKind): string {
   const want = JSON.stringify(ref);
   return `(() => {
   const want = ${want};
+  /**
+   * **種類つきで押す**（meta-taro/git-qa#42）。\`「開く」ボタンをクリックする\` と書いたときだけ付く。
+   * **その種類のものだけ**を候補にする。名前が同じ見出しや窓を押さない。
+   */
+  const kind = ${JSON.stringify(kind ?? null)};
+  const kindOf = (el) => {
+    const r = (el.getAttribute('role') || '').toLowerCase();
+    const t = el.tagName.toLowerCase();
+    if (t === 'button' || r === 'button') return 'button';
+    if (t === 'input' && ['submit', 'button', 'reset'].includes(el.type)) return 'button';
+    if ((t === 'a' && el.hasAttribute('href')) || r === 'link') return 'link';
+    if (r === 'menuitem' || r === 'menuitemcheckbox' || r === 'menuitemradio') return 'menuitem';
+    if (r === 'tab') return 'tab';
+    if ((t === 'input' && el.type === 'checkbox') || r === 'checkbox' || r === 'switch') return 'checkbox';
+    if (t === 'td' || t === 'th' || ['gridcell', 'cell', 'columnheader', 'rowheader'].includes(r)) return 'cell';
+    return null;
+  };
   const seen = [];
   for (const el of document.querySelectorAll('*')) {
+    if (kind !== null && kindOf(el) !== kind) continue;
     const box = el.getBoundingClientRect();
     // 見えているものだけ。隠れた要素を押すと、何も起きないのに押したことになる。
     if (box.width <= 0 || box.height <= 0) continue;

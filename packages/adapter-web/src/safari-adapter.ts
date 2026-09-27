@@ -46,6 +46,8 @@ const capabilities: AdapterCapabilities = {
    * 起きないことが多い。**「送った」と「効いた」は別。**確かめてから真にする。
    */
   keyInput: false,
+  // **種類で絞れる**（#42）。要素の tag と role を見る。
+  elementKinds: true,
   appId: 'package-or-url',
 };
 
@@ -190,7 +192,7 @@ export function createSafariSession(deps: SessionDeps): TargetSession {
 
   const resolvePoint = async (ref: PointerRef): Promise<{ x: number; y: number }> => {
     if (ref.at === 'point') return { x: ref.x, y: ref.y };
-    const point = parseFoundPoint(await evaluate(findElementScript(ref.ref)));
+    const point = parseFoundPoint(await evaluate(findElementScript(ref.ref, ref.kind)));
     if (point === undefined) {
       throw new AdapterError(KIND, `画面に見つからない要素: ${JSON.stringify(ref.ref)}`);
     }

@@ -48,6 +48,11 @@ export interface AdapterCapabilities {
    */
   readonly keyInput: boolean;
   /**
+   * **種類で絞れるか**（`「開く」ボタンをクリックする`・#42）。無ければ絞れない。
+   * **絞れない相手には回さない** —— 種類を黙って捨てて名前だけで押すと、別のものを押しかねない。
+   */
+  readonly elementKinds?: boolean;
+  /**
    * 行き先（`# 対象:`）の書き方。**相手によって違うので、アダプタが名乗る。**
    *
    * Android はパッケージ名、ウェブは URL（`'package-or-url'`）。
@@ -174,9 +179,15 @@ export interface Screenshot {
 }
 
 /** 座標で指すか、対象側の識別子で指すか。識別子の中身はアダプタしか知らない。 */
+/**
+ * **押すものの種類**（meta-taro/git-qa#42）。`「開く」ボタンをクリックする` のように書いたときだけ付く。
+ * 名前が同じでも、**書かれた種類のものだけ**を候補にする（窓とボタンが両方「開く」だった）。
+ */
+export type ElementKind = 'button' | 'link' | 'menuitem' | 'tab' | 'checkbox' | 'cell';
+
 export type PointerRef =
   | { readonly at: 'point'; readonly x: number; readonly y: number }
-  | { readonly at: 'element'; readonly ref: string };
+  | { readonly at: 'element'; readonly ref: string; readonly kind?: ElementKind };
 
 export type Action =
   | { readonly kind: 'tap'; readonly target: PointerRef }
