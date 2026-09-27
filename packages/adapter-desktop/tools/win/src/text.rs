@@ -101,6 +101,38 @@ unsafe fn walk(
     Ok(out)
 }
 
+/// **いま焦点のある欄**の `種類 \t 名前 \t 値`（#42）。読めなければ空。
+///
+/// **パスワード欄は値を出さない**（4 列目に `password` と書いて、値は空）。
+pub fn focused_field() -> String {
+    // SAFETY: COM は使う前に始めて、終わったら閉じる。
+    unsafe {
+        if CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_err() {
+            return String::new();
+        }
+        let out = (|| -> Option<String> {
+            let automation: IUIAutomation =
+                CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok()?;
+            let element = automation.GetFocusedElement().ok()?;
+            let role = role_of(&element);
+            let name = clean(&element.CurrentName().unwrap_or_default().to_string());
+            if element.CurrentIsPassword().unwrap_or_default().as_bool() {
+                return Some(format!("{role}\t{name}\t\tpassword\n"));
+            }
+            let value = clean(&value_of(&element).unwrap_or_default());
+            Some(format!("{role}\t{name}\t{value}\n"))
+        })()
+        .unwrap_or_default();
+        CoUninitialize();
+        out
+    }
+}
+
+/// タブと改行を潰す（読む側の区切りを壊さない）。
+fn clean(text: &str) -> String {
+    text.replace(['\t', '\n', '\r'], " ")
+}
+
 /// 入力欄の中身。**パスワード欄は読まない。**
 ///
 /// 証跡は git で管理できる形で残る（ワークスペース）。**画面に写るのと、

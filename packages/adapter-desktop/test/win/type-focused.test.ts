@@ -35,7 +35,7 @@ const build = { source: 'md-business', label: 'test' };
  * 呼ばれた引数を残し、`text` と `press` には決めた文字を返す。`windows` は md-business にだけ窓を返す。
  */
 let sent: string[][];
-let output: { text: string; press: string };
+let output: { text: string; press: string; keys?: string };
 
 const runTool = (args: readonly string[]): Promise<string> => {
   sent.push([...args]);
@@ -43,6 +43,7 @@ const runTool = (args: readonly string[]): Promise<string> => {
     return Promise.resolve(args[1] === 'md-business' ? `${WINDOW_LINE}\n` : '');
   if (args[0] === 'text') return Promise.resolve(output.text);
   if (args[0] === 'press') return Promise.resolve(output.press);
+  if (args[0] === 'keys') return Promise.resolve(output.keys ?? '');
   return Promise.resolve('');
 };
 
@@ -54,7 +55,7 @@ beforeEach(() => {
 });
 
 /** 道具が `text` と `press` に何を返すか。 */
-function says(out: { text: string; press: string }): void {
+function says(out: { text: string; press: string; keys?: string }): void {
   output = out;
 }
 
@@ -231,6 +232,44 @@ describe('Windows の「ダブルクリックする」', () => {
     expect(sent.find((c) => c[0] === 'dblclick')).toEqual(['dblclick', '4242', '300', '200']);
     expect(report === undefined ? '' : report.detail).toBe(
       '「2026/09/03」（DataItem）をダブルクリックした（300, 200）',
+    );
+  });
+});
+
+/**
+ * **打ったあとの欄の値を、証跡に書く**（#42 の改善案・おまけ）。
+ *
+ * > 入力の後に、フォーカスのある欄の値（ValuePattern）を証跡へ自動で書く。
+ * > 「変わらないこと」を確かめる検証でも、人が画像を拡大せずに読めるようになります。
+ *
+ * 道具は `種類 \t 名前 \t 値` を返す。**パスワード欄は値を返さない**（道具の側で読まない）。
+ */
+describe('Windows の「入力する」が言うこと', () => {
+  const typed = async (keysSays: string): Promise<string> => {
+    says({ text: '', press: '', keys: keysSays });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+    const report = await session.act({ kind: 'type', text: '20261' });
+    return report === undefined ? '' : report.detail;
+  };
+
+  it('焦点の欄の種類・名前・打ったあとの値を言う', async () => {
+    expect(await typed('Spinner\t年\t2026\n')).toBe(
+      '焦点の欄（Spinner「年」）へ 1 文字ずつ打った。打ったあとの値: 2026',
+    );
+  });
+
+  it('値が読めなければ、読めなかったと言う（黙って空にしない）', async () => {
+    expect(await typed('')).toBe('焦点の欄へ 1 文字ずつ打った（打ったあとの値は読めなかった）');
+  });
+
+  it('パスワード欄なら、値は書かないと言う', async () => {
+    expect(await typed('Edit\tパスワード\t\tpassword\n')).toBe(
+      '焦点の欄（Edit「パスワード」）へ 1 文字ずつ打った（パスワード欄なので、値は書かない）',
     );
   });
 });

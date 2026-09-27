@@ -360,8 +360,8 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<ActReport |
    */
   if (action.kind === 'type') {
     if (action.target === undefined) {
-      await deps.tool(winArgs.keys(deps.window().hwnd, action.text));
-      return;
+      const said = await deps.tool(winArgs.keys(deps.window().hwnd, action.text));
+      return { detail: typedReport(said) };
     }
     const { window, point } = await aim(action.target, deps);
     await deps.tool(winArgs.type(window.hwnd, point.x, point.y, action.text));
@@ -454,6 +454,24 @@ async function byText(
   }
   // UI Automation は画面の座標で返す。窓の中へ直さずそのまま使う（押すのも画面の座標）。
   return { point: { x: best.x, y: best.y }, candidates };
+}
+
+/**
+ * **打ったあとの欄の値**を 1 行で言う（meta-taro/git-qa#42 の改善案）。
+ *
+ * > 「変わらないこと」を確かめる検証でも、人が画像を拡大せずに読めるようになります。
+ *
+ * 道具は `種類 \t 名前 \t 値 [\t password]` を返す。**パスワード欄は値を返さない**（道具の側で読まない）。
+ * **読めなければ、読めなかったと言う**（黙って空にしない）。
+ */
+function typedReport(said: string): string {
+  const [role = '', name = '', value = '', flag = ''] = said.replace(/\n$/, '').split('\t');
+  if (role === '' && name === '')
+    return '焦点の欄へ 1 文字ずつ打った（打ったあとの値は読めなかった）';
+
+  const field = `焦点の欄（${role}${name === '' ? '' : `「${name}」`}）へ 1 文字ずつ打った`;
+  if (flag === 'password') return `${field}（パスワード欄なので、値は書かない）`;
+  return `${field}。打ったあとの値: ${value}`;
 }
 
 /**
