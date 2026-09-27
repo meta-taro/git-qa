@@ -46,7 +46,7 @@ beforeEach(async () => {
       '#!/bin/sh',
       `printf '%s\\t' "$@" >> '${log}'`,
       `printf '\\n' >> '${log}'`,
-      `if [ "$1" = windows ]; then printf '%s\\n' '${WINDOW_LINE}'; fi`,
+      `if [ "$1" = windows ] && [ "$2" = md-business ]; then printf '%s\\n' '${WINDOW_LINE}'; fi`,
       `if [ "$1" = text ]; then printf '年\\t10\\t20\\t30\\t12\\n'; fi`,
     ].join('\n'),
   );
@@ -92,5 +92,38 @@ describe.skipIf(process.platform === 'win32')('Windows の「入力する」', (
 
     const sent = (await calls()).filter((c) => c[0] !== 'windows' && c[0] !== 'text');
     expect(sent.map((c) => [c[0], c[1], c[4]])).toEqual([['type', '4242', 'abc']]);
+  });
+});
+
+/**
+ * **「アプリを起動する」を、Windows でも止めない**（meta-taro/git-qa#42）。
+ *
+ * 検証シートは、ほぼ必ず 1 行目がこれ。Windows には起動の口が無く、**最初の行で BLOCKED** になっていた。
+ * macOS と同じく、**窓が出ていれば何もしない。**出ていなければ起動はせず、理由を言って止まる
+ * （名前から実行ファイルを当てにいくと、別のものを起こしかねない・C40）。
+ */
+describe.skipIf(process.platform === 'win32')('Windows の「アプリを起動する」', () => {
+  it('窓がもう出ていれば、何も起こさずに通る', async () => {
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+    }).connect();
+
+    await session.act({ kind: 'launch', app: 'md-business' });
+
+    expect((await calls()).every((c) => c[0] === 'windows')).toBe(true);
+  });
+
+  it('窓が無ければ、起動せずに理由を言って止まる', async () => {
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+    }).connect();
+
+    await expect(session.act({ kind: 'launch', app: 'よそのアプリ' })).rejects.toThrow(
+      /起動していない/,
+    );
   });
 });

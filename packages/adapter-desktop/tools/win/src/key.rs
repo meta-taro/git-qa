@@ -111,7 +111,7 @@ fn unicode(unit: u16, up: bool) -> INPUT {
 /// 相手を前面に出し、**出たことを確かめてから**送り、終わったら前面を返す。
 ///
 /// キーを押すのも、文字を打つのも、**ここを通る**（出ていないのに送る道を作らない）。
-fn in_front(hwnd: HWND, deliver: impl FnOnce()) -> Result<String, String> {
+pub(crate) fn in_front(hwnd: HWND, deliver: impl FnOnce()) -> Result<String, String> {
     // SAFETY: 触るのは渡された窓と、いま前面にある窓だけ。
     unsafe {
         if !IsWindow(hwnd).as_bool() {

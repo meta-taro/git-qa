@@ -39,7 +39,7 @@ import type { DesktopAdapterOptions } from '../adapter.js';
  * | | macOS | Windows |
  * |---|---|---|
  * | 文字 | AX（段 1）＋ Vision OCR（段 2） | **UI Automation だけ**（段 2 はまだ無い） |
- * | 押す | `AXPress` | UI Automation の `Invoke` |
+ * | 押す | `AXPress` | **本物のクリック**（#42）。確かめられなければ `Invoke` |
  * | 録る | ScreenCaptureKit | **まだ無い**（`unsupported`） |
  *
  * **録画はまだ無い。**画面（`screen.webp`）は残るので、証跡としては成立する。
@@ -289,6 +289,27 @@ interface DispatchDeps {
  * （入れない操作は、下で「送れない」と言って止まる）。
  */
 async function dispatch(action: Action, deps: DispatchDeps): Promise<void> {
+  /**
+   * **起動する**（meta-taro/git-qa#42）。**窓が出ていれば、何もしない**（macOS と同じ）。
+   *
+   * 検証シートは、ほぼ必ず 1 行目が「アプリを起動する」。ここに口が無く、**最初の行で止まっていた。**
+   *
+   * **出ていなければ、起動はしない。**名前から実行ファイルを当てにいくと、
+   * **別のものを起こしたまま検証が進みかねない**（C40）。起動していないと言って止まる。
+   */
+  if (action.kind === 'launch') {
+    const running = pickWindow(
+      parseWinWindows(await deps.tool(winArgs.windows(action.app))),
+      action.app,
+    );
+    if (running !== undefined) return;
+    throw new AdapterError(
+      KIND,
+      `「${action.app}」は起動していない。Windows では名前から起動しないので、` +
+        '先に起動してから走らせてください（別のものを起こさないため）',
+    );
+  }
+
   if (action.kind === 'tap') {
     const { window, point } = await aim(action.target, deps);
     await deps.tool(winArgs.press(window.hwnd, point.x, point.y));

@@ -84,8 +84,17 @@ export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undef
     ...(line.height === undefined ? {} : { height: line.height }),
   });
 
-  const exact = lines.find((line) => squeeze(line.text) === want);
-  if (exact !== undefined) return of(exact);
+  /**
+   * **完全一致が複数あるときも、いちばん小さいもの**（meta-taro/git-qa#42）。
+   *
+   * Windows の確認欄で、**窓とボタンが両方「開く」**という名前だった。最初に見つかった
+   * 窓の真ん中を押していて、確認欄が閉じなかった。**押したいのは、たいてい小さいほう。**
+   * 並んだら先に出たほう（`sort` は安定なので、並びは崩れない）。
+   */
+  const exact = lines
+    .filter((line) => squeeze(line.text) === want)
+    .sort((a, b) => sizeOf(a) - sizeOf(b));
+  if (exact[0] !== undefined) return of(exact[0]);
 
   /**
    * **いちばん小さいものを採る**（外部レビュー meta-taro/git-qa#11）。

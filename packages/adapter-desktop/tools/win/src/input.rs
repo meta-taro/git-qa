@@ -8,7 +8,7 @@
 //!
 //! | | 使うもの | 前面に出るか |
 //! |---|---|---|
-//! | 押す | `InvokePattern` | 出ない |
+//! | 押す | **本物のクリック**（#42）。確かめられなければ `InvokePattern` | **出る**（戻す） |
 //! | 打つ | `ValuePattern.SetValue` | 出ない |
 //! | 回す | `ScrollPattern.Scroll` | 出ない |
 //!
@@ -42,10 +42,27 @@ use windows::Win32::UI::Accessibility::{
 
 use crate::wake::ensure_awake;
 
-/// 押す。**その窓の中で**、その場所にある押せるものに伝える。
+/// 押す。**人が押すのと同じ、本物のクリックで押す**（meta-taro/git-qa#42）。
+///
+/// `Invoke` は要素に「押された」と伝えるだけで、**`pointerdown` もフォーカスも起きない。**
+/// 表のセルは `pointerdown` で選ぶので、`Invoke` では選択が移らず、その後の Enter も届かなかった
+/// （2026-09-27・md-business の表で実測）。macOS は最初から本物のクリックで押している（C57）。
+///
+/// **代わりに、相手が一瞬前面に出る。**前に出たことを確かめ、**その点の一番上が相手の窓だと
+/// 確かめてから**押す（別の窓を押さない・C57 で macOS が踏んだ）。押したら前面とカーソルを戻す。
+///
+/// **確かめられなければ、`Invoke` で押す**（これまでの押し方）。要素そのものに伝えるので、
+/// 別の窓を押すことは無い。**押せないよりは、今までどおり押すほうがよい。**
 pub fn press(hwnd: &str, x: &str, y: &str) -> Result<String, String> {
-    let (hwnd, x, y) = place(hwnd, x, y)?;
+    let (target, px, py) = place(hwnd, x, y)?;
+    if crate::click::click_at(target, px, py).is_ok() {
+        return Ok(String::new());
+    }
+    invoke(target, px, py)
+}
 
+/// `Invoke` で押す。**その窓の中で**、その場所にある押せるものに伝える。
+fn invoke(hwnd: HWND, x: i32, y: i32) -> Result<String, String> {
     with_automation(hwnd, |automation, root| {
         let element = unsafe {
             at_point(

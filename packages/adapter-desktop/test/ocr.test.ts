@@ -94,3 +94,24 @@ describe('findInOcr — 部分一致の選び方', () => {
     expect(findInOcr([at('クエリ未実行', 0, 200)], '保存')).toBeUndefined();
   });
 });
+
+/**
+ * **同じ名前が完全に一致して複数あるときは、いちばん小さいもの**（meta-taro/git-qa#42）。
+ *
+ * Windows の確認欄では、**窓（`Window`）とボタン（`Button`）が両方「開く」**という名前だった。
+ * 最初に見つかった窓の真ん中を押していて、**確認欄が閉じなかった。**
+ * 部分一致では #11 から最小を採っている。完全一致だけ「最初」だった。
+ */
+describe('findInOcr — 完全一致が複数あるとき', () => {
+  it('窓とボタンが同じ名前なら、小さいほう（ボタン）を採る', () => {
+    const found = findInOcr(
+      [
+        { text: '開く', x: 400, y: 300, width: 480, height: 240 },
+        { text: '開く', x: 560, y: 390, width: 80, height: 28 },
+      ],
+      '開く',
+    );
+
+    expect(found).toEqual({ x: 560, y: 390, width: 80, height: 28 });
+  });
+});

@@ -8,7 +8,7 @@
 //! git-qa-win windows <アプリ名>      窓を探す
 //! git-qa-win shot <窓> <出力.png>    その窓だけを撮る
 //! git-qa-win text <窓>               読める文字と、その位置
-//! git-qa-win press <窓> <x> <y>      前面に出さずに押す
+//! git-qa-win press <窓> <x> <y>      押す（本物のクリック。前面に一瞬出る）
 //! git-qa-win keys <窓> <文字>        焦点のある欄へ 1 文字ずつ打つ
 //! git-qa-win exe <プロセス番号>      実行ファイルの場所（指紋用）
 //! ```
@@ -22,6 +22,7 @@ use windows::Win32::UI::HiDpi::{
     DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
 };
 
+mod click;
 mod input;
 mod key;
 mod shot;
@@ -102,7 +103,7 @@ const USAGE: &str = "\
   git-qa-win windows <アプリ名>      窓を探す
   git-qa-win shot <窓> <出力.png>    その窓だけを撮る
   git-qa-win text <窓>               読める文字と、その位置
-  git-qa-win press <窓> <x> <y>      前面に出さずに押す
+  git-qa-win press <窓> <x> <y>      押す（本物のクリック。前面に一瞬出る）
   git-qa-win type <窓> <x> <y> <文字>  その欄の中身を置き換える
   git-qa-win scroll <窓> <x> <y> <回数>  回す（正で下・負で上）
   git-qa-win key <窓> <キー>         キーを押す（前面に一瞬出る）

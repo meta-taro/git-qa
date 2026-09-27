@@ -398,6 +398,23 @@ describe('planSteps — キーを押す', () => {
     });
   });
 
+  /**
+   * **キーの名前を鉤括弧で囲んでも、キーとして読む**（meta-taro/git-qa#42）。
+   *
+   * Windows の報告者は `「Enter」キーを押す` と書いて止まっていた。**「キー」の 1 語で決める**
+   * 決まりは変わらない —— 括弧の有無で、書いた人の意図は変わらない。
+   */
+  it('「Enter」キーを押す も、キーとして読む', () => {
+    for (const [line, key] of [
+      ['1. 「Enter」キーを押す', 'Enter'],
+      ['1. 「Shift+Tab」キーを押す', 'Shift+Tab'],
+      ['1. 「Esc」 キーを押す', 'Esc'],
+    ] as const) {
+      const [planned] = planSteps(line, { keyInput: true });
+      expect(planned?.kind === 'action' && planned.action).toEqual({ kind: 'key', key });
+    }
+  });
+
   /** **鉤括弧は今までどおり画面の要素。**キーに取られない。 */
   it('鉤括弧は画面の要素のまま', () => {
     const [planned] = planSteps('1. 「保存」を押す', { keyInput: true });
