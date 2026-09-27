@@ -36,6 +36,13 @@ export interface LiveBridge {
   publish(state: unknown): void;
   /** 画面から届いた打鍵を受ける。戻り値を呼ぶと解除できる。 */
   onInput(handler: (input: unknown) => void): () => void;
+  /**
+   * **映像の読み手が来た／去った**（meta-taro/git-qa#33）。戻り値を呼ぶと解除できる。
+   *
+   * 画面の文言は消える。**その場に居なかった人が、あとで読めるように**証跡へ渡すための口。
+   * 見えるのは出入りだけなので、「切断」とは言わない（網か、閉じたのか、再読み込みかは区別できない）。
+   */
+  onViewer(handler: (kind: 'joined' | 'left') => void): () => void;
   close(): Promise<void>;
 }
 
@@ -79,6 +86,7 @@ function writeVideo(
   res: ServerResponse,
   source: () => AsyncIterable<Uint8Array>,
   cors: Record<string, string>,
+  notify: (kind: 'joined' | 'left') => void,
 ): void {
   res.writeHead(200, {
     'content-type': 'application/octet-stream',
@@ -101,8 +109,10 @@ function writeVideo(
    * **この製品は人を待つのが本業**なので、向きが逆だった。
    */
   let gone = false;
+  notify('joined');
   res.on('close', () => {
     gone = true;
+    notify('left');
   });
 
   void (async () => {
@@ -166,6 +176,10 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
   /** 画面が置いた様子（診断）。**人に聞かないと分からない状態を減らすため。** */
   let diagnostics: string | undefined;
   const handlers = new Set<(input: unknown) => void>();
+  const watchers = new Set<(kind: 'joined' | 'left') => void>();
+  const notify = (kind: 'joined' | 'left'): void => {
+    for (const watcher of watchers) watcher(kind);
+  };
   let latest: string | undefined;
 
   const openEvents = (res: ServerResponse, cors: Record<string, string>): void => {
@@ -189,7 +203,7 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
     const cors = corsHeaders(req.headers.origin);
 
     if (req.url === videoPath) {
-      writeVideo(res, options.source, cors);
+      writeVideo(res, options.source, cors, notify);
       return;
     }
     if (req.url === `${controlPath}/events`) {
@@ -275,11 +289,18 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
       return () => handlers.delete(handler);
     },
 
+    onViewer(handler: (kind: 'joined' | 'left') => void): () => void {
+      watchers.add(handler);
+      return () => watchers.delete(handler);
+    },
+
     async close() {
       // 開いている線を先に閉じる。放っておくとプロセスが終われない。
       for (const viewer of viewers) viewer.end();
       viewers.clear();
       handlers.clear();
+      // **閉じるときの「去った」は知らせない。**閉じたのはこちらで、読み手が離れたのではない。
+      watchers.clear();
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },

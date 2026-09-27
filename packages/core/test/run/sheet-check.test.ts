@@ -115,3 +115,74 @@ describe('renderSheetCheck — 相手が変わったことを出す', () => {
     expect(renderSheetCheck(run(), check)).not.toContain('検証対象');
   });
 });
+
+/**
+ * **映像が離れて戻ったかを、報告に出す**（meta-taro/git-qa#33）。
+ *
+ * > 判定待ちで放置している間に切れて自分で戻ると、あとで見た人には何も残りません。
+ *
+ * 配る側から見えるのは**読み手が離れた／戻った**だけ。**「切断」とは書かない**
+ * （網か、閉じたのか、再読み込みかは区別できない）。
+ */
+describe('renderSheetCheck — 映像が離れたことを出す', () => {
+  const check: SheetCheck = { kind: 'same', reason: 'シートは走らせたときと同じ' };
+  const run = (liveView?: CheckedRun['liveView']): CheckedRun => ({
+    runId: '20260927-091200',
+    sheet: { path: 'docs/test-specs/001.tsv', sha256: 'a'.repeat(64) },
+    cases: [{ no: 1, result: 'VERIFIED' }],
+    ...(liveView === undefined ? {} : { liveView }),
+  });
+
+  it('離れて戻ったなら、回数と秒数を出す', () => {
+    const text = renderSheetCheck(
+      run([
+        { at: '2026-09-27T09:12:00.000Z', kind: 'joined' },
+        { at: '2026-09-27T09:12:03.120Z', kind: 'left' },
+        { at: '2026-09-27T09:12:04.220Z', kind: 'joined' },
+      ]),
+      check,
+    );
+
+    expect(text).toContain('映像: 1 回離れて、1.1 秒で戻った');
+  });
+
+  it('何度も離れたなら、いちばん長かった分を出す', () => {
+    const text = renderSheetCheck(
+      run([
+        { at: '2026-09-27T09:00:00.000Z', kind: 'joined' },
+        { at: '2026-09-27T09:01:00.000Z', kind: 'left' },
+        { at: '2026-09-27T09:01:00.500Z', kind: 'joined' },
+        { at: '2026-09-27T09:02:00.000Z', kind: 'left' },
+        { at: '2026-09-27T09:02:03.000Z', kind: 'joined' },
+      ]),
+      check,
+    );
+
+    expect(text).toContain('映像: 2 回離れて、どれも戻った（いちばん長くて 3.0 秒）');
+  });
+
+  /** **戻らなかったことが、いちばん知りたいこと。** */
+  it('離れたまま終わっていたら、いつ離れたかを出す', () => {
+    const text = renderSheetCheck(
+      run([
+        { at: '2026-09-27T09:00:00.000Z', kind: 'joined' },
+        { at: '2026-09-27T09:12:03.120Z', kind: 'left' },
+      ]),
+      check,
+    );
+
+    expect(text).toContain('映像: 最後に離れたまま戻っていない（2026-09-27T09:12:03.120Z）');
+  });
+
+  /** **「離れていない」も出す。**出ていないと、見ていないのか離れていないのかが読めない。 */
+  it('一度も離れていなければ、そう出す', () => {
+    expect(
+      renderSheetCheck(run([{ at: '2026-09-27T09:00:00.000Z', kind: 'joined' }]), check),
+    ).toContain('映像: 走っている間、離れていない');
+  });
+
+  /** 古い証跡と、画面を持たない実行（`--no-ui`）には無い。**無いものを言い足さない。** */
+  it('持たない証跡には、その行を足さない', () => {
+    expect(renderSheetCheck(run(), check)).not.toContain('映像');
+  });
+});

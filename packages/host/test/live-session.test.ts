@@ -123,6 +123,7 @@ describe('映像の繋ぎ直し（Issue 014）', () => {
           port: 65001,
           publish: () => undefined,
           onInput: () => () => undefined,
+          onViewer: () => () => undefined,
           close: () => Promise.resolve(),
         });
       },

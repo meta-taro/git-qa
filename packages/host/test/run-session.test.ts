@@ -31,10 +31,12 @@ function fakeBridge(): {
   start: (options: LiveBridgeOptions) => Promise<LiveBridge>;
   states: SessionState[];
   send: (input: unknown) => void;
+  viewer: (kind: 'joined' | 'left') => void;
   frames: () => AsyncIterable<Uint8Array>;
 } {
   const states: SessionState[] = [];
   const handlers = new Set<(input: unknown) => void>();
+  const watchers = new Set<(kind: 'joined' | 'left') => void>();
   let source: (() => AsyncIterable<Uint8Array>) | undefined;
 
   const bridge: LiveBridge = {
@@ -45,6 +47,10 @@ function fakeBridge(): {
     onInput: (handler) => {
       handlers.add(handler);
       return () => handlers.delete(handler);
+    },
+    onViewer: (handler) => {
+      watchers.add(handler);
+      return () => watchers.delete(handler);
     },
     close: () => Promise.resolve(),
   };
@@ -58,6 +64,9 @@ function fakeBridge(): {
     states,
     send: (input) => {
       for (const handler of handlers) handler(input);
+    },
+    viewer: (kind) => {
+      for (const watcher of watchers) watcher(kind);
     },
   };
 }
@@ -870,5 +879,47 @@ describe('行き先（#37）', () => {
     const note = await startedWith(['# 対象: http://localhost:3000/']);
 
     expect(note).not.toContain('パッケージ名でも URL でもない');
+  });
+});
+
+/**
+ * **映像が離れて戻ったことを、証跡に残す**（meta-taro/git-qa#33）。
+ *
+ * > 判定待ちで放置している間に切れて自分で戻ると、あとで見た人には何も残りません。
+ */
+describe('startRunSession — 映像の出入りを証跡に残す', () => {
+  it('判定待ちの間に離れて戻ったら、その 2 つが run.json に残る', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.viewer('left');
+    bridge.viewer('joined');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    bridge.send({ kind: 'advance', caseNo: 2 });
+    await waitFor(awaitingIs(bridge, 3), '3 件目の打鍵待ち');
+    bridge.send({ kind: 'advance', caseNo: 3 });
+
+    const run = await session.done;
+    await session.close();
+
+    expect(run.liveView?.map((e) => e.kind)).toEqual(['left', 'joined']);
+    expect(run.liveView?.every((e) => !Number.isNaN(Date.parse(e.at)))).toBe(true);
+  });
+
+  /** 画面は在るが一度も出入りが無かった。**空の記録は「離れていない」の意味で残す。** */
+  it('出入りが無ければ、空の記録が残る', async () => {
+    const bridge = fakeBridge();
+    const session = await start(bridge);
+
+    for (const no of [1, 2, 3]) {
+      await waitFor(awaitingIs(bridge, no), `${String(no)} 件目の打鍵待ち`);
+      bridge.send({ kind: 'advance', caseNo: no });
+    }
+    const run = await session.done;
+    await session.close();
+
+    expect(run.liveView).toEqual([]);
   });
 });

@@ -24,6 +24,7 @@ import type {
   HumanInputCounts,
   HumanResult,
   HumanVerdict,
+  LiveViewEvent,
   Pointing,
   RecordingControl,
   Run,
@@ -232,6 +233,19 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       liveError = message;
       publish();
     },
+  });
+
+  /**
+   * **画面が映像を読みに来た／離れた時刻**（meta-taro/git-qa#33）。
+   *
+   * > 判定待ちで放置している間に切れて自分で戻ると、あとで見た人には何も残りません。
+   *
+   * 画面の文言は消える。**配る側で取れば、画面が落ちても記録は残る。**
+   * 画面より先に聞き始める —— 最初に来た分を取りこぼさない。
+   */
+  const liveViewLog: LiveViewEvent[] = [];
+  live.bridge.onViewer((kind) => {
+    liveViewLog.push({ at: (options.now ?? (() => new Date()))().toISOString(), kind });
   });
 
   /**
@@ -669,6 +683,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     operator: options.operator,
     // **判定を出した道具の版**（残らないと、直った・直っていないの話が噛み合わない）。
     runner: runnerOf(),
+    // **映像の出入り**（#33）。証跡を書くたびに、その時点までの分が入る。
+    liveView: () => liveViewLog,
     /**
      * **止めたら、そこから先は証跡に書かない**（2026-09-12）。
      *

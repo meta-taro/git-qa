@@ -184,3 +184,35 @@ describe('映像の口 — 読み手が去ったら止める（#34）', () => {
     await bridge.close();
   });
 });
+
+/**
+ * **読み手が来た／去ったを、外へ知らせる**（meta-taro/git-qa#33）。
+ *
+ * 画面の文言は消える。**配る側が見ているもの**を証跡へ渡すための口。
+ */
+describe('映像の口 — 読み手の出入りを知らせる（#33）', () => {
+  it('来たら joined、去ったら left', async () => {
+    const seen: string[] = [];
+    const source = (): AsyncIterable<Uint8Array> => ({
+      async *[Symbol.asyncIterator]() {
+        for (;;) {
+          await new Promise((r) => setTimeout(r, 5));
+          yield new Uint8Array([1]);
+        }
+      },
+    });
+
+    const bridge = await startLiveBridge({ source });
+    const off = bridge.onViewer((kind) => seen.push(kind));
+    const controller = new AbortController();
+    const reading = fetch(bridge.url, { signal: controller.signal }).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 40));
+    controller.abort();
+    await reading;
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(seen).toEqual(['joined', 'left']);
+    off();
+    await bridge.close();
+  });
+});

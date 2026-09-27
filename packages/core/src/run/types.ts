@@ -215,6 +215,17 @@ export interface Runner {
   version: string;
 }
 
+/**
+ * 映像の読み手が来た／去った 1 回。
+ *
+ * **「切断」とは書かない。**配る側から見えるのは読み手の出入りだけで、
+ * 網が切れたのか、画面が閉じられたのか、再読み込みなのかは区別できない。
+ */
+export interface LiveViewEvent {
+  at: string;
+  kind: 'joined' | 'left';
+}
+
 export interface Run {
   schemaVersion: typeof RUN_SCHEMA_VERSION;
   runId: string;
@@ -242,6 +253,13 @@ export interface Run {
    * 古い証跡には無いので、任意にしてある。
    */
   targetCheck?: TargetCheck;
+  /**
+   * **画面が映像を読みに来た／離れた時刻**（meta-taro/git-qa#33）。
+   *
+   * 画面の文言は消える。判定待ちで放置している間に離れて戻ると、**あとで読む人には何も残らない。**
+   * 画面を持たない実行（`--no-ui`）と古い証跡には無い。
+   */
+  liveView?: LiveViewEvent[];
   /** 録画するかどうかは実行開始時の設定であって、モードには紐づかない（C11）。 */
   recording: { requested: boolean };
   cases: RunCase[];

@@ -10,6 +10,7 @@ import type {
   CaseRecording,
   Finding,
   HumanResult,
+  LiveViewEvent,
   Run,
   RunCase,
   RunMode,
@@ -82,6 +83,11 @@ export interface ExecuteRunOptions {
   operator: Actor;
   /** **判定を出した道具**（版が残らないと、直った・直っていないの話が噛み合わない）。 */
   runner?: Runner;
+  /**
+   * **画面が映像を読みに来た／離れた記録**（meta-taro/git-qa#33）。証跡を書くたびに聞く。
+   * 画面を持たない実行では渡さない（**空の欄を書かない**）。
+   */
+  liveView?: () => readonly LiveViewEvent[];
   mode: RunMode;
   /** ケース 1 件を実際に動かす。操作は `ctx.session` 経由。 */
   runCase: (ctx: CaseContext) => Promise<CaseVerdict>;
@@ -344,6 +350,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     sheet: options.sheetRef,
     target: session.target,
     targetCheck: compareFingerprint(before, after),
+    ...liveViewOf(options.liveView),
     recording: { requested: (options.recording ?? session.recording).requested },
     cases,
     findings,
@@ -394,4 +401,12 @@ export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
     });
   }
   return run;
+}
+
+/** 映像の記録。**聞けなければ欄を作らない**（無いものを「離れていない」と読ませない）。 */
+function liveViewOf(read: (() => readonly LiveViewEvent[]) | undefined): {
+  liveView?: LiveViewEvent[];
+} {
+  if (read === undefined) return {};
+  return { liveView: [...read()] };
 }

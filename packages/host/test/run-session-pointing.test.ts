@@ -39,6 +39,7 @@ function fakeBridge(): {
     port: 65000,
     publish: (state) => states.push(state as SessionState),
     onInput: () => () => undefined,
+    onViewer: () => () => undefined,
     close: () => Promise.resolve(),
   };
   return { start: (_options: LiveBridgeOptions) => Promise.resolve(bridge), states };

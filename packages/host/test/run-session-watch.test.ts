@@ -48,6 +48,7 @@ function fakeBridge(): {
       handlers.add(handler);
       return () => handlers.delete(handler);
     },
+    onViewer: () => () => undefined,
     close: () => Promise.resolve(),
   };
 

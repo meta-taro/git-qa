@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { TargetCheck } from './target-check.js';
-import type { SheetRef } from './types.js';
+import type { LiveViewEvent, SheetRef } from './types.js';
 
 /**
  * **証跡が何に対して置かれたのかを、後から確かめる。**
@@ -84,6 +84,42 @@ export interface CheckedRun {
   readonly cases: readonly { readonly no: number; readonly result?: string }[];
   /** 相手が走行中に入れ替わっていないか。**古い証跡は持っていない。** */
   readonly targetCheck?: TargetCheck;
+  /** 画面が映像を読みに来た／離れた時刻（#33）。**画面を持たない実行と古い証跡には無い。** */
+  readonly liveView?: readonly LiveViewEvent[];
+}
+
+/**
+ * 映像が離れて戻ったかを、報告に 1 行で出す（meta-taro/git-qa#33）。
+ *
+ * > 判定待ちで放置している間に切れて自分で戻ると、あとで見た人には何も残りません。
+ *
+ * **知りたいのは 3 つ** ——離れたのか、何秒で戻ったのか、戻らなかったのか。
+ * **「切断」とは書かない。**配る側から見えるのは読み手の出入りだけ。
+ * **持っていない証跡には、何も足さない。**
+ */
+function renderLiveView(events: readonly LiveViewEvent[] | undefined): string[] {
+  if (events === undefined) return [];
+
+  const gaps: number[] = [];
+  let leftAt: string | undefined;
+  for (const one of events) {
+    if (one.kind === 'left') {
+      leftAt = one.at;
+      continue;
+    }
+    if (leftAt !== undefined) gaps.push(Date.parse(one.at) - Date.parse(leftAt));
+    leftAt = undefined;
+  }
+
+  // **戻らなかったことが、いちばん知りたいこと。**先に言う。
+  if (leftAt !== undefined) return [`映像: 最後に離れたまま戻っていない（${leftAt}）`];
+  if (gaps.length === 0) return ['映像: 走っている間、離れていない'];
+
+  const seconds = (ms: number): string => (Math.round(ms / 100) / 10).toFixed(1);
+  if (gaps.length === 1) return [`映像: 1 回離れて、${seconds(gaps[0] ?? 0)} 秒で戻った`];
+  return [
+    `映像: ${String(gaps.length)} 回離れて、どれも戻った（いちばん長くて ${seconds(Math.max(...gaps))} 秒）`,
+  ];
 }
 
 /**
@@ -130,6 +166,7 @@ export function renderSheetCheck(run: CheckedRun, check: SheetCheck): string {
     `シート: ${head}`,
     `人が見て置いた判定: ${String(placed)} 件 / 全 ${String(run.cases.length)} 件`,
     ...renderTargetCheck(run.targetCheck),
+    ...renderLiveView(run.liveView),
     '',
     check.reason,
   ].join('\n');

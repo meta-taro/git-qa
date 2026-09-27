@@ -13,6 +13,7 @@ export type {
   HumanAction,
   HumanInputCounts,
   HumanResult,
+  LiveViewEvent,
   Point,
   Run,
   RunCase,
