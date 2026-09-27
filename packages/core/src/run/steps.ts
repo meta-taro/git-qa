@@ -46,6 +46,8 @@ export interface PlanOptions {
   readonly keyInput?: boolean;
   /** **種類で絞れるか**（`AdapterCapabilities.elementKinds`・#42）。無ければ絞れない。 */
   readonly elementKinds?: boolean;
+  /** **ダブルクリックを送れるか**（`AdapterCapabilities.doubleClick`・#42）。 */
+  readonly doubleClick?: boolean;
   /**
    * 行き先の書き方。
    *
@@ -80,6 +82,10 @@ const KIND_WORDS: Readonly<Record<string, ElementKind>> = {
   チェックボックス: 'checkbox',
   セル: 'cell',
 };
+
+/** `「X」をダブルクリックする` / `「X」セルをダブルクリックする`（#42）。**鉤括弧が要る。** */
+const DOUBLE_TAP =
+  /^「(?<target>[^」]+)」(?<kind>ボタン|リンク|メニュー|タブ|チェックボックス|セル)?をダブルクリックする$/;
 
 /** `「X」をタップする` / `X をタップする`（クリックも同じ扱い） */
 const TAP = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))を(?:タップ|クリック)する?$/;
@@ -241,10 +247,13 @@ function planOneStep(
   textInput: 'none' | 'ascii-only' | 'any',
   appId: 'package-or-url' | 'name',
   keyInput: boolean,
-  elementKinds: boolean,
+  can: Can,
 ): PlannedStep {
+  const double = DOUBLE_TAP.exec(text);
+  if (double?.groups) return planDoubleTap(text, double.groups, can);
+
   const kinded = TAP_KIND.exec(text);
-  if (kinded?.groups) return planKindTap(text, kinded.groups, elementKinds);
+  if (kinded?.groups) return planKindTap(text, kinded.groups, can.elementKinds);
 
   const into = TYPE_INTO.exec(text);
   if (into?.groups) {
@@ -345,10 +354,11 @@ export function planSteps(stepsText: string, options: PlanOptions = {}): Planned
   const appId = options.appId ?? 'package-or-url';
   // **キーを送れるかは相手が名乗る**（外部レビュー #6）。ここで推し量らない。
   const keyInput = options.keyInput ?? true;
-  const elementKinds = options.elementKinds ?? false;
-  return lines.map((line) =>
-    planOneStep(line, options.app, textInput, appId, keyInput, elementKinds),
-  );
+  const can: Can = {
+    elementKinds: options.elementKinds ?? false,
+    doubleClick: options.doubleClick ?? false,
+  };
+  return lines.map((line) => planOneStep(line, options.app, textInput, appId, keyInput, can));
 }
 
 /** 画面に在るかどうかで決まる期待結果。 */
@@ -533,4 +543,45 @@ function planKindTap(
     };
   }
   return { kind: 'action', text, action: { kind: 'tap', target: { at: 'element', ref, kind } } };
+}
+
+/** 相手が名乗った、押し方の能力（#42）。 */
+interface Can {
+  readonly elementKinds: boolean;
+  readonly doubleClick: boolean;
+}
+
+/** ダブルクリック（#42）。**送れない相手・種類で絞れない相手には回さない。** */
+function planDoubleTap(
+  text: string,
+  groups: Record<string, string | undefined>,
+  can: Can,
+): PlannedStep {
+  const ref = groups['target'] ?? '';
+  const word = groups['kind'];
+  if (!can.doubleClick) {
+    return {
+      kind: 'hold',
+      text,
+      reason: 'この相手にはダブルクリックを送れない。人が操作する必要がある',
+    };
+  }
+  if (word === undefined) {
+    return { kind: 'action', text, action: { kind: 'doubleTap', target: { at: 'element', ref } } };
+  }
+  const kind = KIND_WORDS[word];
+  if (kind === undefined || !can.elementKinds) {
+    return {
+      kind: 'hold',
+      text,
+      reason:
+        `この相手は種類（${word}）で絞れない。` +
+        `名前だけで探すなら「${ref}」をダブルクリックする、と書いてください`,
+    };
+  }
+  return {
+    kind: 'action',
+    text,
+    action: { kind: 'doubleTap', target: { at: 'element', ref, kind } },
+  };
 }

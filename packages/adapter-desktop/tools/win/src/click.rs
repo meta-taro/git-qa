@@ -19,7 +19,22 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GA_ROOT, GetAncestor, GetCursorPos, SetCursorPos, WindowFromPoint,
 };
 
+/// ダブルクリック（#42）。**前面・点の上を確かめられなければ、押さずに理由を返す**
+/// （`Invoke` に 2 回押す口は無いので、落とす先が無い）。
+pub fn double_click(hwnd: &str, x: &str, y: &str) -> Result<String, String> {
+    let hwnd = crate::parse_hwnd(hwnd)?;
+    let x: i32 = x.parse().map_err(|_| format!("x が数でない: {x}"))?;
+    let y: i32 = y.parse().map_err(|_| format!("y が数でない: {y}"))?;
+    clicks(hwnd, x, y, 2)?;
+    Ok("dblclick".into())
+}
+
 pub fn click_at(hwnd: HWND, x: i32, y: i32) -> Result<(), String> {
+    clicks(hwnd, x, y, 1)
+}
+
+/// 押して離すを `times` 回。**1 回の `SendInput` で送る**（間が空くと、OS がダブルクリックと数えない）。
+fn clicks(hwnd: HWND, x: i32, y: i32, times: usize) -> Result<(), String> {
     let mut before = POINT::default();
     // SAFETY: 読むだけ。読めなければ戻さない（戻す先が分からない）。
     let had_cursor = unsafe { GetCursorPos(&mut before) }.is_ok();
@@ -36,10 +51,10 @@ pub fn click_at(hwnd: HWND, x: i32, y: i32) -> Result<(), String> {
                 return;
             }
             let _ = SetCursorPos(x, y);
-            SendInput(
-                &[button(MOUSEEVENTF_LEFTDOWN), button(MOUSEEVENTF_LEFTUP)],
-                std::mem::size_of::<INPUT>() as i32,
-            );
+            let events: Vec<INPUT> = (0..times)
+                .flat_map(|_| [button(MOUSEEVENTF_LEFTDOWN), button(MOUSEEVENTF_LEFTUP)])
+                .collect();
+            SendInput(&events, std::mem::size_of::<INPUT>() as i32);
         }
     });
 

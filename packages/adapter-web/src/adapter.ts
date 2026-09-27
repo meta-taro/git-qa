@@ -122,6 +122,8 @@ const capabilities: AdapterCapabilities = {
   keyInput: true,
   // **種類で絞れる**（#42）。要素の tag と role を見る。
   elementKinds: true,
+  // **ダブルクリックを送れる**（#42・clickCount 1 → 2）。
+  doubleClick: true,
   // 行き先は URL。
   appId: 'package-or-url',
 };
@@ -520,6 +522,9 @@ async function resolvePoint(
 }
 
 /** 人と AI の操作を、ブラウザの言葉へ移す。 */
+/** 試験のために出す（#42）。**手順 1 つを CDP の命令に直して送る。** */
+export { dispatch as dispatchWebAction };
+
 async function dispatch(
   cdp: CdpClient,
   action: Action,
@@ -617,6 +622,27 @@ async function dispatch(
         button: 'left',
         clickCount: 1,
       });
+    }
+    return;
+  }
+
+  /**
+   * **ダブルクリック**（meta-taro/git-qa#42）。ブラウザは `clickCount` を見て `dblclick` を起こす。
+   * **1 回目は 1、2 回目は 2**（2 回とも 1 だと、単なるクリック 2 回として届く）。
+   */
+  if (action.kind === 'doubleTap') {
+    const point = await resolvePoint(cdp, action.target, onPointed);
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
+    for (const clickCount of [1, 2]) {
+      for (const type of ['mousePressed', 'mouseReleased'] as const) {
+        await cdp.send('Input.dispatchMouseEvent', {
+          type,
+          x: point.x,
+          y: point.y,
+          button: 'left',
+          clickCount,
+        });
+      }
     }
     return;
   }

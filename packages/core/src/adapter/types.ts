@@ -52,6 +52,8 @@ export interface AdapterCapabilities {
    * **絞れない相手には回さない** —— 種類を黙って捨てて名前だけで押すと、別のものを押しかねない。
    */
   readonly elementKinds?: boolean;
+  /** **ダブルクリックを送れるか**（#42）。無ければ送れない（人へ回す）。 */
+  readonly doubleClick?: boolean;
   /**
    * 行き先（`# 対象:`）の書き方。**相手によって違うので、アダプタが名乗る。**
    *
@@ -191,6 +193,11 @@ export type PointerRef =
 
 export type Action =
   | { readonly kind: 'tap'; readonly target: PointerRef }
+  /**
+   * **ダブルクリック**（meta-taro/git-qa#42）。表のセルは、これで編集に入るものが多い。
+   * 送れる相手だけが `doubleClick` を名乗る。
+   */
+  | { readonly kind: 'doubleTap'; readonly target: PointerRef }
   | {
       readonly kind: 'swipe';
       readonly from: PointerRef;

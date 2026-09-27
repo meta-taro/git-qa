@@ -64,6 +64,8 @@ const capabilities: AdapterCapabilities = {
   keyInput: true,
   // **種類で絞れる**（#42）。UI Automation の ControlType を道具が返す。
   elementKinds: true,
+  // **ダブルクリックを送れる**（#42）。本物のクリックを 2 回。
+  doubleClick: true,
   // 窓の持ち主の名前そのもの。**パッケージ名は無い。**
   appId: 'name',
 };
@@ -331,6 +333,16 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<ActReport |
   }
 
   /**
+   * **ダブルクリック**（meta-taro/git-qa#42）。表のセルは、これで編集に入るものが多い。
+   * **`Invoke` には落とさない** —— 2 回押す口が無い。確かめられなければ、道具が理由を言って止まる。
+   */
+  if (action.kind === 'doubleTap') {
+    const aimed = await aim(action.target, deps);
+    await deps.tool(winArgs.dblclick(aimed.window.hwnd, aimed.point.x, aimed.point.y));
+    return { detail: pressReport(action.target, aimed, 'dblclick') };
+  }
+
+  /**
    * 文字を入れる。**欄を指すかどうかで、入れ方が違う。**
    *
    * **欄を指す（#9）—— `SetValue` で欄の中身を置き換える。**1 文字ずつ打つのではないので、
@@ -474,9 +486,11 @@ const KIND_WORDS: Readonly<Record<ElementKind, string>> = {
  */
 function pressReport(target: PointerRef, aimed: Aimed, said: string): string {
   const how =
-    said === 'invoke'
-      ? 'Invoke で押した（本物のクリックは確かめられなかった）'
-      : '本物のクリックで押した';
+    said === 'dblclick'
+      ? 'ダブルクリックした'
+      : said === 'invoke'
+        ? 'Invoke で押した（本物のクリックは確かめられなかった）'
+        : '本物のクリックで押した';
   const at = `（${String(Math.round(aimed.point.x))}, ${String(Math.round(aimed.point.y))}）`;
   const picked = aimed.candidates?.[0];
   if (target.at === 'point' || picked === undefined) return `座標${at}を${how}`;

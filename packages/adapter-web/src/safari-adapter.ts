@@ -311,6 +311,12 @@ export function createSafariSession(deps: SessionDeps): TargetSession {
         await client.post('/actions', { actions: w3cType(action.text) });
       } else if (action.kind === 'key') {
         await client.post('/actions', { actions: w3cType(action.key) });
+      } else if (action.kind === 'doubleTap') {
+        // **黙って 1 回押しに化けさせない**（#42）。
+        throw new AdapterError(
+          KIND,
+          'ダブルクリックはまだ送れない（この相手は名乗っていないので、ふつうはここへ来ない）',
+        );
       } else {
         const from = await resolvePoint(action.from);
         const to = await resolvePoint(action.to);

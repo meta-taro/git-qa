@@ -211,3 +211,26 @@ describe('Windows の「「開く」ボタンをクリックする」', () => {
     expect(sent.some((c) => c[0] === 'press')).toBe(false);
   });
 });
+
+/** **ダブルクリック**（#42 の改善案）。本物のクリックを 2 回。**`Invoke` には落とさない**（2 回押す口が無い）。 */
+describe('Windows の「ダブルクリックする」', () => {
+  it('道具に dblclick を頼み、そう言う', async () => {
+    says({ text: '2026/09/03\t300\t200\t90\t24\tDataItem\n', press: '' });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+
+    const report = await session.act({
+      kind: 'doubleTap',
+      target: { at: 'element', ref: '2026/09/03', kind: 'cell' },
+    });
+
+    expect(sent.find((c) => c[0] === 'dblclick')).toEqual(['dblclick', '4242', '300', '200']);
+    expect(report === undefined ? '' : report.detail).toBe(
+      '「2026/09/03」（DataItem）をダブルクリックした（300, 200）',
+    );
+  });
+});

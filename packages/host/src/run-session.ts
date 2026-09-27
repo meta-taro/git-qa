@@ -573,6 +573,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     keyInput: options.adapter.capabilities.keyInput,
     // **種類で絞れるか**は相手が名乗る（#42）。
     ...(options.adapter.capabilities.elementKinds === true ? { elementKinds: true } : {}),
+    ...(options.adapter.capabilities.doubleClick === true ? { doubleClick: true } : {}),
     ...(expectation === undefined ? {} : { expectation }),
     appId: options.adapter.capabilities.appId,
     // **画面の日付の書き方はシートが決める**（外部レビュー meta-taro/git-qa#29）。

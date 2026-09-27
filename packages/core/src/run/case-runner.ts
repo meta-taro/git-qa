@@ -60,6 +60,8 @@ export interface SheetCaseRunnerOptions {
   readonly keyInput?: boolean;
   /** 種類で絞れるか（`AdapterCapabilities.elementKinds`・#42）。ここで推し量らない。 */
   readonly elementKinds?: boolean;
+  /** ダブルクリックを送れるか（`AdapterCapabilities.doubleClick`・#42）。 */
+  readonly doubleClick?: boolean;
   /**
    * **期待結果が出るまで、少し読み直す**（外部レビュー meta-taro/git-qa#12）。
    *
@@ -184,6 +186,7 @@ export function createSheetCaseRunner(
       ...(options.textInput === undefined ? {} : { textInput: options.textInput }),
       ...(options.keyInput === undefined ? {} : { keyInput: options.keyInput }),
       ...(options.elementKinds === undefined ? {} : { elementKinds: options.elementKinds }),
+      ...(options.doubleClick === undefined ? {} : { doubleClick: options.doubleClick }),
       ...(options.appId === undefined ? {} : { appId: options.appId }),
     });
     const held = holdBeforeTouching(planned);

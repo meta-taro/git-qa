@@ -645,6 +645,14 @@ async function dispatch(
     return;
   }
 
+  if (action.kind === 'doubleTap') {
+    // **黙って 1 回押しに化けさせない**（#42）。名乗っていないので、計画の段で人へ回っている。
+    throw new AdapterError(
+      KIND,
+      'ダブルクリックはまだ送れない（この相手は名乗っていないので、ふつうはここへ来ない）',
+    );
+  }
+
   // swipe。デスクトップではスクロールとして送る（指でなぞる相手ではない）。
   const from = await resolvePoint(action.from, look, lookWindow, onPointed);
   const to = await resolvePoint(action.to, look, lookWindow, onPointed);

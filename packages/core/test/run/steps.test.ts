@@ -665,3 +665,37 @@ describe('planSteps — 種類つきで押す', () => {
     });
   });
 });
+
+/**
+ * **ダブルクリック**（meta-taro/git-qa#42 の改善案）。表のセルは、ダブルクリックで編集に入るものが多い。
+ * **送れる相手だけ**が名乗る（`doubleClick`）。送れない相手では、書き方を添えて人へ回す。
+ */
+describe('planSteps — ダブルクリック', () => {
+  it('「X」をダブルクリックする は、ダブルクリックとして読む', () => {
+    const [planned] = planSteps('1. 「2026/09/03」をダブルクリックする', { doubleClick: true });
+
+    expect(planned?.kind === 'action' && planned.action).toEqual({
+      kind: 'doubleTap',
+      target: { at: 'element', ref: '2026/09/03' },
+    });
+  });
+
+  it('種類つきでも読む（「X」セルをダブルクリックする）', () => {
+    const [planned] = planSteps('1. 「2026/09/03」セルをダブルクリックする', {
+      doubleClick: true,
+      elementKinds: true,
+    });
+
+    expect(planned?.kind === 'action' && planned.action).toEqual({
+      kind: 'doubleTap',
+      target: { at: 'element', ref: '2026/09/03', kind: 'cell' },
+    });
+  });
+
+  it('送れない相手なら、人に回す', () => {
+    const [planned] = planSteps('1. 「2026/09/03」をダブルクリックする', { doubleClick: false });
+
+    expect(planned?.kind).toBe('hold');
+    expect(planned?.kind === 'hold' && planned.reason).toContain('ダブルクリック');
+  });
+});

@@ -322,6 +322,12 @@ function createSession(deps: SessionDeps): TargetSession {
         await perform(typeActions(action.text));
       } else if (action.kind === 'key') {
         await perform(typeActions(action.key));
+      } else if (action.kind === 'doubleTap') {
+        // **黙って 1 回押しに化けさせない**（#42）。
+        throw new AdapterError(
+          KIND,
+          'ダブルクリックはまだ送れない（この相手は名乗っていないので、ふつうはここへ来ない）',
+        );
       } else {
         // swipe。ブラウザではスクロールとして送る。
         const from = await resolvePoint(action.from);

@@ -47,6 +47,13 @@ export const winArgs = {
    * UI Automation にキーを送る口が無く、`SendInput` は焦点のある窓へ届く仕組みのため。
    */
   key: (hwnd: number, key: string): string[] => ['key', String(hwnd), key],
+  /** **ダブルクリック**（#42）。本物のクリックを 2 回。`Invoke` には落とさない（2 回押す口が無い）。 */
+  dblclick: (hwnd: number, x: number, y: number): string[] => [
+    'dblclick',
+    String(hwnd),
+    String(Math.round(x)),
+    String(Math.round(y)),
+  ],
   /**
    * **焦点のある欄へ 1 文字ずつ打つ**（meta-taro/git-qa#42）。`type` と違い、値を置き換えない。
    * 1 キーごとに走る制限（日付欄の年 4 桁など）を、人が打ったときと同じ道で通すため。

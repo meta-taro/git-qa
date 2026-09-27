@@ -532,6 +532,12 @@ function createSession(deps: SessionDeps): TargetSession {
         return { kind: 'key', key: action.key };
       case 'launch':
         return { kind: 'launch', app: action.app, component: await resolveLaunch(action.app) };
+      case 'doubleTap':
+        // **黙って 1 回押しに化けさせない**（#42）。名乗っていないので、計画の段で人へ回っている。
+        throw new AdapterError(
+          KIND,
+          'ダブルクリックはまだ送れない（この相手は名乗っていないので、ふつうはここへ来ない）',
+        );
     }
   };
 

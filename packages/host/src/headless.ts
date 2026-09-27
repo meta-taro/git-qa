@@ -108,6 +108,7 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<Run> {
     keyInput: options.adapter.capabilities.keyInput,
     // **種類で絞れるか**は相手が名乗る（#42）。
     ...(options.adapter.capabilities.elementKinds === true ? { elementKinds: true } : {}),
+    ...(options.adapter.capabilities.doubleClick === true ? { doubleClick: true } : {}),
     appId: options.adapter.capabilities.appId,
     // **期待結果を待つ長さは、シートが決める**（#39）。**両方の入口へ通す**（#37 の轍）。
     ...(sheetWaitMs(options.sheet.meta) === undefined
