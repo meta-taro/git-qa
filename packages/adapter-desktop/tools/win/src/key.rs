@@ -49,8 +49,14 @@ const SETTLE: Duration = Duration::from_millis(250);
 pub fn press_key(hwnd: &str, key: &str) -> Result<String, String> {
     let hwnd = crate::parse_hwnd(hwnd)?;
     let (modifiers, main) = parse(key)?;
+    let mut said = String::new();
     // SAFETY: 送るのは、前面に出たことを確かめた後だけ（`in_front` の中）。
-    in_front(hwnd, || unsafe { send(&modifiers, main) })
+    in_front(hwnd, || unsafe {
+        // **送る直前の焦点の欄を返す**（#42）。どこへキーが入ったかを証跡から読めるように。
+        said = crate::text::focused_field();
+        send(&modifiers, main);
+    })?;
+    Ok(said)
 }
 
 /// **焦点のある欄へ、1 文字ずつ打つ**（meta-taro/git-qa#42）。

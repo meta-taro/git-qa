@@ -227,6 +227,10 @@ unsafe fn at_point(
     let mut best: Option<(IUIAutomationElement, i64)> = None;
     for i in 0..count {
         let Ok(element) = found.GetElement(i) else { continue };
+        // **画面に出ていないものは押さない**（#42。裏のタブの要素が同じ座標に重なっている）。
+        if element.CurrentIsOffscreen().unwrap_or_default().as_bool() {
+            continue;
+        }
         let Ok(rect) = element.CurrentBoundingRectangle() else { continue };
         if x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom {
             continue;

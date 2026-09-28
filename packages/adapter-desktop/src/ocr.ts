@@ -98,6 +98,11 @@ export function findInOcr(lines: readonly OcrLine[], ref: string): Point | undef
  * **候補が何個あって、どれを採ったか**を証跡に書くために、全部を返す口を分けてある。
  * 完全一致があれば完全一致だけ、無ければ部分一致。どちらも小さい順。
  */
+/** 空白を落として、**名前が完全に一致するか**（#42）。 */
+export function isExactOcrMatch(line: OcrLine, ref: string): boolean {
+  return squeeze(line.text) === squeeze(ref);
+}
+
 export function matchesInOcr(lines: readonly OcrLine[], ref: string): OcrLine[] {
   const want = squeeze(ref);
 

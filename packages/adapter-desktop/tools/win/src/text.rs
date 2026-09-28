@@ -81,6 +81,14 @@ unsafe fn walk(
     let mut out = String::new();
     for i in 0..count {
         let Ok(element) = found.GetElement(i) else { continue };
+        /*
+         * **画面に出ていないものは読まない**（#42・2026-09-27 の報告）。
+         * 裏のタブのセルを候補にして押し、続く Enter がエディタに入って**ファイルが書き換わった。**
+         * 期待結果の「表示される」も、裏のタブの文字で通ってはいけない。
+         */
+        if element.CurrentIsOffscreen().unwrap_or_default().as_bool() {
+            continue;
+        }
         let Ok(rect) = element.CurrentBoundingRectangle() else { continue };
 
         let role = role_of(&element);

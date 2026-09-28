@@ -10,6 +10,9 @@
 //!
 //! 押したら、**カーソルを元の場所へ戻す。**人の手元を動かしたままにしない。
 
+use std::thread::sleep;
+use std::time::Duration;
+
 use windows::Win32::Foundation::{HWND, POINT};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_MOUSE, MOUSE_EVENT_FLAGS, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
@@ -33,7 +36,15 @@ pub fn click_at(hwnd: HWND, x: i32, y: i32) -> Result<(), String> {
     clicks(hwnd, x, y, 1)
 }
 
-/// 押して離すを `times` 回。**1 回の `SendInput` で送る**（間が空くと、OS がダブルクリックと数えない）。
+/// 押して離すの間。**ダブルクリックの判定時間（既定 500ms）より十分短く。**
+const STEP: Duration = Duration::from_millis(30);
+
+/// ボタンを 1 つ動かす。
+unsafe fn send(flags: MOUSE_EVENT_FLAGS) {
+    SendInput(&[button(flags)], std::mem::size_of::<INPUT>() as i32);
+}
+
+/// 押して離すを `times` 回。
 fn clicks(hwnd: HWND, x: i32, y: i32, times: usize) -> Result<(), String> {
     let mut before = POINT::default();
     // SAFETY: 読むだけ。読めなければ戻さない（戻す先が分からない）。
@@ -50,11 +61,20 @@ fn clicks(hwnd: HWND, x: i32, y: i32, times: usize) -> Result<(), String> {
                 ));
                 return;
             }
+            /*
+             * **人の押し方に寄せる**（#42・2026-09-27 の報告 B）。
+             * 一瞬で置いて押して離すと、**タブが切り替わらなかった**（Chromium が取りこぼす疑い・未確認）。
+             * カーソルを置いてから少し待ち、押して少し待ってから離す。
+             * 間はダブルクリックの判定時間（既定 500ms）より十分短くしてある。
+             */
             let _ = SetCursorPos(x, y);
-            let events: Vec<INPUT> = (0..times)
-                .flat_map(|_| [button(MOUSEEVENTF_LEFTDOWN), button(MOUSEEVENTF_LEFTUP)])
-                .collect();
-            SendInput(&events, std::mem::size_of::<INPUT>() as i32);
+            sleep(STEP);
+            for _ in 0..times {
+                send(MOUSEEVENTF_LEFTDOWN);
+                sleep(STEP);
+                send(MOUSEEVENTF_LEFTUP);
+                sleep(STEP);
+            }
         }
     });
 

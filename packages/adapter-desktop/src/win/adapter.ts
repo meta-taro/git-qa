@@ -19,7 +19,7 @@ import type {
 } from '@git-qa/core';
 
 import { fingerprintOf } from '../fingerprint.js';
-import { matchesInOcr, parseOcr } from '../ocr.js';
+import { isExactOcrMatch, matchesInOcr, parseOcr } from '../ocr.js';
 import type { OcrLine } from '../ocr.js';
 import { parseWinWindows, pickWindow, whyUnusable, winArgs } from './tool.js';
 import type { WinWindow } from './tool.js';
@@ -70,20 +70,51 @@ const capabilities: AdapterCapabilities = {
   appId: 'name',
 };
 
-/** 外の道具を 1 つ呼ぶ。**出た文字をそのまま返す**（言い換えると原因が絞れなくなる）。 */
-function run(command: string, args: readonly string[]): Promise<string> {
+/**
+ * 外の道具を 1 つ呼ぶ。**出た文字をそのまま返す**（言い換えると原因が絞れなくなる）。
+ *
+ * **上限を超えたら止めて、理由を言う**（meta-taro/git-qa#42・2026-09-27 の報告）。
+ * > 前回の実行を途中で止めると、git-qa-win.exe が残ります。残っていると、次の実行が
+ * > **何も出さずに止まり続けます。**
+ */
+export function runWinTool(
+  command: string,
+  args: readonly string[],
+  timeoutMs: number,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, [...args]);
     let out = '';
     let err = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      const seconds = String(Math.round(timeoutMs / 100) / 10);
+      reject(
+        new Error(
+          `道具（${args[0] ?? command}）が ${seconds} 秒たっても返らなかったので止めた。` +
+            '前の実行の git-qa-win が残っていないかを、タスク マネージャーで見てください',
+        ),
+      );
+    }, timeoutMs);
     child.stdout.on('data', (c: Buffer) => (out += c.toString('utf8')));
     child.stderr.on('data', (c: Buffer) => (err += c.toString('utf8')));
-    child.on('error', reject);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
     child.on('close', (code) => {
+      clearTimeout(timer);
       if (code === 0) resolve(out);
       else reject(new Error(err.trim() || `${command} が ${String(code)} で終わった`));
     });
   });
+}
+
+/** 道具 1 回の上限。**焦点へ打つときは文字数の分だけ延ばす**（1 文字ずつ打つので）。 */
+export function winToolTimeoutMs(args: readonly string[]): number {
+  const base = 30_000;
+  if (args[0] === 'keys') return base + (args[2] ?? '').length * 50;
+  return base;
 }
 
 export interface WindowsDesktopAdapterOptions extends DesktopAdapterOptions {
@@ -101,7 +132,9 @@ export interface WindowsDesktopAdapterOptions extends DesktopAdapterOptions {
 export function createWindowsDesktopAdapter(options: WindowsDesktopAdapterOptions): TargetAdapter {
   const now = options.now ?? (() => new Date());
   const tool =
-    options.runTool ?? ((args: readonly string[]): Promise<string> => run(options.toolPath, args));
+    options.runTool ??
+    ((args: readonly string[]): Promise<string> =>
+      runWinTool(options.toolPath, args, winToolTimeoutMs(args)));
 
   return {
     kind: KIND,
@@ -392,8 +425,9 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<ActReport |
    * 「欄に入力してから Enter」と書いても、**その欄に焦点があるとは限らない。**
    */
   if (action.kind === 'key') {
-    await deps.tool(winArgs.key(deps.window().hwnd, action.key));
-    return;
+    // **送る直前の焦点の欄**を道具が返す（#42）。どこへキーが入ったかを証跡から読めるように。
+    const said = await deps.tool(winArgs.key(deps.window().hwnd, action.key));
+    return { detail: keyReport(action.key, said) };
   }
 
   throw new AdapterError(KIND, `Windows ではまだ「${action.kind}」を送れない`);
@@ -437,23 +471,64 @@ async function byText(
   deps: DispatchDeps,
   kind?: ElementKind,
 ): Promise<{ point: { x: number; y: number }; candidates: readonly OcrLine[] }> {
-  const named = matchesInOcr(await deps.read(), text);
-  // **種類が書いてあれば、その種類のものだけ**（#42）。名前が同じ窓を押さない。
-  const candidates =
-    kind === undefined ? named : named.filter((one) => ROLES_OF[kind].includes(one.role ?? ''));
+  const lines = await deps.read();
+  const candidates = kind === undefined ? matchesInOcr(lines, text) : ofKind(lines, text, kind);
   const [best] = candidates;
-  if (best === undefined && kind !== undefined && named.length > 0) {
-    const seen = [...new Set(named.map((one) => one.role ?? '種類不明'))].join(' / ');
-    throw new AdapterError(
-      KIND,
-      `「${text}」という${KIND_WORDS[kind]}が見つからない（同じ名前は ${seen} に在る）`,
-    );
-  }
   if (best === undefined) {
     throw new AdapterError(KIND, `画面に「${text}」が見つからない`);
   }
   // UI Automation は画面の座標で返す。窓の中へ直さずそのまま使う（押すのも画面の座標）。
   return { point: { x: best.x, y: best.y }, candidates };
+}
+
+/**
+ * **種類つきで探す**（#42・2026-09-27 の報告 A / C）。
+ *
+ * > `「2025-01-01」セルをクリックする` → 「2025-01-01 10:00」（DataItem）を押した。
+ * > …続く Enter がエディタに入り、**元のファイルが書き換わって保存されました。**
+ *
+ * 1. **先に種類で絞る**（前は名前で決めた後に絞っていた。別の種類の完全一致が在ると、その種類の候補が消えた）
+ * 2. **その中で完全一致だけ。**種類まで書いた人は「その 1 つ」を言い切っている。部分一致に落とすと、
+ *    **書いた人が指していないものを押す。**部分一致しか無ければ、押さずに近いものを並べる
+ */
+function ofKind(lines: readonly OcrLine[], text: string, kind: ElementKind): OcrLine[] {
+  const same = lines.filter((one) => ROLES_OF[kind].includes(one.role ?? ''));
+  const hits = matchesInOcr(same, text);
+  const exact = hits.filter((one) => isExactOcrMatch(one, text));
+  if (exact.length > 0) return exact;
+
+  const word = KIND_WORDS[kind];
+  if (hits.length > 0) {
+    const near = hits
+      .slice(0, 3)
+      .map((one) => `「${one.text}」`)
+      .join('・');
+    throw new AdapterError(
+      KIND,
+      `「${text}」と名前が完全に一致する${word}が無い（近いもの: ${near}）。` +
+        '種類を書いたときは、完全に一致するものしか押さない',
+    );
+  }
+  const other = matchesInOcr(lines, text);
+  if (other.length > 0) {
+    const seen = [...new Set(other.map((one) => one.role ?? '種類不明'))].join(' / ');
+    throw new AdapterError(
+      KIND,
+      `「${text}」という${word}が見つからない（同じ名前は ${seen} に在る）`,
+    );
+  }
+  return [];
+}
+
+/**
+ * **キーを何へ送ったか**を 1 行で言う（#42）。**値は書かない**（どの欄かが分かれば足りる）。
+ *
+ * > キーを押す手順に steps[].detail が付きません。どの窓・どの欄にキーが入ったかが証跡から分からず
+ */
+function keyReport(key: string, said: string): string {
+  const [role = '', name = ''] = said.replace(/\n$/, '').split('\t');
+  if (role === '' && name === '') return `${key} を送った（焦点の欄は読めなかった）`;
+  return `${key} を送った（焦点: ${role}${name === '' ? '' : `「${name}」`}）`;
 }
 
 /**

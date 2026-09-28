@@ -35,7 +35,7 @@ const build = { source: 'md-business', label: 'test' };
  * 呼ばれた引数を残し、`text` と `press` には決めた文字を返す。`windows` は md-business にだけ窓を返す。
  */
 let sent: string[][];
-let output: { text: string; press: string; keys?: string };
+let output: { text: string; press: string; keys?: string; key?: string };
 
 const runTool = (args: readonly string[]): Promise<string> => {
   sent.push([...args]);
@@ -44,6 +44,7 @@ const runTool = (args: readonly string[]): Promise<string> => {
   if (args[0] === 'text') return Promise.resolve(output.text);
   if (args[0] === 'press') return Promise.resolve(output.press);
   if (args[0] === 'keys') return Promise.resolve(output.keys ?? '');
+  if (args[0] === 'key') return Promise.resolve(output.key ?? '');
   return Promise.resolve('');
 };
 
@@ -55,7 +56,7 @@ beforeEach(() => {
 });
 
 /** 道具が `text` と `press` に何を返すか。 */
-function says(out: { text: string; press: string; keys?: string }): void {
+function says(out: { text: string; press: string; keys?: string; key?: string }): void {
   output = out;
 }
 
@@ -270,6 +271,89 @@ describe('Windows の「入力する」が言うこと', () => {
   it('パスワード欄なら、値は書かないと言う', async () => {
     expect(await typed('Edit\tパスワード\t\tpassword\n')).toBe(
       '焦点の欄（Edit「パスワード」）へ 1 文字ずつ打った（パスワード欄なので、値は書かない）',
+    );
+  });
+});
+
+/**
+ * **種類で先に絞り、種類を書いたら完全一致だけ**（#42・2026-09-27 の報告 A / C）。
+ *
+ * > `「2025-01-01」セルをクリックする` → 「2025-01-01 10:00」（DataItem）を本物のクリックで押した
+ * > …続く「Enter」キーを押すがエディタに入り、元のファイルが書き換わって保存されました。
+ */
+describe('Windows の種類つき — 選び方の順番', () => {
+  const connect = () =>
+    createWindowsDesktopAdapter({ app: 'md-business', toolPath, build, runTool }).connect();
+
+  it('別の種類の完全一致が在っても、書いた種類の完全一致を押す', async () => {
+    says({
+      text: '2025-01-01\t100\t100\t60\t14\tText\n' + '2025-01-01\t300\t200\t90\t24\tDataItem\n',
+      press: 'click',
+    });
+    const session = await connect();
+
+    await session.act({ kind: 'tap', target: { at: 'element', ref: '2025-01-01', kind: 'cell' } });
+
+    expect(sent.find((c) => c[0] === 'press')).toEqual(['press', '4242', '300', '200']);
+  });
+
+  it('種類を書いたのに部分一致しか無ければ、押さずに近いものを言う', async () => {
+    says({ text: '2025-01-01 10:00\t300\t200\t90\t24\tDataItem\n', press: 'click' });
+    const session = await connect();
+
+    await expect(
+      session.act({ kind: 'tap', target: { at: 'element', ref: '2025-01-01', kind: 'cell' } }),
+    ).rejects.toThrow(/完全に一致するセルが無い.*2025-01-01 10:00/);
+    expect(sent.some((c) => c[0] === 'press')).toBe(false);
+  });
+
+  /** 種類を書かなければ、今までどおり部分一致も採る（#11）。 */
+  it('種類を書かなければ、部分一致も採る', async () => {
+    says({ text: '2025-01-01 10:00\t300\t200\t90\t24\tDataItem\n', press: 'click' });
+    const session = await connect();
+
+    await session.act({ kind: 'tap', target: { at: 'element', ref: '2025-01-01' } });
+
+    expect(sent.find((c) => c[0] === 'press')).toEqual(['press', '4242', '300', '200']);
+  });
+});
+
+/**
+ * **キーにも、何へ送ったかを付ける**（#42・報告の「そのほか」）。
+ * > キーを押す手順に steps[].detail が付きません。どの窓・どの欄にキーが入ったかが証跡から分からず
+ * 道具は送る直前の焦点の欄を `種類 \t 名前 \t 値` で返す。**キーの証跡には値を書かない**（名前と種類で足りる）。
+ */
+describe('Windows の「キーを押す」が言うこと', () => {
+  it('送る直前の焦点の欄を言う', async () => {
+    says({ text: '', press: '', keys: '' });
+    output.key = 'Edit\tエディタ\t2025-01-01\n';
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+
+    const report = await session.act({ kind: 'key', key: 'Enter' });
+
+    expect(report === undefined ? '' : report.detail).toBe(
+      'Enter を送った（焦点: Edit「エディタ」）',
+    );
+  });
+
+  it('焦点が読めなければ、そう言う', async () => {
+    says({ text: '', press: '' });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+
+    const report = await session.act({ kind: 'key', key: 'Enter' });
+
+    expect(report === undefined ? '' : report.detail).toBe(
+      'Enter を送った（焦点の欄は読めなかった）',
     );
   });
 });
