@@ -543,14 +543,20 @@ function keyReport(key: string, said: string): string {
 function typedReport(said: string): string {
   // 1 行目は**打ち始めた欄**、2 行目は**焦点が移った先**（移っていなければ無い・#42）。
   const [first = '', moved = ''] = said.split('\n');
-  const [role = '', name = '', value = '', flag = '', whole = ''] = first.split('\t');
+  const [role = '', name = '', value = '', flag = '', whole = '', settled = ''] = first.split('\t');
   if (role === '' && name === '')
     return '焦点の欄へ 1 文字ずつ打った（打ったあとの値は読めなかった）';
 
   const field = `焦点の欄（${role}${name === '' ? '' : `「${name}」`}）へ 1 文字ずつ打った`;
   if (flag === 'password') return `${field}（パスワード欄なので、値は書かない）`;
 
-  const all = whole === '' ? '' : `（欄全体: ${whole}）`;
+  // **打つ前と同じなら、そう書く**（画面は変わっているのに、欄が値を確定していないことがある・2026-09-28）。
+  const all =
+    whole === ''
+      ? ''
+      : settled === 'unchanged'
+        ? `（欄全体: ${whole} ＝ 打つ前と同じ。欄がまだ値を確定していない）`
+        : `（欄全体: ${whole}）`;
   const [toRole = '', toName = '', toValue = '', toFlag = ''] = moved.split('\t');
   const went =
     toRole === '' && toName === ''

@@ -392,3 +392,30 @@ describe('Windows の「入力する」— 焦点が移る欄', () => {
     );
   });
 });
+
+/**
+ * **「欄全体」が打つ前のままなら、そう書く**（#42・2026-09-28 の報告）。
+ *
+ * > 画面では 2026/09/03 10:00 になっているのに、欄全体は 2025-01-01T10:00（打つ前の値）でした。
+ *
+ * 道具は 6 列目に `unchanged` を付ける（打つ前に読んだ値と、少し待って読み直した値が同じ）。
+ * **画面と違うかもしれない値を、黙って証跡に残さない。**
+ */
+describe('Windows の「入力する」— 欄全体が確定していない', () => {
+  it('打つ前と同じなら、確定していないと書く', async () => {
+    says({ text: '', press: '', keys: 'Spinner\t年\t2026\t\t2025-01-01T10:00\tunchanged\n' });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+
+    const report = await session.act({ kind: 'type', text: '20260903' });
+
+    expect(report === undefined ? '' : report.detail).toBe(
+      '焦点の欄（Spinner「年」）へ 1 文字ずつ打った。打ったあとの値: 2026' +
+        '（欄全体: 2025-01-01T10:00 ＝ 打つ前と同じ。欄がまだ値を確定していない）',
+    );
+  });
+});

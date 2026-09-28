@@ -141,7 +141,7 @@ pub fn focused_field() -> String {
 /// 日付欄は年を 4 桁打つと、焦点が自動で月→日へ進む。**打ち終えた時点の焦点**を読むと、
 /// 年の値が証跡に残らなかった。
 ///
-/// 1 行目 = 打ち始めた欄 `種類 \t 名前 \t 値 \t 印 \t 親の値`、
+/// 1 行目 = 打ち始めた欄 `種類 \t 名前 \t 値 \t 印 \t 親の値 \t 親の値が打つ前と同じなら unchanged`、
 /// 2 行目 = 焦点が移っていれば、移った先（移っていなければ無い）。**パスワード欄は値を出さない。**
 pub fn typed_fields(type_them: impl FnOnce()) -> String {
     // SAFETY: COM は使う前に始めて、終わったら閉じる。**始められなくても、打つことはやめない。**
@@ -153,19 +153,28 @@ pub fn typed_fields(type_them: impl FnOnce()) -> String {
         let automation: Option<IUIAutomation> =
             CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok();
         let start = automation.as_ref().and_then(|a| a.GetFocusedElement().ok());
+        // **打つ前の欄全体も読んでおく**（2026-09-28・打ったあとも前の値のまま返す欄があった）。
+        let before = match (&automation, &start) {
+            (Some(a), Some(field)) => whole_of(a, field),
+            _ => String::new(),
+        };
 
         type_them();
 
         let out = match (&automation, &start) {
             (Some(a), Some(field)) => {
-                let mut out = field_line(field, &whole_of(a, field));
+                // 反映を待って読み直す。**それでも前と同じなら、そう印を付ける**（黙って残さない）。
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                let whole = whole_of(a, field);
+                let settled = if !whole.is_empty() && whole == before { "unchanged" } else { "" };
+                let mut out = field_line(field, &whole, settled);
                 if let Ok(now) = a.GetFocusedElement() {
                     let same = a
                         .CompareElements(field, &now)
                         .map(|b| b.as_bool())
                         .unwrap_or(true);
                     if !same {
-                        out.push_str(&field_line(&now, ""));
+                        out.push_str(&field_line(&now, "", ""));
                     }
                 }
                 out
@@ -178,14 +187,14 @@ pub fn typed_fields(type_them: impl FnOnce()) -> String {
 }
 
 /// 欄 1 つを 1 行に。**パスワード欄は値を出さない**（4 列目に `password`）。
-unsafe fn field_line(element: &IUIAutomationElement, whole: &str) -> String {
+unsafe fn field_line(element: &IUIAutomationElement, whole: &str, settled: &str) -> String {
     let role = role_of(element);
     let name = clean(&element.CurrentName().unwrap_or_default().to_string());
     if element.CurrentIsPassword().unwrap_or_default().as_bool() {
-        return format!("{role}\t{name}\t\tpassword\t\n");
+        return format!("{role}\t{name}\t\tpassword\t\t\n");
     }
     let value = clean(&value_of(element).unwrap_or_default());
-    format!("{role}\t{name}\t{value}\t\t{whole}\n")
+    format!("{role}\t{name}\t{value}\t\t{whole}\t{settled}\n")
 }
 
 /// **親の欄全体の値**（年・月・日の `Spinner` は `Edit` の下に在る）。読めなければ空。
