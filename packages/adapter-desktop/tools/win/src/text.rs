@@ -136,6 +136,72 @@ pub fn focused_field() -> String {
     }
 }
 
+/// **打つ前に焦点の欄を覚え、打ったあとにその欄を読む**（#42・2026-09-28 の報告）。
+///
+/// 日付欄は年を 4 桁打つと、焦点が自動で月→日へ進む。**打ち終えた時点の焦点**を読むと、
+/// 年の値が証跡に残らなかった。
+///
+/// 1 行目 = 打ち始めた欄 `種類 \t 名前 \t 値 \t 印 \t 親の値`、
+/// 2 行目 = 焦点が移っていれば、移った先（移っていなければ無い）。**パスワード欄は値を出さない。**
+pub fn typed_fields(type_them: impl FnOnce()) -> String {
+    // SAFETY: COM は使う前に始めて、終わったら閉じる。**始められなくても、打つことはやめない。**
+    unsafe {
+        if CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_err() {
+            type_them();
+            return String::new();
+        }
+        let automation: Option<IUIAutomation> =
+            CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok();
+        let start = automation.as_ref().and_then(|a| a.GetFocusedElement().ok());
+
+        type_them();
+
+        let out = match (&automation, &start) {
+            (Some(a), Some(field)) => {
+                let mut out = field_line(field, &whole_of(a, field));
+                if let Ok(now) = a.GetFocusedElement() {
+                    let same = a
+                        .CompareElements(field, &now)
+                        .map(|b| b.as_bool())
+                        .unwrap_or(true);
+                    if !same {
+                        out.push_str(&field_line(&now, ""));
+                    }
+                }
+                out
+            }
+            _ => String::new(),
+        };
+        CoUninitialize();
+        out
+    }
+}
+
+/// 欄 1 つを 1 行に。**パスワード欄は値を出さない**（4 列目に `password`）。
+unsafe fn field_line(element: &IUIAutomationElement, whole: &str) -> String {
+    let role = role_of(element);
+    let name = clean(&element.CurrentName().unwrap_or_default().to_string());
+    if element.CurrentIsPassword().unwrap_or_default().as_bool() {
+        return format!("{role}\t{name}\t\tpassword\t\n");
+    }
+    let value = clean(&value_of(element).unwrap_or_default());
+    format!("{role}\t{name}\t{value}\t\t{whole}\n")
+}
+
+/// **親の欄全体の値**（年・月・日の `Spinner` は `Edit` の下に在る）。読めなければ空。
+unsafe fn whole_of(automation: &IUIAutomation, element: &IUIAutomationElement) -> String {
+    let parent = automation
+        .ControlViewWalker()
+        .and_then(|walker| walker.GetParentElement(element));
+    let Ok(parent) = parent else {
+        return String::new();
+    };
+    if parent.CurrentIsPassword().unwrap_or_default().as_bool() {
+        return String::new();
+    }
+    clean(&value_of(&parent).unwrap_or_default())
+}
+
 /// タブと改行を潰す（読む側の区切りを壊さない）。
 fn clean(text: &str) -> String {
     text.replace(['\t', '\n', '\r'], " ")

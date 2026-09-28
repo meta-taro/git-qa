@@ -357,3 +357,38 @@ describe('Windows の「キーを押す」が言うこと', () => {
     );
   });
 });
+
+/**
+ * **打ち始めた欄の値を出す。焦点が移ったら、移った先も並べる**（#42・2026-09-28 の報告）。
+ *
+ * > 日付欄は、年を 4 桁打つと焦点が自動で月→日へ進みます。…「年がいくつになったか」を
+ * > 確かめたい手順で、年の値が証跡に残りません。
+ *
+ * 道具は 1 行目に**打ち始めた欄**（種類・名前・値・印・親の値）、2 行目に**移った先**を返す。
+ */
+describe('Windows の「入力する」— 焦点が移る欄', () => {
+  const typed = async (keysSays: string): Promise<string> => {
+    says({ text: '', press: '', keys: keysSays });
+    const session = await createWindowsDesktopAdapter({
+      app: 'md-business',
+      toolPath,
+      build,
+      runTool,
+    }).connect();
+    const report = await session.act({ kind: 'type', text: '20260903' });
+    return report === undefined ? '' : report.detail;
+  };
+
+  it('打ち始めた欄の値と、欄全体の値と、移った先を言う', async () => {
+    expect(await typed('Spinner\t年\t2026\t\t2026-09-03\nSpinner\t日\t03\t\n')).toBe(
+      '焦点の欄（Spinner「年」）へ 1 文字ずつ打った。打ったあとの値: 2026（欄全体: 2026-09-03）。' +
+        '焦点は Spinner「日」へ移った（値: 03）',
+    );
+  });
+
+  it('移っていなければ、移った先は言わない', async () => {
+    expect(await typed('Edit\t検索\tabc\t\t\n')).toBe(
+      '焦点の欄（Edit「検索」）へ 1 文字ずつ打った。打ったあとの値: abc',
+    );
+  });
+});

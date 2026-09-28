@@ -536,17 +536,28 @@ function keyReport(key: string, said: string): string {
  *
  * > 「変わらないこと」を確かめる検証でも、人が画像を拡大せずに読めるようになります。
  *
- * 道具は `種類 \t 名前 \t 値 [\t password]` を返す。**パスワード欄は値を返さない**（道具の側で読まない）。
+ * 道具は 1 行目に**打ち始めた欄**の `種類 \t 名前 \t 値 \t 印 \t 親の値`、
+ * 2 行目に**焦点が移った先**を返す（日付欄は年を打つと月→日へ焦点が進む・2026-09-28）。**パスワード欄は値を返さない**（道具の側で読まない）。
  * **読めなければ、読めなかったと言う**（黙って空にしない）。
  */
 function typedReport(said: string): string {
-  const [role = '', name = '', value = '', flag = ''] = said.replace(/\n$/, '').split('\t');
+  // 1 行目は**打ち始めた欄**、2 行目は**焦点が移った先**（移っていなければ無い・#42）。
+  const [first = '', moved = ''] = said.split('\n');
+  const [role = '', name = '', value = '', flag = '', whole = ''] = first.split('\t');
   if (role === '' && name === '')
     return '焦点の欄へ 1 文字ずつ打った（打ったあとの値は読めなかった）';
 
   const field = `焦点の欄（${role}${name === '' ? '' : `「${name}」`}）へ 1 文字ずつ打った`;
   if (flag === 'password') return `${field}（パスワード欄なので、値は書かない）`;
-  return `${field}。打ったあとの値: ${value}`;
+
+  const all = whole === '' ? '' : `（欄全体: ${whole}）`;
+  const [toRole = '', toName = '', toValue = '', toFlag = ''] = moved.split('\t');
+  const went =
+    toRole === '' && toName === ''
+      ? ''
+      : `。焦点は ${toRole}${toName === '' ? '' : `「${toName}」`}へ移った` +
+        (toFlag === 'password' ? '' : `（値: ${toValue}）`);
+  return `${field}。打ったあとの値: ${value}${all}${went}`;
 }
 
 /**

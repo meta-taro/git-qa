@@ -75,17 +75,19 @@ pub fn type_focused(hwnd: &str, text: &str) -> Result<String, String> {
     let units = unicode_strokes(text);
     let mut said = String::new();
     // SAFETY: 送るのは、前面に出たことを確かめた後だけ（`in_front` の中）。
-    in_front(hwnd, || unsafe {
-        for pair in units.chunks_exact(2) {
-            SendInput(pair, std::mem::size_of::<INPUT>() as i32);
-            sleep(BETWEEN_CHARS);
-        }
+    in_front(hwnd, || {
         /*
          * **打ったあとの欄の値を読む**（#42 の改善案）。**前面を戻す前に**読む ——
          * 戻したあとに焦点を聞くと、git-qa 自身の欄が返る。積んだキーが読み出されるのを待ってから。
+         * **読むのは打ち始めた欄**（日付欄は年を打つと焦点が日へ進む・2026-09-28）。
          */
-        sleep(SETTLE);
-        said = crate::text::focused_field();
+        said = crate::text::typed_fields(|| unsafe {
+            for pair in units.chunks_exact(2) {
+                SendInput(pair, std::mem::size_of::<INPUT>() as i32);
+                sleep(BETWEEN_CHARS);
+            }
+            sleep(SETTLE);
+        });
     })?;
     Ok(said)
 }
