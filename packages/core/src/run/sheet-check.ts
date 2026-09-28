@@ -81,7 +81,12 @@ const short = (digest: string): string => digest.slice(0, 12);
 export interface CheckedRun {
   readonly runId: string;
   readonly sheet: SheetRef;
-  readonly cases: readonly { readonly no: number; readonly result?: string }[];
+  readonly cases: readonly {
+    readonly no: number;
+    readonly result?: string;
+    /** **人が置いた判定。**これが有る行だけを「人が見て置いた」と数える。 */
+    readonly humanResult?: string;
+  }[];
   /** 相手が走行中に入れ替わっていないか。**古い証跡は持っていない。** */
   readonly targetCheck?: TargetCheck;
   /** 画面が映像を読みに来た／離れた時刻（#33）。**画面を持たない実行と古い証跡には無い。** */
@@ -153,9 +158,6 @@ function renderTargetCheck(check: TargetCheck | undefined): string[] {
   ];
 }
 
-/** **人が見て置いたもの。**`AUTO_PASS` と `SKIP` は入らない（人は見ていない）。 */
-const PLACED_BY_HUMAN = new Set(['VERIFIED', 'FAIL', 'BLOCKED']);
-
 /**
  * 突き合わせた結果を、人が読める形にする。
  *
@@ -164,9 +166,12 @@ const PLACED_BY_HUMAN = new Set(['VERIFIED', 'FAIL', 'BLOCKED']);
  * 読んだ人はいちばん知りたい。
  */
 export function renderSheetCheck(run: CheckedRun, check: SheetCheck): string {
-  const placed = run.cases.filter(
-    (one) => one.result !== undefined && PLACED_BY_HUMAN.has(one.result),
-  ).length;
+  /*
+   * **人の判定の欄で数える**（2026-09-28・実物で見つけた）。
+   * 結果の欄で数えていたので、**AI が出した FAIL / BLOCKED まで「人が置いた」に入っていた**
+   * （人が何も置いていない実行で「1 件」と出た）。人が見たか・見ていないかを混ぜない（C1）。
+   */
+  const placed = run.cases.filter((one) => one.humanResult !== undefined).length;
 
   const head =
     run.sheet.title === undefined ? run.sheet.path : `${run.sheet.title}（${run.sheet.path}）`;
