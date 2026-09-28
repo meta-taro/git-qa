@@ -100,14 +100,24 @@ export interface CheckedRun {
 function renderLiveView(events: readonly LiveViewEvent[] | undefined): string[] {
   if (events === undefined) return [];
 
+  /*
+   * **数えて、誰も居なくなった間だけを「離れた」とする**（2026-09-28）。
+   * 再読み込みでは新しい接続が古い接続より先に来ることがある（joined → joined → left）。
+   * 1 人しか居ない前提で読むと、**「離れたまま」と誤って書く。**
+   */
   const gaps: number[] = [];
   let leftAt: string | undefined;
+  let watching = 0;
   for (const one of events) {
     if (one.kind === 'left') {
-      leftAt = one.at;
+      watching = Math.max(0, watching - 1);
+      if (watching === 0) leftAt = one.at;
       continue;
     }
-    if (leftAt !== undefined) gaps.push(Date.parse(one.at) - Date.parse(leftAt));
+    if (watching === 0 && leftAt !== undefined) {
+      gaps.push(Date.parse(one.at) - Date.parse(leftAt));
+    }
+    watching += 1;
     leftAt = undefined;
   }
 
