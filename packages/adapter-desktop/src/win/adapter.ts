@@ -550,12 +550,13 @@ function typedReport(said: string): string {
   const field = `焦点の欄（${role}${name === '' ? '' : `「${name}」`}）へ 1 文字ずつ打った`;
   if (flag === 'password') return `${field}（パスワード欄なので、値は書かない）`;
 
-  // **打つ前と同じなら、そう書く**（画面は変わっているのに、欄が値を確定していないことがある・2026-09-28）。
+  // **打つ前と同じなら、分かっていることだけを書く**（2026-09-28）。アプリは値を受け取って本文まで
+  // 書き換えていたのに、欄全体として読める値だけが前のままだった。**原因（どこを読んでいるか）は未確認。**
   const all =
     whole === ''
       ? ''
       : settled === 'unchanged'
-        ? `（欄全体: ${whole} ＝ 打つ前と同じ。欄がまだ値を確定していない）`
+        ? `（欄全体として読める値は打つ前のまま: ${whole}。画面は変わっていることがある）`
         : `（欄全体: ${whole}）`;
   const [toRole = '', toName = '', toValue = '', toFlag = ''] = moved.split('\t');
   const went =
