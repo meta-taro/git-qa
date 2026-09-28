@@ -47,6 +47,8 @@ export interface StartLiveSessionOptions {
 
 /** 繋ぎ直しに来る間隔。**人がケーブルを挿し直すのに要る時間**より短くする。 */
 const RECONNECT_INTERVAL_MS = 2_000;
+/** 絵が来ない間の送り直し。**WebKit が切る 60 秒より十分短く**（#33）。 */
+const REPEAT_LAST_MS = 20_000;
 
 /**
  * 繋ぎ直しを諦めるまで。
@@ -128,7 +130,15 @@ export async function startLiveSession(options: StartLiveSessionOptions): Promis
         }
       },
     });
-    const bridge = await (options.startBridge ?? startLiveBridge)({ source: frames });
+    /**
+     * **絵が来ない間も、線を止めない**（meta-taro/git-qa#33・2026-09-28 に実物で見つけた）。
+     * 止まったページを判定待ちで置くと、60 秒ごとに画面側（WebKit）が映像を切っていた。
+     * **絵 1 枚ちょうどで流れる相手だけ**（H.264 の切れ端を送り直すと映像が壊れる）。
+     */
+    const bridge = await (options.startBridge ?? startLiveBridge)({
+      source: frames,
+      ...(liveView.transport.kind === 'image-frames' ? { repeatLastAfterMs: REPEAT_LAST_MS } : {}),
+    });
     return {
       session,
       liveUrl: bridge.url,

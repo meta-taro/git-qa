@@ -216,3 +216,53 @@ describe('映像の口 — 読み手の出入りを知らせる（#33）', () =>
     await bridge.close();
   });
 });
+
+/**
+ * **絵が来ない間は、最後の絵を送り直す**（meta-taro/git-qa#33・2026-09-28）。
+ * 頼まれたときだけ。頼まれなければ、今までどおり来たものだけを流す。
+ */
+describe('映像の口 — 絵が来ない間の送り直し（#33）', () => {
+  const quietAfterOne = (): AsyncIterable<Uint8Array> => ({
+    async *[Symbol.asyncIterator]() {
+      yield new Uint8Array([7, 7, 7]);
+      await new Promise((r) => setTimeout(r, 5_000));
+    },
+  });
+
+  const readFor = async (url: string, ms: number): Promise<number> => {
+    const controller = new AbortController();
+    const res = await fetch(url, { signal: controller.signal });
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    let bytes = 0;
+    const stop = setTimeout(() => controller.abort(), ms);
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+      }
+    } catch {
+      // 止めた（abort）。**読めた分だけを数える。**
+    }
+    clearTimeout(stop);
+    return bytes;
+  };
+
+  it('頼まれたら、黙っている間に最後の絵を送り直す', async () => {
+    const bridge = await startLiveBridge({ source: quietAfterOne, repeatLastAfterMs: 40 });
+
+    const bytes = await readFor(bridge.url, 250);
+
+    // 最初の 1 回（3 バイト）に加えて、送り直しが何回か来ている。
+    expect(bytes).toBeGreaterThanOrEqual(9);
+    expect(bytes % 3).toBe(0);
+    await bridge.close();
+  });
+
+  it('頼まれなければ、来たものだけを流す', async () => {
+    const bridge = await startLiveBridge({ source: quietAfterOne });
+
+    expect(await readFor(bridge.url, 250)).toBe(3);
+    await bridge.close();
+  });
+});

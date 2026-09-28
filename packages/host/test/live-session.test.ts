@@ -226,3 +226,42 @@ describe('映像の繋ぎ直し（Issue 014）', () => {
     expect(adapter.frameStarts()).toBe(1);
   });
 });
+
+/**
+ * **絵が来ない間も、映像の線を止めない**（meta-taro/git-qa#33・2026-09-28 に実物で見つけた）。
+ *
+ * 止まったページを判定待ちで置くと、**60 秒ごとに画面側（WebKit）が映像を切っていた**
+ * （配る側の Node は 80 秒たっても切らないことを確かめた）。
+ * 絵 1 枚ちょうどで流れる相手（`image-frames`）だけ、**最後の絵を送り直す**ように橋へ頼む。
+ * H.264 は途中の切れ端を送り直すと映像が壊れるので、頼まない。
+ */
+describe('startLiveSession — 絵が来ない間の送り直し', () => {
+  const asked = async (mode: 'h264-stream' | 'image-frames'): Promise<number | undefined> => {
+    let seen: number | undefined;
+    const live = await startLiveSession({
+      adapter: stubAdapter({ mode }),
+      startBridge: (options) => {
+        seen = options.repeatLastAfterMs;
+        return Promise.resolve({
+          url: 'http://127.0.0.1:65001/live/token.h264',
+          controlUrl: 'http://127.0.0.1:65001/live/token/control',
+          port: 65001,
+          publish: () => undefined,
+          onInput: () => () => undefined,
+          onViewer: () => () => undefined,
+          close: () => Promise.resolve(),
+        });
+      },
+    });
+    await live.close();
+    return seen;
+  };
+
+  it('絵で流れる相手なら、20 秒で送り直すよう頼む（WebKit が切る 60 秒より十分短く）', async () => {
+    expect(await asked('image-frames')).toBe(20_000);
+  });
+
+  it('H.264 なら頼まない（切れ端を送り直すと映像が壊れる）', async () => {
+    expect(await asked('h264-stream')).toBeUndefined();
+  });
+});

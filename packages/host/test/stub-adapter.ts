@@ -27,7 +27,7 @@ export interface StubTrace {
  * `mode` で、映像を読む口を持つ / 持たないを切り替える。
  */
 export function stubAdapter(options: {
-  mode?: 'h264-stream' | 'external-window';
+  mode?: 'h264-stream' | 'external-window' | 'image-frames';
   chunks?: Uint8Array[];
   failOpen?: boolean;
   /** 映像を読み始めた時点で落ちる（画面が消えている等）。 */
@@ -64,7 +64,9 @@ export function stubAdapter(options: {
     transport:
       mode === 'h264-stream'
         ? { kind: 'h264-stream', label: 'stub' }
-        : { kind: 'external-window', label: 'stub' },
+        : mode === 'image-frames'
+          ? { kind: 'image-frames', label: 'stub', mimeType: 'image/jpeg' }
+          : { kind: 'external-window', label: 'stub' },
     open() {
       if (options.failOpen === true) {
         return Promise.reject(new AdapterError('android', 'ライブビューを開けない'));
@@ -76,7 +78,7 @@ export function stubAdapter(options: {
       closed.push('liveView');
       return Promise.resolve();
     },
-    ...(mode === 'h264-stream'
+    ...(mode === 'h264-stream' || mode === 'image-frames'
       ? {
           frames(): AsyncIterable<Uint8Array> {
             return {

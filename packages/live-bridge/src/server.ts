@@ -51,6 +51,14 @@ export interface LiveBridgeOptions {
   readonly source: () => AsyncIterable<Uint8Array>;
   /** 0 なら空いている口を OS に選ばせる。 */
   readonly port?: number;
+  /**
+   * **絵が来ない間は、最後の 1 つをこの間隔で送り直す**（meta-taro/git-qa#33・2026-09-28）。
+   *
+   * 止まったページを判定待ちで置くと、**60 秒ごとに画面側（WebKit）が映像を切っていた**
+   * （この口は 80 秒たっても切らない。切っているのは読み手の側）。
+   * **1 回に絵 1 枚ちょうどを流す相手にだけ**頼むこと。H.264 の切れ端を送り直すと映像が壊れる。
+   */
+  readonly repeatLastAfterMs?: number;
 }
 
 /** 打鍵 1 回分。これより大きい本文は、この口へ来るものではない。 */
@@ -87,6 +95,7 @@ function writeVideo(
   source: () => AsyncIterable<Uint8Array>,
   cors: Record<string, string>,
   notify: (kind: 'joined' | 'left') => void,
+  repeatLastAfterMs: number | undefined,
 ): void {
   res.writeHead(200, {
     'content-type': 'application/octet-stream',
@@ -109,9 +118,25 @@ function writeVideo(
    * **この製品は人を待つのが本業**なので、向きが逆だった。
    */
   let gone = false;
+  let last: Uint8Array | undefined;
+  let lastAt = Date.now();
+  // **黙っている間は、最後の絵を送り直す**（#33）。頼まれたときだけ。
+  const repeat =
+    repeatLastAfterMs === undefined
+      ? undefined
+      : setInterval(
+          () => {
+            if (gone || res.writableEnded || last === undefined) return;
+            if (Date.now() - lastAt < repeatLastAfterMs) return;
+            res.write(last);
+            lastAt = Date.now();
+          },
+          Math.max(10, Math.floor(repeatLastAfterMs / 4)),
+        );
   notify('joined');
   res.on('close', () => {
     gone = true;
+    if (repeat !== undefined) clearInterval(repeat);
     notify('left');
   });
 
@@ -121,10 +146,13 @@ function writeVideo(
         // **去ったら、次の絵を頼まない。**`for await` を抜けると送り元も止まる。
         if (gone || res.writableEnded) return;
         res.write(chunk);
+        last = chunk;
+        lastAt = Date.now();
       }
     } catch {
       // 送り元が落ちたら、繋ぎっぱなしにせず切る。読み手は繋ぎ直しで復帰できる。
     } finally {
+      if (repeat !== undefined) clearInterval(repeat);
       res.end();
     }
   })();
@@ -203,7 +231,7 @@ export async function startLiveBridge(options: LiveBridgeOptions): Promise<LiveB
     const cors = corsHeaders(req.headers.origin);
 
     if (req.url === videoPath) {
-      writeVideo(res, options.source, cors, notify);
+      writeVideo(res, options.source, cors, notify, options.repeatLastAfterMs);
       return;
     }
     if (req.url === `${controlPath}/events`) {
