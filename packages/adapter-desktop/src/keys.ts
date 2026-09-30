@@ -71,6 +71,11 @@ const MODIFIERS: Readonly<Record<string, string>> = {
  * **知らない名前は断る。**打てないことを、打ったことにしない。
  */
 export function keyScript(key: string): string {
+  return `tell application "System Events" to ${keyAction(key)}`;
+}
+
+/** `keyScript` の中身だけ（`key code 36 using {…}` / `keystroke "a"`）。**前面を確かめる道で包むため**（#34）。 */
+export function keyAction(key: string): string {
   const parts = key.split('+').map((p) => p.trim());
   const named = parts[parts.length - 1] ?? '';
   const modifiers = parts.slice(0, -1);
@@ -84,12 +89,12 @@ export function keyScript(key: string): string {
 
   const code = CODES[named.toLowerCase()];
   if (code !== undefined) {
-    return `tell application "System Events" to key code ${String(code)}${tail}`;
+    return `key code ${String(code)}${tail}`;
   }
 
   // 1 文字なら、そのまま打つ（`keystroke` が正しい相手）。
   if ([...named].length === 1) {
-    return `tell application "System Events" to keystroke ${JSON.stringify(named)}${tail}`;
+    return `keystroke ${JSON.stringify(named)}${tail}`;
   }
 
   throw new Error(

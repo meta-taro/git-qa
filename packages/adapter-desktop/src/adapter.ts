@@ -29,13 +29,14 @@ import {
 import {
   clickScript,
   dragScript,
+  inFrontScript,
   NOT_FRONT_MARK,
   restoreFrontScript,
   scrollScript,
 } from './click.js';
 import type { AxElement } from './ax.js';
 import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
-import { keyScript } from './keys.js';
+import { keyAction } from './keys.js';
 import { oneAtATime } from './one-at-a-time.js';
 import { findInOcr, parseOcr } from './ocr.js';
 import { explainToolFailure } from './permission.js';
@@ -594,17 +595,15 @@ async function dispatch(
       await clickAt(point, await lookWindow(), app, inputPath);
     }
     // `keystroke` は IME を通すので、日本語もそのまま入る。
-    await run('osascript', [
-      '-e',
-      `tell application "System Events" to keystroke ${JSON.stringify(action.text)}`,
-    ]);
+    // **相手を前面に出したことを確かめてから打つ**（#34）。確かめずに打つと、人が見ている git-qa の窓に入る。
+    await sendInFront(app, `keystroke ${JSON.stringify(action.text)}`);
     return;
   }
 
   if (action.kind === 'key') {
     // **`keystroke "Enter"` は「Enter」という 5 文字を打つ。**特殊キーには `key code` が要る
     // （外部レビュー #6・2026-09-13）。押したつもりで文字が入るほうが、押せないより悪い。
-    await run('osascript', ['-e', keyScript(action.key)]);
+    await sendInFront(app, keyAction(action.key));
     return;
   }
 
@@ -749,6 +748,26 @@ const clickAt = async (
   // **奪ったままにはしない。**静かになったら戻す。
   restoreLater(app);
 };
+
+/**
+ * **キーを、相手が前面に居ることを確かめてから送る**（meta-taro/git-qa#34・2026-09-30）。
+ *
+ * 前は、そのとき手前にある窓へ送っていた。人が見ている git-qa の窓が手前だと、
+ * **AI が打った文字が git-qa の判定キーとして拾われ、人の名前で判定が残った。**
+ * 出せなければ**送らずに止まる**（別の窓へ打ち込むのが、いちばん悪い壊れ方）。
+ */
+async function sendInFront(app: string, action: string): Promise<void> {
+  const said = (await run('osascript', ['-e', inFrontScript(app, action)])).trim();
+  if (said.startsWith(NOT_FRONT_MARK)) {
+    const front = said.slice(NOT_FRONT_MARK.length).trim();
+    throw new AdapterError(
+      KIND,
+      notFrontmost(app, front) ?? `${app} を前面に出せなかったので、キーを送っていない`,
+    );
+  }
+  // **奪ったままにはしない。**静かになったら戻す（押すときと同じ）。
+  restoreLater(app);
+}
 
 /**
  * **静かになったら、元の窓へ戻す**（外部レビュー meta-taro/git-qa#32）。

@@ -182,3 +182,36 @@ export function restoreFrontScript(owner: string): string {
     '"ok"',
   ].join('\n');
 }
+
+/**
+ * **相手を前面に出し、出たことを確かめてから `System Events` に 1 つ頼む**（meta-taro/git-qa#34・2026-09-30）。
+ *
+ * キーは**そのとき手前にある窓**へ行く。確かめずに送ると、人が見ている git-qa の窓に入り、
+ * **AI が打った `a` が「判定できない」を押したのと同じ**になっていた。人が作業中の別のアプリにも入りうる。
+ * **出ていなければ送らずに `NOT_FRONT_MARK` を返す**（押すときの `clickScript` と同じ）。
+ * 前面を戻すのは呼び手（静かになってから戻す・#32）。
+ */
+export function inFrontScript(app: string, action: string): string {
+  const name = JSON.stringify(app);
+  return [
+    'tell application "System Events"',
+    '  set wasFront to name of first process whose frontmost is true',
+    'end tell',
+    `if wasFront is not ${name} then`,
+    `  tell application ${name} to activate`,
+    '  tell application "System Events"',
+    '    repeat 25 times',
+    `      if (name of first process whose frontmost is true) is ${name} then exit repeat`,
+    '      delay 0.02',
+    '    end repeat',
+    '  end tell',
+    'end if',
+    'tell application "System Events"',
+    `  if (name of first process whose frontmost is true) is not ${name} then`,
+    `    return "${NOT_FRONT_MARK} " & (name of first process whose frontmost is true)`,
+    '  end if',
+    `  ${action}`,
+    'end tell',
+    'return ""',
+  ].join('\n');
+}
