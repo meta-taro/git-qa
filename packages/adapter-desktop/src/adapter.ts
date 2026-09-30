@@ -223,6 +223,8 @@ function createSession(deps: SessionDeps): TargetSession {
    * 古すぎるときだけ取り直す。
    */
   const WINDOW_FRESH_MS = 400;
+  /** 映像を撮るときに、窓を取り直す間隔（#34）。**押すときは `WINDOW_FRESH_MS` のまま。** */
+  const FRAME_WINDOW_FRESH_MS = 2_000;
   let windowAt = 0;
   const recentWindow = async (): Promise<WindowRef> =>
     Date.now() - windowAt < WINDOW_FRESH_MS ? window : refreshWindow();
@@ -257,7 +259,12 @@ function createSession(deps: SessionDeps): TargetSession {
    */
   const shoot = oneAtATime(
     async (): Promise<{ bytes: Uint8Array; scale: number; window: WindowRef }> => {
-      const target = await refreshWindow();
+      /*
+       * **撮るのに要るのは窓の番号だけ**（位置は要らない・`screencapture -l`）。
+       * 1 枚ごとに取り直すと、判定待ちの間も 1 秒に最大 8 回 `osascript` が立っていた（#34・2026-09-30）。
+       * **2 秒に 1 回**にする。大きさが変わった・閉じられたのに気づくのが、最大 2 秒遅れる。
+       */
+      const target = Date.now() - windowAt < FRAME_WINDOW_FRESH_MS ? window : await refreshWindow();
       const dir = await mkdtemp(join(tmpdir(), 'git-qa-desktop-'));
       const path = join(dir, 'frame.jpg');
       try {
