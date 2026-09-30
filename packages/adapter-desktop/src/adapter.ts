@@ -39,7 +39,12 @@ import { exePathArgs, fingerprintOf, parseExePath } from './fingerprint.js';
 import { keyAction } from './keys.js';
 import { oneAtATime } from './one-at-a-time.js';
 import { findInOcr, parseOcr } from './ocr.js';
-import { explainToolFailure } from './permission.js';
+import {
+  explainToolFailure,
+  NO_SCREEN_RECORDING,
+  parseScreenRecordingPreflight,
+  SCREEN_RECORDING_PREFLIGHT,
+} from './permission.js';
 import type { OcrLine } from './ocr.js';
 import {
   anyWindowScript,
@@ -317,10 +322,23 @@ function createSession(deps: SessionDeps): TargetSession {
       return liveOpen;
     },
     transport: { kind: 'image-frames', label: `screencapture ${app}`, mimeType: 'image/jpeg' },
-    open() {
+    async open() {
       ensureOpen();
+      /**
+       * **画面収録の許可が無ければ、映像を始める前に止まる**（meta-taro/git-qa#33・2026-09-30）。
+       * 前は「映像が切れました・繋ぎ直します」を繰り返すだけで、許可が無いことが分からなかった。
+       * **聞けなかったときは止めない**（許可があるのに使えなくなるほうが悪い）。
+       */
+      const said = await run('osascript', [
+        '-l',
+        'JavaScript',
+        '-e',
+        SCREEN_RECORDING_PREFLIGHT,
+      ]).catch(() => '');
+      if (parseScreenRecordingPreflight(said) === false) {
+        throw new AdapterError(KIND, NO_SCREEN_RECORDING);
+      }
       liveOpen = true;
-      return Promise.resolve();
     },
     close() {
       liveOpen = false;

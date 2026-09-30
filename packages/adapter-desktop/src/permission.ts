@@ -33,3 +33,30 @@ export function explainToolFailure(command: string, stderr: string): string {
 
   return `${command} が失敗した: ${said}`;
 }
+
+/**
+ * **画面収録の許可があるかを macOS に聞く**（meta-taro/git-qa#33・2026-09-30 の報告）。
+ *
+ * 配布版を入れ替えると、画面収録の許可が外れる。そのとき git-qa は「映像が切れました・繋ぎ直します」を
+ * 繰り返すだけで、**許可が無いことが分からなかった。**
+ * 聞くのは git-qa から起こした `osascript` なので、答えは git-qa 自身の許可になる。
+ */
+export const SCREEN_RECORDING_PREFLIGHT =
+  'ObjC.import("CoreGraphics"); ' +
+  'ObjC.bindFunction("CGPreflightScreenCaptureAccess", ["bool", []]); ' +
+  '$.CGPreflightScreenCaptureAccess()';
+
+/** 答えを読む。**読めなければ `undefined`**（分からないときは止めない。止めると、許可があるのに使えなくなる）。 */
+export function parseScreenRecordingPreflight(stdout: string): boolean | undefined {
+  const said = stdout.trim();
+  if (said === 'true') return true;
+  if (said === 'false') return false;
+  return undefined;
+}
+
+/** 許可が無いときに出す文。**無いことと、どこで入れるかと、入れたあと何をするか。** */
+export const NO_SCREEN_RECORDING = [
+  'この Mac では、git-qa に画面収録の許可が無い（配布版を入れ替えると外れることがある）。',
+  'システム設定 → プライバシーとセキュリティ → 画面収録とシステムオーディオ録音 で git-qa を入にし、',
+  'git-qa を起動し直す（起動したままだと、古い許可のまま動く）。',
+].join('\n');

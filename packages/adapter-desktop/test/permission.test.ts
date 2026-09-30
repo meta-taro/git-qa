@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { explainToolFailure } from '../src/permission.js';
+import {
+  NO_SCREEN_RECORDING,
+  SCREEN_RECORDING_PREFLIGHT,
+  explainToolFailure,
+  parseScreenRecordingPreflight,
+} from '../src/permission.js';
 
 describe('explainToolFailure', () => {
   /**
@@ -60,5 +65,30 @@ describe('explainToolFailure', () => {
 
   it('何も言われずに落ちたときも、道具の名前だけは残す', () => {
     expect(explainToolFailure('osascript', '')).toBe('osascript が失敗した（何も言わずに落ちた）');
+  });
+});
+
+/**
+ * **画面収録の許可が無いときは、そう言って止まる**（meta-taro/git-qa#33・2026-09-30 の報告）。
+ *
+ * 配布版を入れ替えると、画面収録の許可が外れる。そのとき git-qa は「映像が切れました・繋ぎ直します」を
+ * 繰り返すだけで、**許可が無いことが分からなかった。**配布版を入れ替えるたびに、人がここを踏む。
+ */
+describe('画面収録の許可', () => {
+  it('macOS に聞く（CGPreflightScreenCaptureAccess）', () => {
+    expect(SCREEN_RECORDING_PREFLIGHT).toContain('CGPreflightScreenCaptureAccess');
+  });
+
+  it('答えを読む。**読めなければ「分からない」**（分からないときは止めない）', () => {
+    expect(parseScreenRecordingPreflight('true\n')).toBe(true);
+    expect(parseScreenRecordingPreflight('false\n')).toBe(false);
+    expect(parseScreenRecordingPreflight('')).toBeUndefined();
+    expect(parseScreenRecordingPreflight('execution error')).toBeUndefined();
+  });
+
+  it('無いときは、無いことと、どこで入れるかを言う', () => {
+    expect(NO_SCREEN_RECORDING).toContain('画面収録の許可が無い');
+    expect(NO_SCREEN_RECORDING).toContain('プライバシーとセキュリティ');
+    expect(NO_SCREEN_RECORDING).toContain('起動し直す');
   });
 });
