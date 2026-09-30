@@ -42,6 +42,8 @@ export function stubAdapter(options: {
    * （人が掴んで広げる）ので、変わる相手を検査で作れないと、ずれに気づけない。
    */
   screen?: { width: number; height: number } | (() => { width: number; height: number });
+  /** 操作 1 つが終わるまでを、外から待たせる（**AI が操作している最中**を検査で作る・#34）。 */
+  onAct?: (action: Action) => Promise<void>;
 }): TargetAdapter & StubTrace {
   const opened: string[] = [];
   const closed: string[] = [];
@@ -114,7 +116,7 @@ export function stubAdapter(options: {
     ...(screenSize === undefined ? {} : { screenSize }),
     act: (action: Action) => {
       actions.push(action);
-      return Promise.resolve();
+      return options.onAct?.(action) ?? Promise.resolve();
     },
     observe: (): Promise<Observation> =>
       Promise.resolve({ kind: 'android', capturedAt: '2026-09-02T00:00:00.000Z', raw: '' }),

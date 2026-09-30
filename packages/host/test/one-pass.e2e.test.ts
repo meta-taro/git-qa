@@ -98,6 +98,7 @@ async function watch(controlUrl: string): Promise<{
 describe('一本道（端末だけ代役・橋も打鍵も本物）', () => {
   it('5 ケースを通し、run.json に VERIFIED と AUTO_PASS が混ざって残る', async () => {
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -154,6 +155,7 @@ describe('一本道（端末だけ代役・橋も打鍵も本物）', () => {
 
   it('画面には、AI の判定と根拠が出ている', async () => {
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },

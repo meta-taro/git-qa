@@ -68,6 +68,7 @@ const start = (
   watch: { pauseMs?: number; sleep?: (ms: number) => Promise<void> } = {},
 ) =>
   startRunSession({
+    afterActionMs: 0,
     adapter: stubAdapter({}),
     sheet: SHEET,
     sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },

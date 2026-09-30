@@ -43,6 +43,9 @@ import { createFrameRecording, shouldRecordFrames } from './frame-recording.js';
 import type { FrameRecording } from './frame-recording.js';
 
 /** ライブ映像の枚数（橋が流す速さ）。**動画の長さを出すのに要る。** */
+/** AI の操作が終わってから、判定を受け始めるまでの間。**送られたキーは少し遅れて届く**（#34）。 */
+const AFTER_ACTION_MS = 1_500;
+
 const LIVE_FPS = 8;
 const runTool = promisify(execFile);
 import { imageTools } from './image-tools.js';
@@ -106,6 +109,11 @@ export interface StartRunSessionOptions {
    * 検査そのものが待ち切れなくなる（実際にそうなった）。
    */
   readonly expectation?: { readonly waitMs?: number; readonly stepMs?: number };
+  /**
+   * AI の操作が終わってから、判定を受け始めるまでの間（既定 1.5 秒・#34）。
+   * **検査では 0 にする**（押すのは検査そのもので、遅れて届く合成のキーは無い）。
+   */
+  readonly afterActionMs?: number;
   /**
    * **鑑賞モード**（2026-09-11・人の指示）。
    *
@@ -417,6 +425,26 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   /** 人が触った分を、**1 つずつ順に**端末へ送るための列。 */
   let humanWork: Promise<void> = Promise.resolve();
 
+  /**
+   * **AI が操作している間（と、その直後）は、判定を受けない**（meta-taro/git-qa#34・2026-09-30）。
+   *
+   * macOS の「入力する」「キーを押す」は、そのとき手前にある窓へキーを送る。人が見ている git-qa の窓が
+   * 手前に居ると、**AI が打った `a` が「判定できない」を押したのと同じ**になり、走り終えたケースへの
+   * 置き直しとして入っていた（人が押していないのに、人の名前で BLOCKED が残った）。
+   * **打鍵がどこから来たかは見分けられない**ので、操作中に届いたものは人の判定にしない。
+   * 送られたキーは少し遅れて届くので、**終わってからも少しの間**は受けない。
+   */
+  let acting = false;
+  let actingEndedAt = 0;
+  const afterActionMs = options.afterActionMs ?? AFTER_ACTION_MS;
+  const duringAiAction = (): boolean => acting || Date.now() - actingEndedAt < afterActionMs;
+  /** 操作が終わった。**ここから少しの間はまだ受けない**（送られたキーが遅れて届く）。 */
+  const actionEnded = (): void => {
+    if (!acting) return;
+    acting = false;
+    actingEndedAt = Date.now();
+  };
+
   live.bridge.onInput((raw) => {
     const input = parseHumanInput(raw);
     if (input === undefined) return;
@@ -430,6 +458,15 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
      */
     if (input.kind === 'stop') {
       stop(`人が止めた（${String(input.caseNo)} 件目を見ているとき）`);
+      return;
+    }
+
+    // **止める以外の判定は、AI の操作中には受けない**（#34）。止める手段は奪わない。
+    if ((input.kind === 'verdict' || input.kind === 'advance') && duringAiAction()) {
+      console.warn(
+        `[git-qa] AI が操作している間に届いた判定を捨てた（${input.kind}・${String(input.caseNo)} 件目）。` +
+          '人の判定かどうか見分けられないため',
+      );
       return;
     }
 
@@ -563,6 +600,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
      * 見る所は、見つかった時点で出し直す（`session.locate`）。
      */
     onJudging: () => {
+      // **操作はここで終わり。**期待結果を待つ間に、遅れて届くキーの猶予が過ぎる（#34）。
+      actionEnded();
       pointing = undefined;
       publish();
     },
@@ -588,7 +627,14 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
     pointing = undefined;
     publish();
 
-    const verdict = await runner(ctx);
+    acting = true;
+    let verdict: CaseVerdict;
+    try {
+      verdict = await runner(ctx);
+    } finally {
+      // 手順が途中で落ちたときは、ここが操作の終わり。
+      actionEnded();
+    }
     patch(ctx.subject.no, {
       aiResult: verdict.aiResult,
       ...(verdict.note === undefined ? {} : { note: verdict.note }),

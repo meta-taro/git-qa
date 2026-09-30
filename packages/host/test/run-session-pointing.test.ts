@@ -62,6 +62,7 @@ describe('指した場所の知らせ', () => {
       | undefined;
 
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({ screen: () => size }),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },

@@ -73,6 +73,7 @@ function fakeBridge(): {
 
 const start = (bridge: ReturnType<typeof fakeBridge>, screenText = '保存しました') =>
   startRunSession({
+    afterActionMs: 0,
     adapter: stubAdapter({}),
     sheet: SHEET,
     sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -224,6 +225,7 @@ describe('人が端末を触る', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({});
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -254,6 +256,7 @@ describe('人が端末を触る', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({});
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -281,6 +284,7 @@ describe('人がなぞる（スワイプ / フリック）', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({});
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -322,6 +326,7 @@ describe('小さく流した映像の座標を、端末の実寸へ戻す', () =
     const bridge = fakeBridge();
     const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -362,6 +367,7 @@ describe('小さく流した映像の座標を、端末の実寸へ戻す', () =
 describe('手数を数える（Issue 008）', () => {
   const start = (bridge: ReturnType<typeof fakeBridge>) =>
     startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -455,6 +461,7 @@ describe('判定の置き直し（Issue 013）', () => {
    */
   const start = (bridge: ReturnType<typeof fakeBridge>) =>
     startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -537,6 +544,7 @@ describe('人が触った操作を証跡に残す', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -579,6 +587,7 @@ describe('人が触った操作を証跡に残す', () => {
   it('触っていないケースには残らない（「触らずに見た」も記録のうち）', async () => {
     const bridge = fakeBridge();
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({ screen: { width: 1080, height: 2220 } }),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -605,6 +614,7 @@ describe('長押し', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -651,6 +661,7 @@ describe('文字を端末へ送る', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({ screen: { width: 1080, height: 2220 } });
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -692,6 +703,7 @@ describe('映像が止まった理由を画面へ伝える', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({ failFrames: '端末の画面が消えている' });
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -742,6 +754,7 @@ describe('startRunSession — 対象アプリ', () => {
     const bridge = fakeBridge();
     const adapter = stubAdapter({});
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter,
       sheet: LAUNCH_SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -772,6 +785,7 @@ describe('startRunSession — 証跡の保存', () => {
     const bridge = fakeBridge();
     const saved: unknown[] = [];
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -799,6 +813,7 @@ describe('startRunSession — 証跡の保存', () => {
   it('保存に失敗したら、黙らずに理由を出す', async () => {
     const bridge = fakeBridge();
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: SHEET,
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -846,6 +861,7 @@ describe('行き先（#37）', () => {
   const startedWith = async (head: readonly string[]): Promise<string> => {
     const bridge = fakeBridge();
     const session = await startRunSession({
+      afterActionMs: 0,
       adapter: stubAdapter({}),
       sheet: sheetWith(head),
       sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
@@ -921,5 +937,94 @@ describe('startRunSession — 映像の出入りを証跡に残す', () => {
     await session.close();
 
     expect(run.liveView).toEqual([]);
+  });
+});
+
+/**
+ * **AI が操作している間に届いた判定は、人の判定にしない**（meta-taro/git-qa#34・2026-09-30）。
+ *
+ * macOS の「入力する」「キーを押す」は、そのとき手前にある窓へキーを送る。
+ * 人が見ている git-qa の窓が手前に居ると、**AI が打った `a` が「判定できない」を押したのと同じ**になり、
+ * 走り終えたケースへの置き直しとして受け付けていた（ケース 1 に BLOCKED が付いた）。
+ * **打鍵がどこから来たかは見分けられない**ので、操作中に届いたものは受けない。
+ */
+describe('startRunSession — 操作中の打鍵を判定にしない', () => {
+  it('ケース 2 を操作している間に届いた、ケース 1 への置き直しは入らない', async () => {
+    const bridge = fakeBridge();
+    let release: () => void = () => undefined;
+    let actingOnCase2 = false;
+    let acts = 0;
+    const session = await startRunSession({
+      afterActionMs: 0,
+      adapter: stubAdapter({
+        onAct: () => {
+          acts += 1;
+          // 1 件目の操作は 1 回。2 回目の操作（2 件目）で止めておく。
+          if (acts !== 2) return Promise.resolve();
+          actingOnCase2 = true;
+          return new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        },
+      }),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260930-100000',
+      operator: { handle: 'octocat' },
+      readScreenText: fakeScreenPerCase('保存しました'),
+      startBridge: bridge.start,
+      expectation: { waitMs: 0, stepMs: 1 },
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(() => actingOnCase2, '2 件目の操作中');
+
+    // **AI が打った `a`**（git-qa の窓に入った）。ケース 1 への置き直しとして届く。
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'BLOCKED' });
+    release();
+
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+    bridge.send({ kind: 'advance', caseNo: 2 });
+    await waitFor(awaitingIs(bridge, 3), '3 件目の打鍵待ち');
+    bridge.send({ kind: 'advance', caseNo: 3 });
+    const run = await session.done;
+    await session.close();
+
+    expect(run.cases[0]?.result).toBe('VERIFIED');
+    expect(run.cases[0]?.verifiedBy).toBe('octocat');
+  });
+});
+
+/** **操作が終わった直後も、少しの間は受けない**（送られたキーは遅れて届く・#34）。猶予が過ぎたら受ける。 */
+describe('startRunSession — 操作直後の猶予', () => {
+  it('操作の直後に届いた判定は捨て、猶予が過ぎてから届いた判定は受ける', async () => {
+    const bridge = fakeBridge();
+    const session = await startRunSession({
+      afterActionMs: 300,
+      adapter: stubAdapter({}),
+      sheet: SHEET,
+      sheetRef: { path: 'test.tsv', sha256: '0'.repeat(64) },
+      runId: '20260930-110000',
+      operator: { handle: 'octocat' },
+      readScreenText: fakeScreenPerCase('保存しました'),
+      startBridge: bridge.start,
+      expectation: { waitMs: 0, stepMs: 1 },
+    });
+
+    await waitFor(awaitingIs(bridge, 1), '1 件目の打鍵待ち');
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'BLOCKED' });
+    await new Promise((r) => setTimeout(r, 50));
+    // 捨てられて、まだ 1 件目を待っている。
+    expect(bridge.states.at(-1)?.awaiting).toBe(1);
+
+    await new Promise((r) => setTimeout(r, 350));
+    bridge.send({ kind: 'verdict', caseNo: 1, humanResult: 'VERIFIED' });
+    await waitFor(awaitingIs(bridge, 2), '2 件目の打鍵待ち');
+
+    session.abort('検査の後始末');
+    const run = await session.done;
+    await session.close();
+    expect(run.cases[0]?.result).toBe('VERIFIED');
   });
 });
