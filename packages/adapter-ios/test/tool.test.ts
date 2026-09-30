@@ -5,7 +5,7 @@ import { framesFrom, iosArgs, parseIosToolDevices } from '../src/tool.js';
 /**
  * **iPhone / iPad を USB 越しに映す**（2026-09-19・人の指示）。
  *
- * > Android を接続して検証録画できるように、iPhone,iPad の検証録画も必要です
+ * Android と同様に、iPhone / iPad も接続して検証録画できる必要がある。
  *
  * **押す口はまだ無い。**iOS を押すには端末側にアプリ（WebDriverAgent）が要り、
  * 署名が要る＝人の作業（§14）。**見る・読むだけを持つ。**

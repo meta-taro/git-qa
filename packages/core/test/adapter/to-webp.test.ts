@@ -5,7 +5,7 @@ import { webpCommand } from '../../src/adapter/to-webp.js';
 /**
  * **証跡の絵を webp で残す**（2026-09-11・人の指示）。
  *
- * > webp で出力したい。動画も理想は webm です。
+ * 絵は webp、動画も理想は webm で出す。
  *
  * ウェブはブラウザがそのまま出せる（CDP が `webp` を受ける）。
  * **デスクトップと Android は変換が要る**が、macOS の `sips` は webp を**書けない**

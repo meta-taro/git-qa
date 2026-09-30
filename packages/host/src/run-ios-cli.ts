@@ -24,7 +24,7 @@ import { installSaveOnExit } from './save-on-exit.js';
  *
  *   pnpm run:sheet:ios <検証シート.tsv>
  *
- * > Android を接続して検証録画できるように、iPhone,iPad の検証録画も必要です
+ * Android と同じく、iPhone / iPad でも検証を録画できるようにする。
  *
  * **押す口はまだ無い。**端末側に WebDriverAgent が要り、署名が要る＝人の作業（§14）。
  * **人が端末を触り、git-qa が見て、人が判定を置く**形になる（#30 / #35 と同じ分担）。

@@ -91,7 +91,7 @@ const ja = {
   'setup.release': 'この git-qa は {version} です',
   'setup.update': '新しい版が出ています（{version}）— 配布ページを開く',
   'setup.operator': '0. あなたのハンドル（証跡に「誰が見たか」として残る）',
-  'setup.operator.placeholder': '個人名ではなく、名乗る名前（例: めたたろ / octocat）',
+  'setup.operator.placeholder': '個人名ではなく、名乗る名前（例: しけんがかり / octocat）',
   'setup.device': '1. 見る相手を選ぶ',
   'setup.web': 'ウェブページを見るなら、URL を入れる（端末より優先）',
   'live.desktop.note':

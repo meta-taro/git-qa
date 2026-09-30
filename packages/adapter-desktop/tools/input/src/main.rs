@@ -320,7 +320,7 @@ fn fail(message: &str) -> ! {
 
 **返すだけでは足りない。**`CGWarpMouseCursorPosition` の後、macOS は
 **0.25 秒ほど、実際のマウスの動きを画面の指に伝えない。**
-人からはこう見える: 「ポインタが斜めにとばされるんですよね」。
+人からは、ポインタが斜めに飛ばされたように見える。
 `CGAssociateMouseAndMouseCursorPosition(1)` で、その場で繋ぎ直す。
 */
 unsafe fn warp_back(to: CGPoint) {

@@ -6,7 +6,7 @@ import type { WebDriverClient } from '../src/webdriver.js';
 /**
  * **Safari でも、人が見る場所を指す**（2026-09-25・人の指示）。
  *
- * > Firefox は優先度低いですが、**Safari はひつようでしょうね。**
+ * Firefox の優先度は低いが、**Safari は必要。**
  *
  * Chrome には在って Safari に無かったのは 2 つ。
  *

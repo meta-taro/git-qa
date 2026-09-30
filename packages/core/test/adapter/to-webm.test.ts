@@ -5,7 +5,7 @@ import { webmCommand } from '../../src/adapter/to-webm.js';
 /**
  * 動画を webm にする（2026-09-11・人の指示）。
  *
- * > webp で出力したい。動画も理想は webm です。
+ * 絵は webp、動画も理想は webm で出す。
  *
  * **効き目**（実測・1280x800 を 4.4 秒）: `mov 169,644 → webm 36,870 bytes`、
  * 変換に 1.0 秒。長い実行ほど効く。

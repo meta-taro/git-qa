@@ -95,7 +95,7 @@ export function installDeviceTouch(options: InstallDeviceTouchOptions): () => vo
   /**
    * **捨てるときは、なぜ捨てたかを言う。**
    *
-   * 2026-09-07、人が 2 度「クリックしても反応しない」と言った。
+   * 2026-09-07、クリックしても反応しない、と人から 2 度指摘された。
    * 3 箇所で黙って `return` していたので、**届いていないのか・届いて弾かれたのか**が
    * 誰にも分からなかった（`product-baseline.md` §8）。
    */

@@ -28,7 +28,7 @@ for observation in (request.results ?? []) {
     let x = Int((box.midX) * width)
     let y = Int((1 - box.midY) * height)
     // **大きさも返す。**指す矢印を文字の外へ置くのに要る
-    // （2026-09-08「カレンダーならかぶっちゃだめでしょ」）。
+    // （2026-09-08・人の指摘。指すものに矢印が重なると読めない）。
     let w = Int(box.width * width)
     let h = Int(box.height * height)
     print("\(best.string)\t\(x)\t\(y)\t\(w)\t\(h)")

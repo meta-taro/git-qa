@@ -3,7 +3,7 @@ import type { ImageTools, ToolCommand } from './to-webp.js';
 /**
  * 証跡の動画を webm にする（2026-09-11・人の指示）。
  *
- * > webp で出力したい。動画も理想は webm です。
+ * 絵は webp、動画は webm で出す。
  *
  * 撮るのは macOS の ScreenCaptureKit で、**出てくるのは H.264 の `.mov`。**
  * webm にするには外の道具（ffmpeg）が要る。

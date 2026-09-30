@@ -262,7 +262,7 @@ export function createSafariSession(deps: SessionDeps): TargetSession {
     /**
      * **見える大きさ**（CSS 画素・2026-09-25・人の指示）。
      *
-     * > Firefox は優先度低いですが、**Safari はひつようでしょうね。**
+     * Firefox は後回しでよいが、**Safari は要る**、という判断。
      *
      * 無いと実行側が**指した場所を丸ごと捨てる** —— 赤い枠も矢印も出ない。
      * **覚えない。**窓は走っている間に大きさが変わる（C87）。

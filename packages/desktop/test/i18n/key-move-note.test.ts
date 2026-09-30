@@ -3,9 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MESSAGES } from '../../src/i18n/index.js';
 
 /**
- * **2026-09-07、人に言われた。**
- *
- * > 一回合格にすると不合格にできない。ほかのケースもないかチェックがひつよう
+ * **2026-09-07、人の指摘。**一度合格にすると不合格に戻せない。他のケースにも同じ問題が無いか確かめる必要がある。
  *
  * **置き直しはできる**（`session/cursor.ts` と `host/run-session.ts` の `revise`、
  * どちらも検査してある）。**画面の説明が嘘だった。**

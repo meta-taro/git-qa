@@ -16,7 +16,7 @@ import { HANDLE_RULE, isValidHandle } from '../../src/run/handle.js';
 describe('isValidHandle', () => {
   it('日本語のハンドルが通る', () => {
     // **人が実際に使っている値。**ここが通らないと検証を始められない。
-    expect(isValidHandle('めたたろ')).toBe(true);
+    expect(isValidHandle('しけんがかり')).toBe(true);
     expect(isValidHandle('田中')).toBe(true);
   });
 

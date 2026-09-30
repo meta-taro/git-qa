@@ -5,8 +5,7 @@ import { parseWinWindows, winArgs } from '../../src/win/tool.js';
 /**
  * **Windows のデスクトップ検証**（2026-09-12・人の指示）。
  *
- * > デスクトップアプリ試験導入予定なんです。……顧客対象が大抵 win なので、
- * > win で検証する必要があります。
+ * デスクトップアプリの試験導入先が主に Windows のため、Windows で検証できる必要がある。
  *
  * macOS 側の 3 本（OCR / 触る / 録る）に当たるものを、Windows では 1 本にまとめてある
  * （窓・文字・操作がどれも Win32 と UI Automation から取れるため）。

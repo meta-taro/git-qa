@@ -1,6 +1,6 @@
 // iPhone / iPad の画面を、USB 越しに映す道具（2026-09-19・人の指示）。
 //
-// > Android を接続して検証録画できるように、iPhone,iPad の検証録画も必要です
+// Android と同じく、iPhone / iPad でも検証を録画できるようにする。
 //
 //   git-qa-ios devices                 つながっている端末を並べる
 //   git-qa-ios shoot <識別子> <出力.jpg>  1 枚撮る
