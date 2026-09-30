@@ -13,7 +13,7 @@
 > **試験導入する人への案内はここではありません。**それは `docs/alpha-guide.md`、
 > 別の OS で開発する人への案内は `docs/dev-check.md` です。
 
-最終更新: 2026-09-28（`v0.2.0-beta.17` を出した直後）
+最終更新: 2026-09-30（`v0.2.0-beta.18` を出した直後）
 
 ---
 
@@ -74,7 +74,7 @@ pnpm verify      # format / lint / typecheck / test / build
 
 ### 出した版
 
-**`v0.2.0-beta.17`**（2026-09-28・macOS は署名＋公証・Windows は未署名）。
+**`v0.2.0-beta.18`**（2026-09-30・macOS は署名＋公証・Windows は未署名）。
 **転がる開発版 `dev`** が `develop` に入るたび建ちます（**Windows だけ**）。
 
 - 配布ページ: https://meta-taro.github.io/git-qa/
