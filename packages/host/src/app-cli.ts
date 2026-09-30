@@ -48,6 +48,7 @@ import { gitQaWindowRecording } from './window-recording.js';
 import { imageTools } from './image-tools.js';
 import type { RunSession } from './run-session.js';
 import { startSetupServer } from './setup-server.js';
+import { stopServing } from './stop-serving.js';
 import { watchParent } from './watch-parent.js';
 
 /**
@@ -382,8 +383,9 @@ console.log(`[git-qa] 画面から始める: ${setup.url}`);
 
 if (serveOnly) {
   // 画面は既に出ている。**ここは待つだけ。**親（アプリ）が終わればここも終わる。
+  // **必ず終わる**（#34）。実行が動いていなくても、後片付けが返らなくても。
   const stop = (): void => {
-    void session?.close().finally(() => process.exit(0));
+    void stopServing({ session, exit: (code) => process.exit(code) });
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
