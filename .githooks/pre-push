@@ -1,0 +1,3 @@
+#!/bin/sh
+# push の前に置き場所を見る（作業の記録を公開リポへ出さない）。
+exec bash .github/scripts/oss-placement-check.sh

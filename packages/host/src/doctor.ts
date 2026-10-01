@@ -103,7 +103,7 @@ export async function reportOf(probes: readonly Probe[], context: ReportContext)
 /**
  * **繋がっている iPhone を数える**（`xcrun devicectl list devices` の表から）。
  *
- * **iOS のアダプタはまだ無い**（README の表・`.claude/issues/001`）。
+ * **iOS のアダプタはまだ無い**（README の表）。
  * それでも**挿したことに気づける**ようにしておく ——
  * 「見る」を作りにいく前の一歩目が、ここで踏めなくなるため。
  *

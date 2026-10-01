@@ -2,7 +2,6 @@
 
 - 状態: 採用（2026-08-17）
 - 関係する決定: C4（ライブビューが主媒体）/ C8（Adapter に入る条件）/ C11・C20（録画）/ C19（機体は run.json 側）
-- 出典 Issue: `.claude/issues/002-adapter-boundary.md`
 
 ## 決めたこと
 

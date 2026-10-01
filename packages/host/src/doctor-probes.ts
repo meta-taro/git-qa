@@ -124,7 +124,7 @@ const browsers = async (): Promise<ProbeResult> => {
 };
 
 /**
- * **iPhone はまだ相手にできない**（README の表・`.claude/issues/001`）。
+ * **iPhone はまだ相手にできない**（README の表）。
  * それでも**挿したことには気づく。**
  */
 const iphone = async (): Promise<ProbeResult> => {

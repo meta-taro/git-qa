@@ -12,7 +12,7 @@ git-qa がやるのは、**人が責任を持つ前提のまま、その責任�
 > **Android 端末で、シートを読み → AI が操作し → 画面に映るところまでは動いています**
 > （`sheets/android-settings.tsv` の 5 件が AI だけで PASS まで行くことを実機で確認済み）。
 > **まだ足りないのは、人が実物を見て判定を置いた `run.json`** です。
-> 方向性は `PRD.md`、進め方は `.claude/roadmap.md`、いま何がどこまでかは `.claude/project-status.md` にあります。
+> 方向性は `PRD.md`、決めたことと理由は `docs/decisions.md` にあります。
 
 ## 考え方
 

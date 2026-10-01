@@ -1,0 +1,18 @@
+name: oss-placement-check
+
+# 公開リポの置き場所の検査。作業の記録が git に入っていないかを見る。
+# 語の検査（oss-privacy-check）とは別。記録は文面が中立でも、公開リポに置く理由が無い。
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  placement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/oss-placement-check.sh
