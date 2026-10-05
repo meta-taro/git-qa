@@ -183,7 +183,18 @@ jobs:
           if-no-files-found: error
 
   windows:
-    runs-on: windows-latest
+    # **x64 と ARM64 を、それぞれの機械で建てる**（2026-10-05）。
+    # x64 は Intel・AMD の両方で動く（AMD64 と同じもの）。ARM の Windows（Snapdragon など）には arm64 が要る。
+    # 交差で建てるより、その機械で建てるほうが手堅い（Rust の道具 git-qa-win もその機械の形で建つ）。
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -211,7 +222,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: git-qa-windows
+          name: git-qa-windows-${{ matrix.arch }}
           path: |
             packages/desktop/src-tauri/target/release/bundle/msi/*.msi
             packages/desktop/src-tauri/target/release/bundle/nsis/*.exe
