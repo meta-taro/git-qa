@@ -24,7 +24,19 @@
 | | |
 | --- | --- |
 | macOS | `.dmg` を開いて Applications へ。**署名と公証をしています**ので、そのまま開けます |
-| Windows | `.msi` で入れる。**署名していません** —— 「WindowsによってPCが保護されました」が出るので、出どころを確かめてから［詳細情報］→［実行］ |
+| Windows | x64（Intel・AMD）と ARM64 の 2 つがあります。`.msi` で入れる。**署名していません** —— 「WindowsによってPCが保護されました」が出るので、出どころを確かめてから［詳細情報］→［実行］ |
+
+## v0.2.0-beta.19 で入ったもの
+
+**Windows の ARM64 版を出しました。**Snapdragon などの ARM の Windows で、そのまま入れられます。
+
+| 配布物 | 向け |
+| --- | --- |
+| `git-qa_0.2.0_x64_en-US.msi` / `x64-setup.exe` | Windows（Intel・AMD。x64 は AMD64 と同じもの） |
+| `git-qa_0.2.0_arm64_en-US.msi` / `arm64-setup.exe` | **Windows（ARM64）** |
+| `git-qa_0.2.0_aarch64.dmg` | macOS（Apple Silicon） |
+
+配布ページも、x64 と ARM64 の入口を分けました。
 
 ## v0.2.0-beta.18 で入ったもの
 

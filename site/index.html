@@ -364,7 +364,7 @@
           <span class="size" id="size-mac"></span>
         </div>
         <div class="file">
-          <span class="os">Windows（x64）</span>
+          <span class="os">Windows（x64・Intel / AMD）</span>
           <span class="what">
             <code>.msi</code> で入れます。<b>ブラウザ・Android 端末・デスクトップアプリ</b>
             を見られます（<b>録画と、入力欄の一部は、まだ Windows にありません</b>）。
@@ -373,6 +373,16 @@
             .msi を落とす
           </a>
           <span class="size" id="size-win"></span>
+        </div>
+        <div class="file">
+          <span class="os">Windows（ARM64）</span>
+          <span class="what">
+            Snapdragon などの ARM の Windows 向けです。入れ方とできることは x64 と同じです。
+          </span>
+          <a class="get" id="dl-win-arm" href="https://github.com/meta-taro/git-qa/releases">
+            .msi を落とす
+          </a>
+          <span class="size" id="size-win-arm"></span>
         </div>
       </div>
       <div class="warn">
@@ -644,10 +654,16 @@ pnpm app</code></pre>
             'size-mac',
             探す((x) => x.name.endsWith('.dmg')),
           );
+          // **x64 と ARM64 を取り違えない。**名前に入っている形で選ぶ（最初の .msi を採ると、どちらかに当たる）。
           当てる(
             'dl-win',
             'size-win',
-            探す((x) => x.name.endsWith('.msi')),
+            探す((x) => x.name.endsWith('.msi') && x.name.includes('_x64')),
+          );
+          当てる(
+            'dl-win-arm',
+            'size-win-arm',
+            探す((x) => x.name.endsWith('.msi') && x.name.includes('_arm64')),
           );
         } catch (e) {
           // **黙って古い物を配らない。**読めなかったことを出す。
