@@ -93,6 +93,10 @@ const connect = (): Promise<TargetSession> => {
       toolPath,
       ...(target.device === undefined ? {} : { device: target.device }),
       ...(ocrPath === undefined ? {} : { ocrPath }),
+      // **押す口**（WebDriverAgent・C99）。無ければ見る・読むだけ。
+      ...(process.env['GIT_QA_IOS_WDA'] === undefined
+        ? {}
+        : { wdaUrl: process.env['GIT_QA_IOS_WDA'] }),
       build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
     }).connect();
   }

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { AdapterError } from '@git-qa/core';
 import type {
   Action,
+  ActReport,
   AdapterCapabilities,
   LiveView,
   Observation,
@@ -17,6 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { framesFrom, iosArgs, parseIosToolDevices, type IosDevice } from './tool.js';
+import { createWdaClient, pickByText, toPoints, type WdaClient } from './wda.js';
 
 /**
  * iPhone / iPad を **USB 越しに映して見る**アダプタ（2026-09-19・人の指示）。
@@ -29,7 +31,7 @@ import { framesFrom, iosArgs, parseIosToolDevices, type IosDevice } from './tool
  * |---|---|
  * | **見る** | ✅ USB で映す（端末に何も入れない） |
  * | **読む** | ✅ 絵から文字を読む（`git-qa-ocr`・C55 の段 2） |
- * | **押す** | ❌ **無い。**端末側に WebDriverAgent が要り、**署名が要る＝人の作業**（§14） |
+ * | **押す・打つ** | **WebDriverAgent の口を渡したときだけ**（`GIT_QA_IOS_WDA`・C99）。署名して端末へ入れ、起こすのは人の作業。**実機では未確認** |
  * | **録る** | ✅ 流れてくる絵をそのまま残せる（Android と違い、OS の録画を借りない） |
  *
  * **押せないことを黙らない。**`act` は理由を言って止まる ——
@@ -103,6 +105,79 @@ export interface IosAdapterOptions {
   /** 何を見に行ったか（シートの `行き先`・#22）。 */
   readonly destination?: string;
   readonly now?: () => Date;
+  /**
+   * **押す口**（WebDriverAgent の URL・例 `http://127.0.0.1:8100`・C99）。
+   * 署名して端末へ入れ、起こすのは人の作業。**無ければ、今までどおり見る・読むだけ。**
+   */
+  readonly wdaUrl?: string;
+}
+
+/**
+ * 名乗る能力。**押す口（WDA）があるときだけ、打てると名乗る**（C99）。
+ * 口が無いのに名乗ると、planning が「操作できる」つもりで回る（C20）。
+ */
+export function iosCapabilities(canPress: boolean): AdapterCapabilities {
+  return canPress ? { ...IOS_CAPABILITIES, textInput: 'any' } : IOS_CAPABILITIES;
+}
+
+/** `iosAct` が要るもの。**試験で差し替えられるように、撮る・読むを 1 つにまとめてある。** */
+export interface IosActDeps {
+  readonly wda: WdaClient | undefined;
+  /** いまの画面を撮って、絵から読んだ文字（`文字 \t x \t y \t 幅 \t 高さ`）を返す。 */
+  readonly look: () => Promise<string>;
+}
+
+/**
+ * **押す・打つを WebDriverAgent に頼む**（C99）。何をどう押したかを返す（証跡の手順に付く）。
+ *
+ * **口が無ければ、理由を言って止まる**（C20）。見つからない文字は押さない。
+ */
+export async function iosAct(action: Action, deps: IosActDeps): Promise<ActReport> {
+  const { wda } = deps;
+  if (wda === undefined) {
+    throw new AdapterError(
+      KIND,
+      `iPhone / iPad を操作する口が無い（${action.kind}）。WebDriverAgent を端末で起こし、` +
+        'GIT_QA_IOS_WDA にその URL を渡すと押せます。無いあいだは、人が端末を触り、git-qa が見て、人が判定を置いてください',
+    );
+  }
+
+  /** 押す点を、画素からポイントへ。文字なら絵から探す。 */
+  const aim = async (
+    target: Extract<Action, { kind: 'tap' }>['target'],
+  ): Promise<{ pt: { x: number; y: number }; label: string }> => {
+    const scale = await wda.scale();
+    if (target.at === 'point') {
+      return { pt: toPoints(target, scale), label: '座標' };
+    }
+    const found = pickByText(await deps.look(), target.ref);
+    if (found === undefined) {
+      throw new AdapterError(
+        KIND,
+        `画面に「${target.ref}」が見つからない（絵から読んだ文字で探した）`,
+      );
+    }
+    return { pt: toPoints(found, scale), label: `「${target.ref}」` };
+  };
+  const at = (pt: { x: number; y: number }): string =>
+    `（${String(Math.round(pt.x))}, ${String(Math.round(pt.y))}）`;
+
+  if (action.kind === 'tap') {
+    const { pt, label } = await aim(action.target);
+    await wda.tap(pt);
+    return { detail: `${label}を WebDriverAgent で押した${at(pt)}` };
+  }
+
+  if (action.kind === 'type') {
+    if (action.target !== undefined) {
+      const { pt } = await aim(action.target);
+      await wda.tap(pt);
+    }
+    await wda.type(action.text);
+    return { detail: '焦点の欄へ WebDriverAgent で打った' };
+  }
+
+  throw new AdapterError(KIND, `iPhone / iPad には、まだ送れない操作（${action.kind}）`);
 }
 
 const runTool = (toolPath: string, args: readonly string[]): Promise<string> =>
@@ -133,7 +208,7 @@ export function createIosAdapter(options: IosAdapterOptions): TargetAdapter {
 
   return {
     kind: KIND,
-    capabilities: IOS_CAPABILITIES,
+    capabilities: iosCapabilities(options.wdaUrl !== undefined),
     async connect(): Promise<TargetSession> {
       const devices = await listIosDevices(options.toolPath);
       const device =
@@ -159,6 +234,7 @@ interface SessionDeps extends Omit<IosAdapterOptions, 'device'> {
 }
 
 function createIosSession(deps: SessionDeps): TargetSession {
+  const wda = deps.wdaUrl === undefined ? undefined : createWdaClient(deps.wdaUrl);
   let closed = false;
   let liveOpen = false;
   let streaming: ChildProcess | undefined;
@@ -264,22 +340,16 @@ function createIosSession(deps: SessionDeps): TargetSession {
       return closed;
     },
 
-    act(action: Action): Promise<void> {
-      /**
-       * **押せないことを黙らない**（C20）。
-       *
-       * iOS を押すには端末側に WebDriverAgent が要り、**それを入れるには署名が要る**
-       * （秘密情報の投入は人の作業・§14）。**入っていないものを「できる」と言わない。**
-       *
-       * ここで理由を言えば、planning の段で**「人が操作する」に倒せる。**
-       */
-      return Promise.reject(
-        new AdapterError(
-          KIND,
-          `iPhone / iPad を操作する口はまだ無い（${action.kind}）。` +
-            '見る・読むだけできます。人が端末を触り、git-qa が見て、人が判定を置いてください',
-        ),
-      );
+    /**
+     * **押す・打つは WebDriverAgent に頼む**（C99）。口が無ければ理由を言って止まる（C20）。
+     * 押す口を持つまでは、ここで止めて planning を「人が操作する」に倒していた。
+     */
+    act(action: Action): Promise<ActReport> {
+      ensureOpen();
+      return iosAct(action, {
+        wda,
+        look: async () => readText((await shoot()).bytes),
+      });
     },
 
     async observe(): Promise<Observation> {

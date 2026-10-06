@@ -82,6 +82,8 @@ const adapter = createIosAdapter({
   toolPath,
   ...(wanted === undefined ? {} : { device: wanted }),
   ...(ocrPath === undefined ? {} : { ocrPath }),
+  // **押す口**（WebDriverAgent・C99）。人が端末で起こし、その URL を渡す。無ければ見る・読むだけ。
+  ...(process.env['GIT_QA_IOS_WDA'] === undefined ? {} : { wdaUrl: process.env['GIT_QA_IOS_WDA'] }),
   build: {
     source: sheetSubject(sheet.meta) ?? sheetDestination(sheet.meta) ?? 'ios',
     label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
