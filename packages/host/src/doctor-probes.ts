@@ -152,9 +152,56 @@ const iphone = async (): Promise<ProbeResult> => {
     detail:
       devices.length === 0
         ? '実機はつながっていない（挿して「このコンピュータを信頼」→ pnpm run:sheet:ios）'
-        : `${devices.join(' / ')}（pnpm run:sheet:ios。**自動ロックは「なし」に**。押す口はまだ無いので、端末は人が触ります）`,
+        : `${devices.join(' / ')}（pnpm run:sheet:ios。**自動ロックは「なし」に**。押すには下の「押す口」が要ります）`,
   };
 };
+
+/** `fetch` の要る所だけ（試験で差し替える）。 */
+type ProbeFetch = (url: string) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+
+/**
+ * **iPhone / iPad を押す口（WebDriverAgent）が生きているか**（C99）。
+ *
+ * 口を起こすのは人の作業（署名・端末への導入）。**渡されていない・届かない・生きている**を分けて言う。
+ * 渡されていないのは欠けではない（見る・読むだけなら要らない）ので `skip`。
+ */
+export async function iosPressProbe(
+  url: string | undefined,
+  fetchImpl: ProbeFetch = fetch,
+): Promise<ProbeResult> {
+  const name = 'iPhone を押す口';
+  if (url === undefined) {
+    return {
+      name,
+      state: 'skip',
+      detail:
+        'GIT_QA_IOS_WDA が渡されていない（押さずに見るだけなら要りません。起こし方は docs/ios-press.md）',
+    };
+  }
+  try {
+    const res = await fetchImpl(`${url.replace(/\/+$/, '')}/status`);
+    const said = (await res.json()) as {
+      value?: { ready?: boolean; build?: { version?: string }; os?: { version?: string } };
+    };
+    const v = said.value;
+    if (!res.ok || v?.ready === false) {
+      return { name, state: 'missing', detail: `${url} は返事をしたが、まだ使えない状態` };
+    }
+    return {
+      name,
+      state: 'ok',
+      detail: `WebDriverAgent ${v?.build?.version ?? '?'}・端末 iOS ${v?.os?.version ?? '?'}（${url}）`,
+    };
+  } catch (error: unknown) {
+    return {
+      name,
+      state: 'missing',
+      detail:
+        `${url} に届かない（${error instanceof Error ? error.message : String(error)}）。` +
+        '端末で WebDriverAgent が起きているか、Mac と端末が同じ網にいるかを見てください',
+    };
+  }
+}
 
 /**
  * 建てた道具が在るか。
@@ -224,14 +271,10 @@ export const PROBES: readonly Probe[] = [
   { pillar: '見る', run: browsers },
   { pillar: '見る', run: otherBrowsers },
   { pillar: '見る', run: iphone },
+  { pillar: '押す', run: () => iosPressProbe(process.env['GIT_QA_IOS_WDA']) },
   {
     pillar: '見る',
-    run: tool(
-      'git-qa-ios（iPhone / iPad）',
-      findIos,
-      'macOS でだけ建ちます。押す口はまだありません',
-      ['darwin'],
-    ),
+    run: tool('git-qa-ios（iPhone / iPad）', findIos, 'macOS でだけ建ちます', ['darwin']),
   },
   {
     pillar: '読む',
