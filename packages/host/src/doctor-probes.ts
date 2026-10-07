@@ -129,10 +129,15 @@ const browsers = async (): Promise<ProbeResult> => {
  */
 const iphone = async (): Promise<ProbeResult> => {
   if (process.platform !== 'darwin') {
+    /**
+     * **USB で数える道具は macOS だけ。**ほかの OS は、押す口（WebDriverAgent）から見る（2026-10-07）。
+     * 口が生きているかは下の「押す口」が言う。
+     */
     return {
       name: 'iPhone',
-      state: 'missing',
-      detail: 'この OS では見に行きません（Windows から iOS は未測定・issues/001）',
+      state: 'skip',
+      detail:
+        'この OS では USB で数えません。GIT_QA_IOS_WDA に WebDriverAgent の口を渡せば、映像も絵も口から取ります（未実測・docs/ios-press.md）',
     };
   }
   const said = await ask('xcrun', ['devicectl', 'list', 'devices']);

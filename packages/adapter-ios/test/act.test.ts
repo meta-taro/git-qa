@@ -21,6 +21,7 @@ const fake = (scale = 3) => {
       return Promise.resolve();
     },
     screenshot: () => Promise.resolve(new Uint8Array()),
+    info: () => Promise.resolve({ model: 'iPhone', osVersion: '17.5.1', id: 'X' }),
     launch: (bundleId) => {
       done.push(`launch ${bundleId}`);
       return Promise.resolve();

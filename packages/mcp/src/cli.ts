@@ -47,8 +47,13 @@ const run = promisify(execFile);
 const target = mcpTargetFrom(process.env);
 const label = process.env['GIT_QA_APP_LABEL'] ?? 'dev';
 
-/** iPhone / iPad を映す道具と、絵から文字を読む道具。**無ければ、その相手は見られない。** */
-const toolPath = target.kind === 'ios' ? await findIosTool() : undefined;
+/**
+ * iPhone / iPad を映す道具と、絵から文字を読む道具。
+ * **映す道具が無くても、押す口（WebDriverAgent）があれば、絵も口から取る**（2026-10-07・Windows 向け）。
+ */
+const wdaUrl = process.env['GIT_QA_IOS_WDA'];
+const onlyWda = wdaUrl !== undefined && process.env['GIT_QA_IOS_ONLY_WDA'] === '1';
+const toolPath = target.kind === 'ios' && !onlyWda ? await findIosTool() : undefined;
 const ocrPath = target.kind === 'ios' ? await findOcrTool() : undefined;
 
 const connect = (): Promise<TargetSession> => {
@@ -79,24 +84,22 @@ const connect = (): Promise<TargetSession> => {
 
   if (target.kind === 'ios') {
     /**
-     * iPhone / iPad（2026-09-19・C75）。**押す口は無い。**
+     * iPhone / iPad（2026-09-19・C75 / C99）。
      *
-     * **道具が無ければ、見ることもできない**（`git-qa-ocr` と違い代わりの道が無い）ので、
-     * ここで理由を言って止まる。
+     * **映す道具も押す口も無ければ、見ることもできない**ので、ここで理由を言って止まる。
      */
-    if (toolPath === undefined) {
+    if (toolPath === undefined && wdaUrl === undefined) {
       throw new Error(
-        'iPhone / iPad を映す道具が無い（macOS で pnpm build すると建ちます）。場所を渡すなら GIT_QA_IOS',
+        'iPhone / iPad を映す道具が無い（macOS で pnpm build すると建ちます）。場所を渡すなら GIT_QA_IOS。' +
+          'ほかの OS なら WebDriverAgent を起こして GIT_QA_IOS_WDA に URL を（docs/ios-press.md）',
       );
     }
     return createIosAdapter({
-      toolPath,
+      ...(toolPath === undefined ? {} : { toolPath }),
       ...(target.device === undefined ? {} : { device: target.device }),
       ...(ocrPath === undefined ? {} : { ocrPath }),
       // **押す口**（WebDriverAgent・C99）。無ければ見る・読むだけ。
-      ...(process.env['GIT_QA_IOS_WDA'] === undefined
-        ? {}
-        : { wdaUrl: process.env['GIT_QA_IOS_WDA'] }),
+      ...(wdaUrl === undefined ? {} : { wdaUrl }),
       build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
     }).connect();
   }

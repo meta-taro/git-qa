@@ -28,6 +28,8 @@ export interface WdaClient {
    * 10 秒以上見えなくなり、手順ごとに撮ると必ず落ちた。
    */
   screenshot(): Promise<Uint8Array>;
+  /** 端末の機種・iOS の版・識別子。**名前は返さない**（人が付けるので個人名が入る）。 */
+  info(): Promise<{ model: string; osVersion: string; id: string }>;
   /** 識別子（Bundle ID）でアプリを起動する。 */
   launch(bundleId: string): Promise<void>;
   /** ホーム画面へ戻る。 */
@@ -143,6 +145,18 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
 
     async type(text) {
       await inSession('POST', '/wda/keys', { value: [...text] });
+    },
+
+    async info() {
+      const device = (await call('GET', '/wda/device/info')) as {
+        value?: { model?: string; uuid?: string };
+      };
+      const status = (await call('GET', '/status')) as { value?: { os?: { version?: string } } };
+      return {
+        model: device.value?.model ?? 'iPhone',
+        osVersion: status.value?.os?.version ?? '?',
+        id: device.value?.uuid ?? '',
+      };
     },
 
     async launch(bundleId) {

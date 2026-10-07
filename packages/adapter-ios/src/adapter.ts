@@ -19,6 +19,7 @@ import type {
 
 import { framesFrom, iosArgs, parseIosToolDevices, type IosDevice } from './tool.js';
 import { createWdaClient, pickByText, toPoints, type WdaClient } from './wda.js';
+import { encodeFrames, mjpegFrames } from './frames.js';
 
 /**
  * iPhone / iPad を **USB 越しに映して見る**アダプタ（2026-09-19・人の指示）。
@@ -95,8 +96,11 @@ export const IOS_CAPABILITIES: AdapterCapabilities = {
 };
 
 export interface IosAdapterOptions {
-  /** `git-qa-ios` の場所。**無ければ、この相手は見られない。** */
-  readonly toolPath: string;
+  /**
+   * `git-qa-ios`（USB で映す道具・macOS だけ）の場所。
+   * **無くても、押す口（`wdaUrl`）があれば WebDriverAgent だけで動く**（Windows など・2026-10-07）。
+   */
+  readonly toolPath?: string;
   readonly build: TargetBuild;
   /** 端末の識別子。**省くと、最初に見つかったもの。** */
   readonly device?: string;
@@ -110,6 +114,41 @@ export interface IosAdapterOptions {
    * 署名して端末へ入れ、起こすのは人の作業。**無ければ、今までどおり見る・読むだけ。**
    */
   readonly wdaUrl?: string;
+  /** 映像の口（WDA の MJPEG）。省くと `wdaUrl` と同じ宛先の 9100 番。 */
+  readonly wdaMjpegUrl?: string;
+  /** 試験で差し替える：WDA との話し方。 */
+  readonly wda?: WdaClient;
+  /** 試験で差し替える：映像の口を開く。 */
+  readonly openStream?: (url: string) => AsyncIterable<Uint8Array>;
+}
+
+/** WDA の映像の口（MJPEG）の既定の宛先。**同じ宛先の 9100 番**（WebDriverAgent の既定）。 */
+export function wdaMjpegUrl(wdaUrl: string): string {
+  const url = new URL(wdaUrl);
+  url.port = '9100';
+  url.pathname = '/';
+  return url.toString();
+}
+
+/** 映像の口を開いて、届くバイト列をそのまま流す。`stop` で切る。 */
+async function* openHttpStream(url: string, stop: AbortSignal): AsyncIterable<Uint8Array> {
+  const res = await fetch(url, { signal: stop });
+  if (!res.ok || res.body === null) {
+    throw new AdapterError(
+      KIND,
+      `WebDriverAgent の映像の口が開かない（${String(res.status)} ${url}）`,
+    );
+  }
+  const reader: ReadableStreamDefaultReader<Uint8Array> = res.body.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      yield value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /** 識別子（Bundle ID）の形。**名前（「設定」）は通さない。** */
@@ -279,7 +318,35 @@ export function createIosAdapter(options: IosAdapterOptions): TargetAdapter {
     kind: KIND,
     capabilities: iosCapabilities(options.wdaUrl !== undefined),
     async connect(): Promise<TargetSession> {
-      const devices = await listIosDevices(options.toolPath);
+      /**
+       * **USB の道具が無ければ、WebDriverAgent だけで繋ぐ**（2026-10-07・Windows から iPhone を扱うため）。
+       * 一覧は取らず、口に端末の情報を聞く。**名前は残さない**（人が付けるので個人名が入る）。
+       */
+      if (options.toolPath === undefined) {
+        if (options.wdaUrl === undefined) {
+          throw new AdapterError(
+            KIND,
+            'iPhone / iPad に繋ぐ道が無い。macOS なら git-qa-ios（pnpm build で建つ）、' +
+              'ほかの OS なら WebDriverAgent を起こして GIT_QA_IOS_WDA にその URL を渡してください（docs/ios-press.md）',
+          );
+        }
+        const client = options.wda ?? createWdaClient(options.wdaUrl);
+        if (!(await client.ready())) {
+          throw new AdapterError(
+            KIND,
+            `WebDriverAgent に届かない（${options.wdaUrl}）。端末で起きているか、同じ網にいるかを見てください`,
+          );
+        }
+        const info = await client.info();
+        const device: IosDevice = {
+          id: info.id,
+          name: info.model,
+          model: `${info.model}（iOS ${info.osVersion}）`,
+        };
+        return createIosSession({ ...options, device, now, wdaClient: client });
+      }
+      const toolPath = options.toolPath;
+      const devices = await listIosDevices(toolPath);
       const device =
         options.device === undefined
           ? devices[0]
@@ -292,7 +359,7 @@ export function createIosAdapter(options: IosAdapterOptions): TargetAdapter {
             : `その端末が見つからない: ${String(options.device)}`,
         );
       }
-      return createIosSession({ ...options, device, now });
+      return createIosSession({ ...options, device, now, wdaClient: options.wda });
     },
   };
 }
@@ -300,10 +367,14 @@ export function createIosAdapter(options: IosAdapterOptions): TargetAdapter {
 interface SessionDeps extends Omit<IosAdapterOptions, 'device'> {
   readonly device: IosDevice;
   readonly now: () => Date;
+  readonly wdaClient?: WdaClient | undefined;
 }
 
 function createIosSession(deps: SessionDeps): TargetSession {
-  const wda = deps.wdaUrl === undefined ? undefined : createWdaClient(deps.wdaUrl);
+  const wda =
+    deps.wdaClient ?? (deps.wdaUrl === undefined ? undefined : createWdaClient(deps.wdaUrl));
+  /** 映像の口を切るため（WDA だけで動くとき）。 */
+  let streamStop: AbortController | undefined;
   let closed = false;
   let liveOpen = false;
   let streaming: ChildProcess | undefined;
@@ -322,6 +393,10 @@ function createIosSession(deps: SessionDeps): TargetSession {
      */
     if (wda !== undefined) {
       return { format: 'png', bytes: await wda.screenshot(), capturedAt: deps.now().toISOString() };
+    }
+    if (deps.toolPath === undefined) {
+      // 繋ぐときに口が要るので、ふつうはここへ来ない。来たら、来た理由を言う。
+      throw new AdapterError(KIND, '画面を撮る道が無い（USB の道具も WebDriverAgent も無い）');
     }
     const dir = await mkdtemp(join(tmpdir(), 'git-qa-ios-'));
     const path = join(dir, 'screen.jpg');
@@ -361,7 +436,11 @@ function createIosSession(deps: SessionDeps): TargetSession {
       return liveOpen;
     },
     // **ウェブと同じ道に乗せる**（C54）。画面側は既に JPEG の並びを描ける。
-    transport: { kind: 'image-frames', label: 'ios usb capture', mimeType: 'image/jpeg' },
+    transport: {
+      kind: 'image-frames',
+      label: deps.toolPath === undefined ? 'ios webdriveragent mjpeg' : 'ios usb capture',
+      mimeType: 'image/jpeg',
+    },
     open() {
       ensureOpen();
       liveOpen = true;
@@ -371,12 +450,25 @@ function createIosSession(deps: SessionDeps): TargetSession {
       liveOpen = false;
       streaming?.kill('SIGTERM');
       streaming = undefined;
+      streamStop?.abort();
+      streamStop = undefined;
       return Promise.resolve();
     },
     frames() {
       if (!liveOpen) {
         // 開く前に読もうとしている。**空を返すと「映像が来ない」に化ける。**
         throw new AdapterError(KIND, '映像を出す準備ができていない（ライブビューを開く前）');
+      }
+      /**
+       * **画面が読める形（長さで包む）で流す**（2026-10-07）。
+       * 前は JPEG をそのまま流していて、**アプリの画面では映らなかった**。
+       */
+      if (deps.toolPath === undefined) {
+        // **WebDriverAgent だけで動くとき**は、映像の口（MJPEG・網越し）から読む。
+        const url = deps.wdaMjpegUrl ?? wdaMjpegUrl(deps.wdaUrl ?? '');
+        streamStop = new AbortController();
+        const source = deps.openStream?.(url) ?? openHttpStream(url, streamStop.signal);
+        return encodeFrames(mjpegFrames(source));
       }
       const child = spawn(deps.toolPath, iosArgs.stream(deps.device.id), {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -386,7 +478,7 @@ function createIosSession(deps: SessionDeps): TargetSession {
       child.stderr?.on('data', (chunk: Buffer) => {
         process.stderr.write(`[git-qa-ios] ${chunk.toString()}`);
       });
-      return framesFrom(child.stdout as AsyncIterable<Uint8Array>);
+      return encodeFrames(framesFrom(child.stdout as AsyncIterable<Uint8Array>));
     },
   };
 

@@ -26,10 +26,8 @@ import { installSaveOnExit } from './save-on-exit.js';
  *
  * Android と同じく、iPhone / iPad でも検証を録画できるようにする。
  *
- * **押す口はまだ無い。**端末側に WebDriverAgent が要り、署名が要る＝人の作業（§14）。
- * **人が端末を触り、git-qa が見て、人が判定を置く**形になる（#30 / #35 と同じ分担）。
- *
- * **まだ実機で 1 度も流していない**（2026-09-19・C56）。
+ * **押すには WebDriverAgent の口が要る**（C99）。署名して端末へ入れるのは人の作業（§14）。
+ * 口が無ければ、**人が端末を触り、git-qa が見て、人が判定を置く**形になる（#30 / #35 と同じ分担）。
  *
  * **ここは配線なので検査していない。**判断のある所は `@git-qa/adapter-ios` にある。
  */
@@ -40,11 +38,17 @@ if (sheetPath === undefined) {
   process.exit(1);
 }
 
-const toolPath = await findIos();
-if (toolPath === undefined) {
+const wdaUrl = process.env['GIT_QA_IOS_WDA'];
+/**
+ * **USB の道具が無くても、押す口（WebDriverAgent）があれば WDA だけで動く**（2026-10-07）。
+ * Windows では USB の道具が建たない。`GIT_QA_IOS_ONLY_WDA=1` で、macOS でもこの形を試せる。
+ */
+const onlyWda = wdaUrl !== undefined && process.env['GIT_QA_IOS_ONLY_WDA'] === '1';
+const toolPath = onlyWda ? undefined : await findIos();
+if (toolPath === undefined && wdaUrl === undefined) {
   console.error(
     '[git-qa] iPhone / iPad を映す道具が無い（macOS で pnpm build すると建ちます）。' +
-      '場所を渡すなら GIT_QA_IOS',
+      '場所を渡すなら GIT_QA_IOS。ほかの OS なら WebDriverAgent を起こして GIT_QA_IOS_WDA に URL を（docs/ios-press.md）',
   );
   process.exit(1);
 }
@@ -60,15 +64,18 @@ if (duplicated !== undefined) {
   process.exit(1);
 }
 
-/** **繋がっている端末を先に数える。**0 台なら、理由を出して止まる。 */
-const devices = await listIosDevices(toolPath).catch((error: unknown) => {
-  console.error(
-    `[git-qa] 端末を数えられない: ${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exit(1);
-});
+/** **繋がっている端末を先に数える**（USB の道具があるときだけ）。0 台なら、理由を出して止まる。 */
+const devices =
+  toolPath === undefined
+    ? undefined
+    : await listIosDevices(toolPath).catch((error: unknown) => {
+        console.error(
+          `[git-qa] 端末を数えられない: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exit(1);
+      });
 
-if (devices.length === 0) {
+if (devices !== undefined && devices.length === 0) {
   console.error(
     '[git-qa] 映せる端末が無い（USB で繋ぎ、端末側で「このコンピュータを信頼」を済ませてください）',
   );
@@ -79,11 +86,11 @@ const wanted = positional(process.argv, 1) ?? process.env['GIT_QA_IOS_DEVICE'];
 const ocrPath = await findOcr();
 
 const adapter = createIosAdapter({
-  toolPath,
+  ...(toolPath === undefined ? {} : { toolPath }),
   ...(wanted === undefined ? {} : { device: wanted }),
   ...(ocrPath === undefined ? {} : { ocrPath }),
   // **押す口**（WebDriverAgent・C99）。人が端末で起こし、その URL を渡す。無ければ見る・読むだけ。
-  ...(process.env['GIT_QA_IOS_WDA'] === undefined ? {} : { wdaUrl: process.env['GIT_QA_IOS_WDA'] }),
+  ...(wdaUrl === undefined ? {} : { wdaUrl }),
   build: {
     source: sheetSubject(sheet.meta) ?? sheetDestination(sheet.meta) ?? 'ios',
     label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
@@ -136,9 +143,13 @@ const session = await startRunSession({
 });
 
 console.log(
-  `[git-qa] 見る端末: ${devices[0]?.model ?? '不明'}${ocrPath === undefined ? '（文字は読めません）' : ''}`,
+  `[git-qa] 見る端末: ${devices?.[0]?.model ?? (toolPath === undefined ? 'WebDriverAgent の先' : '不明')}${ocrPath === undefined ? '（文字は読めません）' : ''}`,
 );
-console.log('[git-qa] **押す口はありません。**端末はご自身で触ってください');
+console.log(
+  wdaUrl === undefined
+    ? '[git-qa] **押す口はありません。**端末はご自身で触ってください'
+    : `[git-qa] 押す口: ${wdaUrl}${toolPath === undefined ? '（映像も WebDriverAgent から）' : ''}`,
+);
 console.log(`[git-qa] ライブ映像の橋: ${session.liveUrl}`);
 console.log(`[git-qa] 画面で ${verdictKeyHint()}`);
 
