@@ -4,10 +4,11 @@
 
 [日本語版はこちら / Japanese](./README.ja.md) · [Download](https://meta-taro.github.io/git-qa/)
 
-![git-qa running a test sheet: cases on the left, the live screen in the middle, one-key verdicts on the right](./site/screenshot.png)
+![git-qa running a test sheet: cases on the left, the live screen in the middle with the AI pointing at what it found, one-key verdicts on the right](./docs/images/run.png)
 
-*Left: the cases in your test sheet. Middle: the device, browser or app, live, while the AI drives it.
-Right: one key per verdict — `D` pass, `F` fail. Your name goes into the evidence when you press it.*
+*Left: the cases in your test sheet. Middle: the page, device or app, live, while the AI drives it —
+the red marker is where it found the expected text. Right: one key per verdict — `D` pass, `F` fail.
+Your handle goes into the evidence when you press it. (The UI is shown in Japanese; it also speaks English.)*
 
 ## When you would reach for it
 
@@ -32,6 +33,12 @@ in the morning you review the failures. **The pass is still yours to give.**
 2. Open git-qa. Enter a handle (it goes into the evidence as "who looked"), pick what to look at —
    an `adb` device, a web page URL, or a desktop app by name — and a test sheet
 3. Start, watch, and press `D` / `F` per case
+
+![Picking what to look at: a web page URL, a desktop app by name, or an adb device](./docs/images/setup-target.png)
+
+A run, case by case — the AI runs each step, you press `D`, the case turns `VERIFIED / qa` and the next one starts:
+
+![A run: case 1 verified, case 2 verified, case 3 where the AI pressed the button and found the result](./docs/images/flow.gif)
 
 A test sheet is a TSV you can write in any spreadsheet — samples are in [`sheets/`](./sheets/).
 From source instead: `git clone … && pnpm install && pnpm app` (see [Install](#install)).
