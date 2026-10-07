@@ -176,3 +176,25 @@ describe('createWdaClient — 画面の絵', () => {
     expect([...got]).toEqual([...png]);
   });
 });
+
+describe('createWdaClient — 起動とホーム', () => {
+  it('識別子でアプリを起動する', async () => {
+    const { sent, fetchImpl } = fakeWda();
+    const wda = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+
+    await wda.launch('com.apple.Preferences');
+
+    expect(sent.find((one) => one.path === '/session/S1/wda/apps/launch')?.body).toEqual({
+      bundleId: 'com.apple.Preferences',
+    });
+  });
+
+  it('ホーム画面へ戻る', async () => {
+    const { sent, fetchImpl } = fakeWda();
+    const wda = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+
+    await wda.home();
+
+    expect(sent.some((one) => one.path === '/wda/homescreen' && one.method === 'POST')).toBe(true);
+  });
+});

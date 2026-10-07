@@ -28,6 +28,10 @@ export interface WdaClient {
    * 10 秒以上見えなくなり、手順ごとに撮ると必ず落ちた。
    */
   screenshot(): Promise<Uint8Array>;
+  /** 識別子（Bundle ID）でアプリを起動する。 */
+  launch(bundleId: string): Promise<void>;
+  /** ホーム画面へ戻る。 */
+  home(): Promise<void>;
   /** なぞる（ポイントの座標で・`durationMs` かけて動かす）。 */
   swipe(
     from: { x: number; y: number },
@@ -139,6 +143,14 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
 
     async type(text) {
       await inSession('POST', '/wda/keys', { value: [...text] });
+    },
+
+    async launch(bundleId) {
+      await inSession('POST', '/wda/apps/launch', { bundleId });
+    },
+
+    async home() {
+      await call('POST', '/wda/homescreen');
     },
 
     async screenshot() {

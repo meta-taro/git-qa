@@ -112,12 +112,18 @@ export interface IosAdapterOptions {
   readonly wdaUrl?: string;
 }
 
+/** 識別子（Bundle ID）の形。**名前（「設定」）は通さない。** */
+const BUNDLE_ID = /^[a-zA-Z][a-zA-Z0-9-]*(?:\.[a-zA-Z0-9-]+)+$/;
+
 /**
  * 名乗る能力。**押す口（WDA）があるときだけ、打てると名乗る**（C99）。
  * 口が無いのに名乗ると、planning が「操作できる」つもりで回る（C20）。
  */
 export function iosCapabilities(canPress: boolean): AdapterCapabilities {
-  return canPress ? { ...IOS_CAPABILITIES, textInput: 'any' } : IOS_CAPABILITIES;
+  // 口があれば、打てる・キー（Enter / Home）を送れる・**識別子（Bundle ID）で開ける**。
+  return canPress
+    ? { ...IOS_CAPABILITIES, textInput: 'any', keyInput: true, appId: 'package-or-url' }
+    : IOS_CAPABILITIES;
 }
 
 /** `iosAct` が要るもの。**試験で差し替えられるように、撮る・読むを 1 つにまとめてある。** */
@@ -175,6 +181,39 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     }
     await wda.type(action.text);
     return { detail: '焦点の欄へ WebDriverAgent で打った' };
+  }
+
+  /**
+   * **識別子（Bundle ID）で起動する**（例 `com.apple.Preferences`）。
+   * 名前（「設定」）から当てにいかない —— 端末と地域で名前が変わり、別のアプリを起こしかねない（C40）。
+   */
+  if (action.kind === 'launch') {
+    if (!BUNDLE_ID.test(action.app)) {
+      throw new AdapterError(
+        KIND,
+        `「${action.app}」は識別子（Bundle ID・例 com.apple.Preferences）ではないので起動しない。` +
+          'シートの「# 行き先:」に識別子を書いてください',
+      );
+    }
+    await wda.launch(action.app);
+    return { detail: `${action.app} を WebDriverAgent で起動した` };
+  }
+
+  /** キー。**iOS には物のキーが無い**ので、Enter は改行として打ち、Home はホーム画面へ戻る。 */
+  if (action.kind === 'key') {
+    const key = action.key.trim().toLowerCase();
+    if (key === 'enter' || key === 'return') {
+      await wda.type('\n');
+      return { detail: 'Enter を改行として WebDriverAgent で打った' };
+    }
+    if (key === 'home' || key === 'ホーム') {
+      await wda.home();
+      return { detail: 'WebDriverAgent でホーム画面へ戻った' };
+    }
+    throw new AdapterError(
+      KIND,
+      `iPhone / iPad には送れないキー（${action.key}）。送れるのは Enter と Home だけ`,
+    );
   }
 
   if (action.kind === 'swipe') {

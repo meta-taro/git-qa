@@ -21,6 +21,14 @@ const fake = (scale = 3) => {
       return Promise.resolve();
     },
     screenshot: () => Promise.resolve(new Uint8Array()),
+    launch: (bundleId) => {
+      done.push(`launch ${bundleId}`);
+      return Promise.resolve();
+    },
+    home: () => {
+      done.push('home');
+      return Promise.resolve();
+    },
     swipe: (from, to, ms) => {
       done.push(
         `swipe ${String(from.x)},${String(from.y)}→${String(to.x)},${String(to.y)} ${String(ms)}ms`,
@@ -39,8 +47,11 @@ describe('iosCapabilities', () => {
   it('口が無ければ、押せない・打てないと名乗る', () => {
     expect(iosCapabilities(false).textInput).toBe('none');
   });
-  it('口があれば、打てると名乗る', () => {
-    expect(iosCapabilities(true).textInput).toBe('any');
+  it('口があれば、打てる・キーを送れる・識別子で開けると名乗る', () => {
+    const can = iosCapabilities(true);
+    expect(can.textInput).toBe('any');
+    expect(can.keyInput).toBe(true);
+    expect(can.appId).toBe('package-or-url');
   });
 });
 
@@ -105,9 +116,47 @@ describe('iosAct', () => {
     expect(done).toEqual(['swipe 180,600→180,250 300ms']);
   });
 
+  /** **識別子（Bundle ID）で起動する**（2026-10-07）。名前から当てにいかない（C40）。 */
+  it('アプリを識別子で起動する', async () => {
+    const { done, deps } = fake();
+
+    const report = await iosAct({ kind: 'launch', app: 'com.apple.Preferences' }, deps);
+
+    expect(done).toEqual(['launch com.apple.Preferences']);
+    expect(report.detail).toContain('com.apple.Preferences');
+  });
+
+  it('識別子でない名前では起動しない（当てずっぽうで起こさない）', async () => {
+    const { done, deps } = fake();
+
+    await expect(iosAct({ kind: 'launch', app: '設定' }, deps)).rejects.toThrow(/識別子/);
+    expect(done).toEqual([]);
+  });
+
+  it('Enter キーは改行として打ち、Home キーはホーム画面へ戻る', async () => {
+    const { done, deps } = fake();
+
+    await iosAct({ kind: 'key', key: 'Enter' }, deps);
+    await iosAct({ kind: 'key', key: 'Home' }, deps);
+
+    expect(done).toEqual(['type \n', 'home']);
+  });
+
+  it('知らないキーは送らない（別の文字を打たない）', async () => {
+    const { done, deps } = fake();
+
+    await expect(iosAct({ kind: 'key', key: 'F5' }, deps)).rejects.toThrow(/送れないキー/);
+    expect(done).toEqual([]);
+  });
+
   it('まだ持たない操作は、そう言って止まる', async () => {
     const { deps } = fake();
 
-    await expect(iosAct({ kind: 'key', key: 'Enter' }, deps)).rejects.toThrow(/まだ送れない/);
+    await expect(
+      iosAct(
+        { kind: 'drag', from: { at: 'point', x: 1, y: 1 }, to: { at: 'point', x: 2, y: 2 } },
+        deps,
+      ),
+    ).rejects.toThrow(/まだ送れない/);
   });
 });
