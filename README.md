@@ -1,8 +1,42 @@
 # git-qa
 
-**A QA runner where the AI drives and a human signs off.**
+**Your test sheet runs itself. You watch, and sign off each case with one key.**
 
 [日本語版はこちら / Japanese](./README.ja.md) · [Download](https://meta-taro.github.io/git-qa/)
+
+![git-qa running a test sheet: cases on the left, the live screen in the middle, one-key verdicts on the right](./site/screenshot.png)
+
+*Left: the cases in your test sheet. Middle: the device, browser or app, live, while the AI drives it.
+Right: one key per verdict — `D` pass, `F` fail. Your name goes into the evidence when you press it.*
+
+## When you would reach for it
+
+**The release check nobody wants to click through again.**
+You have a 30-row regression sheet for an Android app, a web page and a desktop app.
+Instead of tapping through it by hand, the AI follows the sheet while you watch the live view
+and press a key per case. You only stop to look closely where something changed or failed.
+
+**"Who actually checked this?"**
+A client, an auditor or your own team asks after an incident. The evidence answers:
+each case says `VERIFIED` (a person looked and signed) or `AUTO_PASS` (the AI passed it, nobody looked),
+with the name, the time, and the screen at that moment.
+
+**An AI agent built the feature — now it should check it, on a real device.**
+Over MCP, Claude Code (or any agent) can screenshot, read the screen, list what can be pressed and tap it,
+on Android, web, desktop or iPhone. It can run the sheet unattended overnight (`--no-ui`);
+in the morning you review the failures. **The pass is still yours to give.**
+
+## Try it
+
+1. Download the app from the [distribution page](https://meta-taro.github.io/git-qa/) (macOS, Windows x64 / ARM64) and install **Node 22+**
+2. Open git-qa. Enter a handle (it goes into the evidence as "who looked"), pick what to look at —
+   an `adb` device, a web page URL, or a desktop app by name — and a test sheet
+3. Start, watch, and press `D` / `F` per case
+
+A test sheet is a TSV you can write in any spreadsheet — samples are in [`sheets/`](./sheets/).
+From source instead: `git clone … && pnpm install && pnpm app` (see [Install](#install)).
+
+## Why it is built this way
 
 This is *not* a tool for handing verification to an AI and letting it say
 "everything passed." When something ships broken, the person is accountable —
@@ -14,7 +48,7 @@ So git-qa splits the work:
 - **The human watches, and places the verdict** with a single keystroke
 - **The evidence records who saw what**, and when
 
-## The vocabulary is the point
+### The vocabulary is the point
 
 | Value | Meaning |
 |---|---|
@@ -39,8 +73,8 @@ tool that exists to save effort expensive to use.
 | **Android devices** | Real devices and emulators over `adb` — tap, swipe, type |
 | **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare |
 | **Desktop apps** | macOS (Accessibility + Vision OCR) and Windows (UI Automation) |
-| **iPhone / iPad** | Mirrored over USB — watch, read, record. **No tapping** (that needs an app signed onto the device). **Not yet tried on a real device** |
-| **Mobile browsers** | Android Chrome over `adb forward` + CDP. iOS Safari by mirroring the screen. **Not yet tried** |
+| **iPhone / iPad** | Watch, read and record over USB. **Tap, type, swipe and launch apps** through WebDriverAgent, which you sign and install on the device yourself ([guide](./docs/ios-press.md)). Tried on a real iPhone (iOS 17.5.1) |
+| **Mobile browsers** | Android Chrome over `adb forward` + CDP. iOS Safari through the iPhone path above. **Not yet tried** |
 | **From an AI agent** | Over MCP — screenshot, read the screen, **list the names you can press**, tap by name. Android, web, desktop, or iPhone / iPad |
 
 ## What evidence looks like
@@ -92,7 +126,7 @@ pnpm doctor
 ```
 
 The app also states its own version on the start screen ("This git-qa is
-v0.2.0-beta.14"). **Paste that line into bug reports** — it decides which build
+v0.2.0-beta.20"). **Paste that line into bug reports** — it decides which build
 you are talking about. When a newer build exists, the same place says so; git-qa
 never replaces itself.
 
