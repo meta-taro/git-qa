@@ -99,8 +99,21 @@ func captureDevices() -> [AVCaptureDevice] {
     fail("\(reason)。iPhone / iPad の画面は、カメラの許可が無いと一覧に出てきません")
   }
   allowScreenCaptureDevices()
-  // **少し待つ。**開放した直後は、まだ一覧に載っていないことがある。
-  Thread.sleep(forTimeInterval: 0.6)
+  // **輪を回しながら、現れるまで待つ**（2026-10-07）。
+  // 端末が現れた知らせは run loop で届く。`Thread.sleep` は輪を止めたまま待つので、
+  // **待っても 0 台のまま**だった（iPhone XS・iOS 17 で踏んだ。QuickTime が先に開けていると見える）。
+  // **見つかればすぐ返す**ので、空いていれば待たない。最大 5 秒。
+  // **この中で長く待っても無駄**（2026-10-07）：前のプロセスが端末を手放している最中に始まったプロセスは、
+  // 20 秒待っても見つけられなかった。起こし直しは呼ぶ側（`listIosDevices`）がする。
+  for _ in 0..<25 {
+    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    if !discover().isEmpty { break }
+  }
+  return discover()
+}
+
+/// 一覧を 1 回だけ取る。
+func discover() -> [AVCaptureDevice] {
 
   // **`.external` は macOS 14 以降**（2026-09-19・建てて分かった）。
   // 共通の建て方は macOS 13 向けなので、**古い名前も持っておく。**

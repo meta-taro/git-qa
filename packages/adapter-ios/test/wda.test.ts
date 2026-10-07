@@ -107,3 +107,72 @@ describe('createWdaClient', () => {
     await expect(wda.tap({ x: 1, y: 1 })).rejects.toThrow(/WebDriverAgent.*ECONNREFUSED/);
   });
 });
+
+/**
+ * **セッションが無効になったら、作り直して 1 回だけやり直す**（2026-10-07・実機で踏んだ）。
+ * WDA はセッションを 1 つしか持てない。別の誰かが作ると前のものは消え、押すと 404 になった。
+ */
+describe('createWdaClient — セッションの作り直し', () => {
+  it('404 が返ったら、セッションを作り直してやり直す', async () => {
+    const sent: string[] = [];
+    let sessions = 0;
+    const fetchImpl = (url: string, init?: { method?: string; body?: string }) => {
+      const path = new URL(url).pathname;
+      sent.push(`${init?.method ?? 'GET'} ${path}`);
+      const reply = (status: number, value: unknown) =>
+        Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(value) });
+      if (path === '/session') {
+        sessions += 1;
+        return reply(200, { sessionId: `S${String(sessions)}` });
+      }
+      // 1 本目のセッションは、もう消えている。
+      if (path.startsWith('/session/S1/'))
+        return reply(404, { value: { error: 'invalid session id' } });
+      return reply(200, { value: null });
+    };
+    const wda = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+
+    await wda.tap({ x: 1, y: 2 });
+
+    expect(sessions).toBe(2);
+    expect(sent.filter((one) => one.endsWith('/actions'))).toEqual([
+      'POST /session/S1/actions',
+      'POST /session/S2/actions',
+    ]);
+  });
+});
+
+/** **なぞる**（2026-10-07）。指を置いて、間を取りながら動かして離す。 */
+describe('createWdaClient — なぞる', () => {
+  it('指を置いて動かして離す（ポイントの座標で）', async () => {
+    const { sent, fetchImpl } = fakeWda();
+    const wda = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+
+    await wda.swipe({ x: 180, y: 600 }, { x: 180, y: 250 }, 300);
+
+    const body = JSON.stringify(sent.find((one) => one.path === '/session/S1/actions')?.body);
+    expect(body).toContain('"x":180,"y":600');
+    expect(body).toContain('"duration":300,"x":180,"y":250');
+  });
+});
+
+/**
+ * **画面の絵を WDA から取る**（2026-10-07・実機で踏んだ）。
+ * USB で映す口は、前のプロセスが手放した直後に 10 秒以上見えなくなり、手順ごとに撮ると必ず落ちた。
+ * WDA があるなら、絵も WDA から取る（PNG を base64 で返す）。
+ */
+describe('createWdaClient — 画面の絵', () => {
+  it('base64 の PNG を、そのままの bytes に戻す', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+    const fetchImpl = (url: string) => {
+      const path = new URL(url).pathname;
+      const value = path === '/screenshot' ? png.toString('base64') : null;
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ value }) });
+    };
+    const wda = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+
+    const got = await wda.screenshot();
+
+    expect([...got]).toEqual([...png]);
+  });
+});

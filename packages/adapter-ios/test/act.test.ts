@@ -20,6 +20,13 @@ const fake = (scale = 3) => {
       done.push(`type ${text}`);
       return Promise.resolve();
     },
+    screenshot: () => Promise.resolve(new Uint8Array()),
+    swipe: (from, to, ms) => {
+      done.push(
+        `swipe ${String(from.x)},${String(from.y)}→${String(to.x)},${String(to.y)} ${String(ms)}ms`,
+      );
+      return Promise.resolve();
+    },
   };
   const deps = {
     wda,
@@ -80,6 +87,22 @@ describe('iosAct', () => {
         { wda: undefined, look: () => Promise.resolve('') },
       ),
     ).rejects.toThrow(/WebDriverAgent/);
+  });
+
+  it('なぞるは、画素をポイントに直して WDA に頼む', async () => {
+    const { done, deps } = fake();
+
+    await iosAct(
+      {
+        kind: 'swipe',
+        from: { at: 'point', x: 540, y: 1800 },
+        to: { at: 'point', x: 540, y: 750 },
+        durationMs: 300,
+      },
+      deps,
+    );
+
+    expect(done).toEqual(['swipe 180,600→180,250 300ms']);
   });
 
   it('まだ持たない操作は、そう言って止まる', async () => {

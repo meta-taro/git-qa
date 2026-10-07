@@ -23,6 +23,27 @@ export interface WdaClient {
   tap(at: { x: number; y: number }): Promise<void>;
   /** いま焦点のある欄へ打つ。 */
   type(text: string): Promise<void>;
+  /**
+   * 画面の絵（PNG）。**USB で映す口を使わない**（2026-10-07）。映す口は前のプロセスが手放した直後に
+   * 10 秒以上見えなくなり、手順ごとに撮ると必ず落ちた。
+   */
+  screenshot(): Promise<Uint8Array>;
+  /** なぞる（ポイントの座標で・`durationMs` かけて動かす）。 */
+  swipe(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    durationMs: number,
+  ): Promise<void>;
+}
+
+/** 断られた理由ごと持ち運ぶ（セッションの作り直しの判断に要る）。 */
+class WdaRefused extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }
 
 export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): WdaClient {
@@ -46,7 +67,10 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
     }
     const said = await res.json().catch(() => undefined);
     if (!res.ok) {
-      throw new Error(`WebDriverAgent が断った（${String(res.status)} ${method} ${path}）`);
+      throw new WdaRefused(
+        `WebDriverAgent が断った（${String(res.status)} ${method} ${path}）`,
+        res.status,
+      );
     }
     return said;
   };
@@ -63,6 +87,26 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
     return id;
   };
 
+  /**
+   * セッションを使う呼び出し。**セッションが消えていたら（404）、作り直して 1 回だけやり直す**
+   * （2026-10-07・実機で踏んだ）。WDA はセッションを 1 つしか持てず、別の誰かが作ると前のものは消える。
+   */
+  const inSession = async (method: string, tail: string, body?: unknown): Promise<unknown> => {
+    try {
+      return await call(method, `/session/${await session()}${tail}`, body);
+    } catch (error: unknown) {
+      if (!(error instanceof WdaRefused) || error.status !== 404) throw error;
+      sessionId = undefined;
+      return call(method, `/session/${await session()}${tail}`, body);
+    }
+  };
+
+  const fingerMoves = (moves: readonly Record<string, unknown>[]): unknown => ({
+    actions: [
+      { type: 'pointer', id: 'finger', parameters: { pointerType: 'touch' }, actions: moves },
+    ],
+  });
+
   return {
     async ready() {
       try {
@@ -74,35 +118,48 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
     },
 
     async scale() {
-      const id = await session();
-      const said = (await call('GET', `/session/${id}/wda/screen`)) as {
+      const said = (await inSession('GET', '/wda/screen')) as {
         value?: { scale?: number };
       };
       return said.value?.scale ?? 1;
     },
 
     async tap(at) {
-      const id = await session();
-      await call('POST', `/session/${id}/actions`, {
-        actions: [
-          {
-            type: 'pointer',
-            id: 'finger',
-            parameters: { pointerType: 'touch' },
-            actions: [
-              { type: 'pointerMove', duration: 0, x: Math.round(at.x), y: Math.round(at.y) },
-              { type: 'pointerDown', button: 0 },
-              { type: 'pause', duration: 80 },
-              { type: 'pointerUp', button: 0 },
-            ],
-          },
-        ],
-      });
+      await inSession(
+        'POST',
+        '/actions',
+        fingerMoves([
+          { type: 'pointerMove', duration: 0, x: Math.round(at.x), y: Math.round(at.y) },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 80 },
+          { type: 'pointerUp', button: 0 },
+        ]),
+      );
     },
 
     async type(text) {
-      const id = await session();
-      await call('POST', `/session/${id}/wda/keys`, { value: [...text] });
+      await inSession('POST', '/wda/keys', { value: [...text] });
+    },
+
+    async screenshot() {
+      const said = (await call('GET', '/screenshot')) as { value?: string };
+      if (typeof said.value !== 'string')
+        throw new Error('WebDriverAgent が画面の絵を返さなかった');
+      return new Uint8Array(Buffer.from(said.value, 'base64'));
+    },
+
+    async swipe(from, to, durationMs) {
+      await inSession(
+        'POST',
+        '/actions',
+        fingerMoves([
+          { type: 'pointerMove', duration: 0, x: Math.round(from.x), y: Math.round(from.y) },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 100 },
+          { type: 'pointerMove', duration: durationMs, x: Math.round(to.x), y: Math.round(to.y) },
+          { type: 'pointerUp', button: 0 },
+        ]),
+      );
     },
   };
 }

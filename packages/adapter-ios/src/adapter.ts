@@ -177,6 +177,14 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     return { detail: '焦点の欄へ WebDriverAgent で打った' };
   }
 
+  if (action.kind === 'swipe') {
+    const from = await aim(action.from);
+    const to = await aim(action.to);
+    const ms = action.durationMs ?? 300;
+    await wda.swipe(from.pt, to.pt, ms);
+    return { detail: `WebDriverAgent でなぞった${at(from.pt)}→${at(to.pt)}` };
+  }
+
   throw new AdapterError(KIND, `iPhone / iPad には、まだ送れない操作（${action.kind}）`);
 }
 
@@ -199,8 +207,30 @@ const runTool = (toolPath: string, args: readonly string[]): Promise<string> =>
   });
 
 /** つながっている端末を並べる。**0 台は「無い」であって「測れなかった」ではない。** */
-export async function listIosDevices(toolPath: string): Promise<IosDevice[]> {
-  return parseIosToolDevices(await runTool(toolPath, iosArgs.devices()));
+/**
+ * 映せる端末の一覧。**空なら、間を置いて道具を起こし直す**（2026-10-07・実機で測った）。
+ *
+ * 前のプロセスが端末を手放した直後は、新しいプロセスから **10 秒以上**見えなくなる。
+ * その最中に始まったプロセスは待ち続けても見つけられないので、**起こし直す**しかない。
+ * 既定は 3 秒おきに 10 回（最長 30 秒ほど）。見えればすぐ返す。
+ */
+export async function listIosDevices(
+  toolPath: string,
+  options: {
+    readonly attempts?: number;
+    readonly gapMs?: number;
+    readonly run?: (args: readonly string[]) => Promise<string>;
+  } = {},
+): Promise<IosDevice[]> {
+  const attempts = options.attempts ?? 10;
+  const gapMs = options.gapMs ?? 3_000;
+  const run = options.run ?? ((args: readonly string[]) => runTool(toolPath, args));
+  for (let i = 0; i < attempts; i++) {
+    const found = parseIosToolDevices(await run(iosArgs.devices()));
+    if (found.length > 0 || i === attempts - 1) return found;
+    await new Promise((resolve) => setTimeout(resolve, gapMs));
+  }
+  return [];
 }
 
 export function createIosAdapter(options: IosAdapterOptions): TargetAdapter {
@@ -245,6 +275,15 @@ function createIosSession(deps: SessionDeps): TargetSession {
 
   const shoot = async (): Promise<Screenshot> => {
     ensureOpen();
+    /**
+     * **押す口（WDA）があるなら、絵も WDA から取る**（2026-10-07・実機で踏んだ）。
+     * USB で映す道具は、前のプロセスが端末を手放した直後に 10 秒以上見えなくなる。
+     * 手順ごとに撮ると**必ずその隙間に落ちて「映せる端末が無い」**になった。
+     * 人が見る映像（ライブビュー）は、長く動く 1 本なので、これまでどおり USB で映す。
+     */
+    if (wda !== undefined) {
+      return { format: 'png', bytes: await wda.screenshot(), capturedAt: deps.now().toISOString() };
+    }
     const dir = await mkdtemp(join(tmpdir(), 'git-qa-ios-'));
     const path = join(dir, 'screen.jpg');
     try {
@@ -264,7 +303,9 @@ function createIosSession(deps: SessionDeps): TargetSession {
   const readText = async (bytes: Uint8Array): Promise<string> => {
     if (deps.ocrPath === undefined) return '';
     const dir = await mkdtemp(join(tmpdir(), 'git-qa-ios-ocr-'));
-    const path = join(dir, 'frame.jpg');
+    // **名前を中身に合わせる**（WDA の絵は PNG・USB の絵は JPEG）。
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+    const path = join(dir, isPng ? 'frame.png' : 'frame.jpg');
     try {
       await writeFile(path, bytes);
       return await runTool(deps.ocrPath, [path]);
