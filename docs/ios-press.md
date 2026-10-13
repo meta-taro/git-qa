@@ -53,6 +53,8 @@ xcodebuild -project WebDriverAgent.xcodeproj -scheme WebDriverAgentRunner \
 ```
 
 - 端末の識別子は `xcrun xctrace list devices` の括弧の中です
+- **ケーブルが無くても入ります。**一度ペアリングした端末が同じ網にいれば、Xcode は網越しに建てて入れます
+  （2026-10-13・iPad mini・iOS 26.6.1 で確かめた。Mac と端末が別の網の区切りにいても、互いに届けば入った）
 - `-allowProvisioningDeviceRegistration` は、**端末を開発者アカウントに登録**します（未登録だと署名できません）
 - 途中で「codesign がキーチェーンの鍵を使おうとしています」と出たら、Mac のパスワードを入れて**「常に許可」**
 - 端末に「信頼されていないデベロッパ」と出たら、端末の 設定 → 一般 → VPN とデバイス管理 で信頼する
