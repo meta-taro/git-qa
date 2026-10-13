@@ -33,7 +33,7 @@ git-qa の環境確認 — darwin arm64 / dev
 - `–` は**その OS では要らない**もの（macOS の `git-qa-win` など）。欠けている数に入りません
 - `✗` と `!` が、**その機械で足りていないもの**です
 
-## いま何が実測済みか（2026-09-19）
+## いま何が実測済みか（2026-10-13）
 
 **「動く見込み」と「動いた」を混ぜません。**空欄は**誰もまだ踏んでいない**という意味です。
 
@@ -41,8 +41,8 @@ git-qa の環境確認 — darwin arm64 / dev
 |---|---|---|---|
 | デスクトップアプリ | ✅ 実測 | ✅ 実測（録画は無い） | |
 | ウェブ（Chrome / Firefox / Safari） | ✅ 実測 | ✅ **実測**（2026-09-20・外部レビュー #37） | |
-| Android 実機 | ✅ 実測 | | |
-| iPhone / iPad 実機 | ⏳ **叩きが入った。誰もまだ実機で流していない** | ❌ 道具が建たない | — |
+| Android 実機 | ✅ 実測 | ✅ **実測**（2026-10-13・Windows 11 ARM64・Wi-Fi の adb・見本シート 5 件 AUTO_PASS） | |
+| iPhone / iPad 実機 | ✅ 実測（見る・読む・押す。押すのは WebDriverAgent・C99） | ⏳ USB で映す道具は建たない。**WebDriverAgent の口だけの形**で動くはず（macOS で確かめた）。Windows では未実測 | — |
 | 録画 | ✅ 実測 | ❌ 無い | ❌ 無い |
 
 **空欄を埋めるのが、この文書の目的です。**
@@ -134,18 +134,18 @@ adb devices
 pnpm run:sheet sheets/android-settings-ja.tsv
 ```
 
-**Windows + Android はまだ誰も流していません。**
+**Windows + Android も流れました**（2026-10-13・Windows 11 ARM64・開発起動の `pnpm app`・Node 24）。
+Zenfone 10 を **Wi-Fi の adb**（`adb connect <端末のアドレス>:<ポート>`）で繋ぎ、`android-settings-ja` の 5 件が `AUTO_PASS`。
+USB の adb は、その機械では途中から「デバイスが機能していません（エラー 31）」で止まっていた —— **USB が不安定なら Wi-Fi の adb に切り替える。**
 
 ### スマートフォンを見る
 
-**Android は動きます**（上の表）。**iPhone / iPad は叩きが入りました**（2026-09-19）。
+**Android は動きます**（上の表）。**iPhone / iPad も実機で流れます**（2026-10-07・押すには WebDriverAgent が要る・`docs/ios-press.md`）。
 
 ```bash
 pnpm run:sheet:ios <シート>          # 人が見ている実行
 pnpm run:sheet:ios <シート> --record  # 動画も残す
 ```
-
-**誰もまだ実機で流していません。**建つことと、端末が無いときの振る舞いだけ確かめてあります。
 
 ```
 [git-qa] 映せる端末が無い（USB で繋ぎ、端末側で「このコンピュータを信頼」を済ませてください）
@@ -157,10 +157,10 @@ pnpm run:sheet:ios <シート> --record  # 動画も残す
 |---|---|---|
 | **見る** | `adb` / `scrcpy` | ✅ **USB で映す**（端末に何も入れない） |
 | **読む** | `uiautomator dump` | ✅ **絵から文字を読む**（`git-qa-ocr`・段 2） |
-| **押す** | `adb shell input tap` | ❌ **無い。**WebDriverAgent が要り、**署名が要る＝人の作業**（§14） |
+| **押す** | `adb shell input tap` | ✅ **WebDriverAgent の口を渡したときだけ**（`GIT_QA_IOS_WDA`）。署名と導入は人の作業（§14） |
 | **録る** | OS の録画を借りる | ✅ **流れてくる絵から作る** |
 
-**押せません。**だから **人が端末を触り、git-qa が見て、人が判定を置く**形になります
+口が無ければ、**人が端末を触り、git-qa が見て、人が判定を置く**形になります
 （#30 / #35 と同じ分担）。
 
 押す手順が来ると、**`BLOCKED`（判断保留）と、その理由**が残ります。
