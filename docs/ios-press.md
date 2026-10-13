@@ -115,8 +115,16 @@ ios runwda \
 トンネル → `runwda` で口が起き、口だけの形で検証シートが流れた（起動・押す・読む・判定）。
 **窓のライブ映像も、口の MJPEG から映った**（USB で映す道具は使っていない）。
 
-**まだ確かめていないこと（Windows）**：go-ios が端末を見つけるには、Windows に Apple のドライバ（Apple Devices アプリか iTunes）が要るはずです。
-Windows 機で上の手順が通るかは、まだ誰も試していません。**WDA を端末へ入れる（建てて署名する）ところは Mac が要ります**（初回と、署名が切れたとき）。
+**Windows で確かめたこと**（2026-10-13・Windows 11 ARM64・go-ios 1.3.2）：
+
+- **Apple Devices アプリ**（Microsoft Store）を入れないと、`ios list` は `dial tcp 127.0.0.1:27015: … actively refused it` で落ちます。
+  入れて使用許諾に同意し、端末を挿し直すと、`ios list` に端末の識別子が出ました
+- go-ios の Windows 版（`go-ios-win.zip`・中身は x64 の `ios.exe`）は、**ARM64 の Windows でもそのまま動きました**
+- **USB の記述子の失敗（「不明な USB デバイス」・VID_0000）や数秒での切断は、ケーブルが原因でした。**
+  Mac で問題の無いケーブルでも起きました。別のケーブルに替えると安定しました
+- `go-ios agent is not running …` という警告は毎回出ますが、`ios list` には関係しません
+
+**まだ確かめていないこと（Windows）**：その先（トンネル → `runwda` → git-qa で流す）。**WDA を端末へ入れる（建てて署名する）ところは Mac が要ります**（初回と、署名が切れたとき）。
 
 ---
 
