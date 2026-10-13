@@ -21,6 +21,7 @@ const wda = (ready = true): WdaClient => ({
   launch: () => Promise.resolve(),
   home: () => Promise.resolve(),
   swipe: () => Promise.resolve(),
+  texts: () => Promise.resolve('一般\t300\t600\t120\t60'),
   info: () => Promise.resolve({ model: 'iPhone', osVersion: '17.5.1', id: 'ABCDEF' }),
 });
 
@@ -52,6 +53,35 @@ describe('createIosAdapter — WebDriverAgent だけで', () => {
         build: { source: 'ios', label: 'test' },
       }).connect(),
     ).rejects.toThrow(/WebDriverAgent/);
+  });
+
+  /**
+   * **絵から読む道具が無くても、口から画面の文字を読む**（2026-10-13・Windows の席で踏んだ）。
+   * 読めないと、判定は「文字が現れなかった」になり、押す所も探せなかった。
+   */
+  it('絵から読む道具が無ければ、画面の文字は口（部品の名前）から読む', async () => {
+    const session = await createIosAdapter({
+      wdaUrl: 'http://192.0.2.10:8100',
+      wda: wda(),
+      build: { source: 'ios', label: 'test' },
+    }).connect();
+
+    const seen = await session.observe();
+    expect((seen.raw as { screenText: string }).screenText).toContain('一般');
+    await session.close();
+  });
+
+  it('絵から読む道具が無くても、文字で指せば口から位置を探して押す', async () => {
+    const tapped: { x: number; y: number }[] = [];
+    const session = await createIosAdapter({
+      wdaUrl: 'http://192.0.2.10:8100',
+      wda: { ...wda(), tap: (at) => (tapped.push(at), Promise.resolve()) },
+      build: { source: 'ios', label: 'test' },
+    }).connect();
+
+    await session.act({ kind: 'tap', target: { at: 'element', ref: '一般' } });
+    expect(tapped).toEqual([{ x: 100, y: 200 }]);
+    await session.close();
   });
 
   it('道具も口も無ければ、繋げないと言う', async () => {

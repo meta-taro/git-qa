@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  findIos,
   inputCandidates,
   ocrCandidates,
   recordCandidates,
@@ -128,5 +131,36 @@ describe('winToolCandidates', () => {
     const paths = winToolCandidates(AT);
 
     expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+/**
+ * **iPhone / iPad を USB で映す道具は macOS でしか動かない**（2026-10-13・Windows の席で踏んだ）。
+ *
+ * 道具は repo に入っている（`resources/git-qa-ios`・macOS の実行ファイル）ので、
+ * Windows の clone にも在る。**在るだけで返すと、起こそうとして `spawn … ENOENT` で終わる**
+ * —— 口（WebDriverAgent）だけで動く形に切り替わらない。
+ */
+describe('findIos', () => {
+  const withTool = async (): Promise<string> => {
+    const dir = await mkdtemp(join(tmpdir(), 'git-qa-find-ios-'));
+    await writeFile(join(dir, 'git-qa-ios'), '');
+    return dir;
+  };
+
+  it('macOS なら、在る道具を返す', async () => {
+    const dir = await withTool();
+    expect(await findIos(dir, 'darwin', {})).toBe(join(dir, 'git-qa-ios'));
+  });
+
+  it('macOS 以外では、道具が在っても返さない', async () => {
+    const dir = await withTool();
+    expect(await findIos(dir, 'win32', {})).toBeUndefined();
+  });
+
+  it('場所を渡されたら、OS に関わらずそれを使う', async () => {
+    expect(await findIos('/nowhere', 'win32', { GIT_QA_IOS: '/given/git-qa-ios' })).toBe(
+      '/given/git-qa-ios',
+    );
   });
 });

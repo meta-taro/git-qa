@@ -30,6 +30,7 @@ const fake = (scale = 3) => {
       done.push('home');
       return Promise.resolve();
     },
+    texts: () => Promise.resolve(''),
     swipe: (from, to, ms) => {
       done.push(
         `swipe ${String(from.x)},${String(from.y)}→${String(to.x)},${String(to.y)} ${String(ms)}ms`,

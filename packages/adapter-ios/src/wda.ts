@@ -34,6 +34,11 @@ export interface WdaClient {
   launch(bundleId: string): Promise<void>;
   /** ホーム画面へ戻る。 */
   home(): Promise<void>;
+  /**
+   * 画面の部品の名前と位置を、**絵から読んだ文字と同じ形**で返す（`sourceToLines`）。
+   * 絵から読む道具（macOS だけ）が無いときに使う（2026-10-13）。
+   */
+  texts(): Promise<string>;
   /** なぞる（ポイントの座標で・`durationMs` かけて動かす）。 */
   swipe(
     from: { x: number; y: number },
@@ -167,6 +172,11 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
       await call('POST', '/wda/homescreen');
     },
 
+    async texts() {
+      const said = (await call('GET', '/source?format=json')) as { value?: unknown };
+      return sourceToLines(said.value, await this.scale());
+    },
+
     async screenshot() {
       const said = (await call('GET', '/screenshot')) as { value?: string };
       if (typeof said.value !== 'string')
@@ -188,6 +198,57 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
       );
     },
   };
+}
+
+/** WDA の部品の木の 1 つ（`/source?format=json`）。使う所だけ。 */
+interface SourceNode {
+  readonly type?: string;
+  readonly label?: string | null;
+  readonly isVisible?: string | boolean;
+  readonly rect?: { x: number; y: number; width: number; height: number };
+  readonly children?: readonly SourceNode[];
+}
+
+/**
+ * **部品の木を、絵から読んだ文字と同じ形にする**（2026-10-13・Windows の席で踏んだ）。
+ *
+ * 1 行 `名前 \t x \t y \t 幅 \t 高さ`（**画素**・x / y は真ん中）。そうすれば、押す所を探す
+ * （`pickByText`）のも、判定で画面の文字を見るのも、絵から読んだときと同じ道で動く。
+ *
+ * - **見えていない部品は入れない**（画面の外の行を「在る」と言わない）
+ * - **アプリそのもの（画面全体）は入れない**（アプリ名が画面に出ていなくても「在る」になる）
+ * - 同じ名前が親子で重なっても入れる。押す所はいちばん小さいもの（文字そのもの）が選ばれる
+ */
+export function sourceToLines(root: unknown, scale: number): string {
+  const by = scale > 0 ? scale : 1;
+  const out: string[] = [];
+  const walk = (node: SourceNode): void => {
+    const visible =
+      node.isVisible === undefined || node.isVisible === true || node.isVisible === '1';
+    const label = typeof node.label === 'string' ? node.label.trim() : '';
+    const { rect } = node;
+    if (
+      visible &&
+      label !== '' &&
+      node.type !== 'Application' &&
+      rect !== undefined &&
+      rect.width > 0 &&
+      rect.height > 0
+    ) {
+      out.push(
+        [
+          label.replace(/[\t\n]+/g, ' '),
+          (rect.x + rect.width / 2) * by,
+          (rect.y + rect.height / 2) * by,
+          rect.width * by,
+          rect.height * by,
+        ].join('\t'),
+      );
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  if (typeof root === 'object' && root !== null) walk(root);
+  return out.join('\n');
 }
 
 /** 画素の座標をポイントへ。 */

@@ -197,10 +197,7 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     }
     const found = pickByText(await deps.look(), target.ref);
     if (found === undefined) {
-      throw new AdapterError(
-        KIND,
-        `画面に「${target.ref}」が見つからない（絵から読んだ文字で探した）`,
-      );
+      throw new AdapterError(KIND, `画面に「${target.ref}」が見つからない（画面の文字で探した）`);
     }
     return { pt: toPoints(found, scale), label: `「${target.ref}」` };
   };
@@ -413,9 +410,18 @@ function createIosSession(deps: SessionDeps): TargetSession {
     }
   };
 
-  /** 絵から文字を読む（段 2・C55）。**道具が無ければ空**（黙って空にしない側は呼び出し元）。 */
+  /**
+   * 画面の文字を読む。**絵から読む道具（段 2・C55）を先に**、無ければ**口（WDA）の部品の名前**から。
+   *
+   * 絵から読む道具は macOS でしか建たない（2026-10-13・Windows の席で踏んだ）。
+   * 無いまま空を返すと、判定は「文字が現れなかった」になり、押す所も探せなかった。
+   * **どちらも無ければ空**（黙って空にしない側は呼び出し元）。
+   */
   const readText = async (bytes: Uint8Array): Promise<string> => {
-    if (deps.ocrPath === undefined) return '';
+    if (deps.ocrPath === undefined) {
+      // **読めないことは、見られないことではない。**口が答えなくても映像は出る。
+      return wda === undefined ? '' : wda.texts().catch(() => '');
+    }
     const dir = await mkdtemp(join(tmpdir(), 'git-qa-ios-ocr-'));
     // **名前を中身に合わせる**（WDA の絵は PNG・USB の絵は JPEG）。
     const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
@@ -530,7 +536,7 @@ function createIosSession(deps: SessionDeps): TargetSession {
       return {
         kind: KIND,
         capturedAt: shot.capturedAt,
-        // **絵から読んだ文字だけ。**AX 木は取れない（WebDriverAgent が要る）。
+        // 絵から読んだ文字。絵から読む道具が無ければ、口（WDA）の部品の名前。
         raw: { screenText: text },
       };
     },
@@ -557,8 +563,8 @@ function createIosSession(deps: SessionDeps): TargetSession {
 /**
  * 画面の文字を読む（**判定はこれを見る**・C64）。
  *
- * **絵から読む道具（`git-qa-ocr`）だけが出どころ。**AX 木は取れない
- * （端末側に WebDriverAgent が要る）。**道具が無ければ空**で、
+ * 出どころは、絵から読む道具（`git-qa-ocr`）か、それが無ければ口（WebDriverAgent）の部品の名前。
+ * **どちらも無ければ空**で、
  * **空は「文字が無い」ではなく「読めない」**として扱われる（呼ぶ側が言う）。
  */
 export async function readIosScreenText(session: TargetSession): Promise<string> {

@@ -162,12 +162,20 @@ export function iosCandidates(fromDir: string): string[] {
   return [...new Set([beside, inRepo])];
 }
 
-/** 実際にあるものを 1 つ返す。**無ければ undefined**（iOS は見られない）。 */
+/**
+ * 実際にあるものを 1 つ返す。**無ければ undefined**（USB では見られない。口があれば口だけで動く）。
+ *
+ * **macOS 以外では探さない**（2026-10-13・Windows の席で踏んだ）。道具は repo に入っているので
+ * Windows の clone にも在り、在るだけで返すと `spawn … ENOENT` で終わって、口だけの形に切り替わらなかった。
+ */
 export async function findIos(
   fromDir = dirname(fileURLToPath(import.meta.url)),
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | undefined> {
-  const fromEnv = process.env['GIT_QA_IOS'];
+  const fromEnv = env['GIT_QA_IOS'];
   if (fromEnv !== undefined) return fromEnv;
+  if (platform !== 'darwin') return undefined;
 
   for (const path of iosCandidates(fromDir)) {
     try {

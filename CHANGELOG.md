@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+- 直した: **Windows で iPhone / iPad を、口（WebDriverAgent）だけの形に自動で切り替えていなかった。**
+  `GIT_QA_IOS_ONLY_WDA=1` を付けないと `spawn … git-qa-ios ENOENT` で終わっていた（実行器・MCP とも）
+- 足した: **絵から読む道具が無いとき（Windows）、iPhone / iPad の画面の文字を口の部品の名前から読む。**
+  これまでは文字が読めず、AI が押す所を探せなかった（BLOCKED）
 - 直した: **判定の欄が「AI の判定: PASS」と出ていた。**証跡では人が見ていない合格は `AUTO_PASS` になるので、
   画面だけが素の `PASS` だと「誰も見ていない」が画面から消える。証跡と同じ語（`AUTO_PASS`）で出す
 - 直した: **見本のシート（`sheets/web-sample-ja.tsv`）が、自分の検査で止まっていた。**

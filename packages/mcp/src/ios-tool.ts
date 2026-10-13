@@ -29,9 +29,21 @@ const candidates = (name: string, fromDir: string): string[] => [
   resolve(fromDir, '..', '..', 'desktop', 'src-tauri', 'resources', name),
 ];
 
-/** `git-qa-ios` を探す。**無ければ iPhone / iPad は見られない**（代わりの道が無い）。 */
-export async function findIosTool(fromDir = here()): Promise<string | undefined> {
-  return process.env['GIT_QA_IOS'] ?? (await found(candidates('git-qa-ios', fromDir)));
+/**
+ * `git-qa-ios` を探す。無ければ USB では見られない（口＝WebDriverAgent があれば口だけで動く）。
+ *
+ * **macOS 以外では探さない**（2026-10-13）。道具は repo に入っていて Windows の clone にも在り、
+ * 在るだけで返すと起こせずに終わった（宿主の `findIos` と同じ直し）。
+ */
+export async function findIosTool(
+  fromDir = here(),
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | undefined> {
+  const fromEnv = env['GIT_QA_IOS'];
+  if (fromEnv !== undefined) return fromEnv;
+  if (platform !== 'darwin') return undefined;
+  return found(candidates('git-qa-ios', fromDir));
 }
 
 /** `git-qa-ocr` を探す。**無ければ文字が読めない**（映像は出る）。 */

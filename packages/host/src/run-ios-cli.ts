@@ -41,7 +41,8 @@ if (sheetPath === undefined) {
 const wdaUrl = process.env['GIT_QA_IOS_WDA'];
 /**
  * **USB の道具が無くても、押す口（WebDriverAgent）があれば WDA だけで動く**（2026-10-07）。
- * Windows では USB の道具が建たない。`GIT_QA_IOS_ONLY_WDA=1` で、macOS でもこの形を試せる。
+ * Windows では USB の道具が建たない。`GIT_QA_IOS_ONLY_WDA=1` で、macOS でもこの形を試せる
+ * （**絵から読む道具も使わない** —— Windows には無いので、文字も口から読む形を試すため）。
  */
 const onlyWda = wdaUrl !== undefined && process.env['GIT_QA_IOS_ONLY_WDA'] === '1';
 const toolPath = onlyWda ? undefined : await findIos();
@@ -83,7 +84,7 @@ if (devices !== undefined && devices.length === 0) {
 }
 
 const wanted = positional(process.argv, 1) ?? process.env['GIT_QA_IOS_DEVICE'];
-const ocrPath = await findOcr();
+const ocrPath = onlyWda ? undefined : await findOcr();
 
 const adapter = createIosAdapter({
   ...(toolPath === undefined ? {} : { toolPath }),
@@ -143,7 +144,7 @@ const session = await startRunSession({
 });
 
 console.log(
-  `[git-qa] 見る端末: ${devices?.[0]?.model ?? (toolPath === undefined ? 'WebDriverAgent の先' : '不明')}${ocrPath === undefined ? '（文字は読めません）' : ''}`,
+  `[git-qa] 見る端末: ${devices?.[0]?.model ?? (toolPath === undefined ? 'WebDriverAgent の先' : '不明')}${ocrPath === undefined && wdaUrl === undefined ? '（文字は読めません）' : ''}`,
 );
 console.log(
   wdaUrl === undefined
