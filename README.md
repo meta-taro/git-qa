@@ -36,9 +36,9 @@ in the morning you review the failures. **The pass is still yours to give.**
 
 ![Picking what to look at: a web page URL, a desktop app by name, or an adb device](./docs/images/setup-target.png)
 
-A run, case by case — the AI runs each step, you press `D`, the case turns `VERIFIED / qa` and the next one starts:
+A run, case by case — the AI runs each step (press the button, reopen the page, press it again), you press `D`, the case turns `VERIFIED / qa` and the next one starts:
 
-![A run: case 1 verified, case 2 verified, case 3 where the AI pressed the button and found the result](./docs/images/flow.gif)
+![A run: the AI presses the button and finds the result, reopens the page and finds it reset, presses again; each case is verified with D](./docs/images/flow.gif)
 
 A test sheet is a TSV you can write in any spreadsheet — samples are in [`sheets/`](./sheets/).
 From source instead: `git clone … && pnpm install && pnpm app` (see [Install](#install)).
