@@ -1,3 +1,4 @@
+import { resolveCaseResult } from '@git-qa/core/session';
 import type { SessionCase, SessionField, SessionState } from '@git-qa/core/session';
 
 import { t } from '../i18n/current.js';
@@ -225,7 +226,13 @@ function renderAi(doc: Document, subject: SessionCase): HTMLElement {
 
   const head = doc.createElement('summary');
   head.className = 'verdict-ai';
-  head.textContent = `AI の判定: ${subject.aiResult ?? ''}`;
+  /**
+   * **証跡に残る語で出す**（2026-10-13）。素の `PASS` と出していたので、
+   * 人が見ていない合格が画面では「合格」に見えた（C1）。
+   */
+  head.textContent = t('verdict.ai', {
+    result: subject.aiResult === undefined ? '' : resolveCaseResult({ aiResult: subject.aiResult }),
+  });
 
   const note = doc.createElement('p');
   note.className = 'verdict-note';

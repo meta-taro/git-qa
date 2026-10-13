@@ -90,6 +90,26 @@ describe('判定カラム — シートの中身', () => {
     expect(details?.textContent).toContain('直前のクエリ');
   });
 
+  /**
+   * **AI の判定は、証跡に残る語で出す**（2026-10-13）。
+   *
+   * 素の `PASS` と出していた。証跡では人が見ていない合格は `AUTO_PASS` になる。
+   * **画面だけが `PASS` だと、「誰も見ていない」が画面から消える**（C1）。
+   */
+  it('AI の合格は AUTO_PASS と出る（素の PASS と出さない）', () => {
+    renderSession(root, stateWith([]));
+
+    const head = root.querySelector('.verdict-ai')?.textContent ?? '';
+    expect(head).toContain('AUTO_PASS');
+  });
+
+  it('AI の不合格・止まりは、そのままの語で出る', () => {
+    const state = stateWith([]);
+    renderSession(root, { ...state, cases: [{ no: 1, title: 'ボタン', aiResult: 'BLOCKED' }] });
+
+    expect(root.querySelector('.verdict-ai')?.textContent).toContain('BLOCKED');
+  });
+
   /** 欄を持たないシート（前の版の実行）でも、今までどおり出る。 */
   it('欄が無くても、判定は置ける', () => {
     const state = stateWith([]);

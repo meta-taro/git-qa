@@ -14,6 +14,8 @@ export { WATCH_PAUSE_MS, watchPause } from './watch.js';
 export type { WatchOutcome, WatchPauseOptions } from './watch.js';
 // 結果の語彙は run.json と同じものを使う。画面側で別の語を作らない。
 export { AI_RESULTS, CASE_RESULTS, HUMAN_RESULTS } from '../run/types.js';
+// 画面も証跡と同じ語で出す（素の PASS を画面にだけ残さない）。
+export { resolveCaseResult } from '../run/result.js';
 // 打鍵の割り当ての正本。**画面もターミナルの案内もここから作る。**
 export { VERDICT_KEYS, verdictKeyHint } from './verdict-keys.js';
 export type { AiResult, CaseResult, HumanResult } from '../run/types.js';
