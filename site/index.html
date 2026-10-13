@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>git-qa — AI が操作し、人が判定を置く</title>
+    <title>git-qa — 人が判定する QA ランナー（human-in-the-loop QA）</title>
     <meta
       name="description"
-      content="検証シートに沿って AI が端末・ブラウザ・デスクトップアプリを操作し、人は見て 1 打鍵で判定を置く。誰が見て保証したかが証跡に残ります（ベータ版）。"
+      content="人が判定する QA ランナー（human-in-the-loop QA）。検証シートに沿って AI エージェントが Android・iPhone・ウェブ・デスクトップアプリを操作し、人は見て 1 打鍵で判定を置く。誰が見て保証したかが証跡に残ります。MCP 対応・オープンソース（ベータ版）。"
     />
     <link rel="icon" href="./icon.png" />
-    <meta property="og:title" content="git-qa" />
+    <meta property="og:title" content="git-qa — 人が判定する QA ランナー" />
     <meta
       property="og:description"
-      content="AI が操作し、人が判定を置く。誰が見て保証したかが証跡に残る。"
+      content="AI が検証シートを流し、人が見て 1 打鍵で判定を置く。誰が見て保証したかが証跡に残る（human-in-the-loop QA）。"
     />
     <!--
       SNS のカード。**画像と URL は絶対 URL で書く**（2026-09-25）。
@@ -26,6 +26,30 @@
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <!--
+      検索エンジン向けの名乗り（2026-10-13）。README・llms.txt と同じ語で言う。
+      語は packages/host/test/discoverability.test.ts が持っている。
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "git-qa",
+        "url": "https://meta-taro.github.io/git-qa/",
+        "description": "Open-source human-in-the-loop QA runner. An AI agent works through a test sheet on Android, iPhone, web and desktop apps; a person watches the live screen and signs off each case with one key, and the evidence records who verified what. AI agents can drive it over MCP.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Windows",
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/meta-taro/git-qa",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "inLanguage": ["ja", "en"],
+        "keywords": "human-in-the-loop QA, manual testing, AI testing, test sheet, test evidence, MCP, Claude Code, Android, iPhone, web, desktop, 検証シート, 動作検証"
+      }
+    </script>
     <style>
       /*
        * 色は DESIGN.md から採る（2026-09-03・持ち主が決めた緑）。
@@ -323,6 +347,7 @@
         </div>
         <p class="lead">
           <b>AI が操作し、人が見て、1 打鍵で判定を置く。</b>
+          人が判定する QA ランナー（human-in-the-loop QA）です。
           検証シート（TSV）に沿って端末・ブラウザ・デスクトップアプリを動かします。
         </p>
         <p class="split">
@@ -343,8 +368,8 @@
           alt="git-qa の画面。左にケース一覧、中央に相手の画面の映像、右に AI の判定と判定キーが並んでいる"
         />
         <figcaption>
-          <b>実物の画面です。</b>左が検証シートのケース、中央が相手の画面（いま AI
-          が押した直後）、右が AI の判定と、人が押すキー。
+          <b>実物の画面です。</b>左が検証シートのケース、中央が相手の画面（赤い印は、AI
+          が期待結果の文字を見つけた所）、右が AI の判定と、人が押すキー。
           <b>済んだケースには「VERIFIED / 誰が見たか」が付きます。</b>
         </figcaption>
       </figure>
@@ -555,6 +580,13 @@
             <td>
               <b>macOS と Windows。</b>macOS は前面に出さずに押せ、文字は AX と OCR の 2
               段で読みます。 Windows は UI Automation で読んで押します（録画は無い）
+            </td>
+          </tr>
+          <tr>
+            <th>iPhone / iPad</th>
+            <td>
+              USB で映す・文字を読む・録る。<b>押す・打つ・アプリの起動</b>は、端末に WebDriverAgent
+              を入れたときだけ（署名と導入は人の作業）。Windows からは未確認
             </td>
           </tr>
           <tr>

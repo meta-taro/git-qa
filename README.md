@@ -2,6 +2,10 @@
 
 **Your test sheet runs itself. You watch, and sign off each case with one key.**
 
+git-qa is an open-source **human-in-the-loop QA** runner. An AI agent works through your test sheet
+on Android, iPhone, web and desktop apps; you watch the live screen and sign off each case,
+and the evidence records who verified what. AI agents can also drive it over MCP.
+
 [日本語版はこちら / Japanese](./README.ja.md) · [Download](https://meta-taro.github.io/git-qa/)
 
 ![git-qa running a test sheet: cases on the left, the live screen in the middle with the AI pointing at what it found, one-key verdicts on the right](./docs/images/run.png)

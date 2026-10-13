@@ -1,0 +1,18 @@
+# git-qa
+
+> Open-source human-in-the-loop QA runner. An AI agent works through a test sheet on Android, iPhone, web and desktop apps; a person watches the live screen and signs off each case with one key, and the evidence records who verified what. AI agents can drive it over MCP.
+
+git-qa does not let an AI declare "everything passed". The AI operates the device, browser or desktop app and can only mark a case `AUTO_PASS` (nobody looked). A case becomes `VERIFIED` only when a person presses the key, and their handle goes into the evidence (`run.json` plus the screen at that moment).
+
+- Test sheets are TSV files you can write in any spreadsheet.
+- Targets: Android devices and emulators (adb), web pages (Chrome, Edge, Firefox, Safari), desktop apps on macOS and Windows, iPhone / iPad (USB mirroring; tapping needs WebDriverAgent on the device).
+- Unattended runs (`--no-ui`) for overnight checks; a person reviews failures later.
+- Status: beta. macOS builds are signed and notarized; Windows builds are not signed.
+
+## Links
+
+- [README (English)](https://github.com/meta-taro/git-qa/blob/develop/README.md)
+- [README (日本語)](https://github.com/meta-taro/git-qa/blob/develop/README.ja.md)
+- [Download](https://meta-taro.github.io/git-qa/)
+- [iPhone / iPad tapping guide](https://github.com/meta-taro/git-qa/blob/develop/docs/ios-press.md)
+- [Design decisions](https://github.com/meta-taro/git-qa/blob/develop/docs/decisions.md)

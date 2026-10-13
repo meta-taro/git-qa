@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "iPhone / iPad を USB 越しに映して見るアダプタ（押す口はまだ無い）",
+  "description": "iPhone / iPad を USB 越しに映して見る・WebDriverAgent があれば押すアダプタ",
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts"

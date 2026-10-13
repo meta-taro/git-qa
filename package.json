@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "AI と人が一緒に動作検証をするための QA ランナー",
+  "description": "Open-source human-in-the-loop QA runner: an AI agent works through a test sheet, a person watches and signs off each case",
   "license": "MIT",
   "packageManager": "pnpm@11.1.1",
   "engines": {
