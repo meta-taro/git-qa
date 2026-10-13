@@ -91,7 +91,32 @@ pnpm run:sheet:ios <検証シート.tsv>
 映す道具が無ければ、自動でこの形になります。macOS で試すときは `GIT_QA_IOS_ONLY_WDA=1` を足します。
 
 - **確かめたこと**（macOS・iOS 17.5.1）：口だけで検証シートを無人で通した
-- **まだ確かめていないこと**：**Windows で WDA を端末へ入れて起こす手順**（上の手順 4 は Xcode が要ります）と、Windows の窓に映像が出るか
+
+### Xcode を使わずに口を起こす（go-ios）
+
+**一度 Mac で建てて端末へ入れた WDA は、Xcode なしで起こせます**（2026-10-13・macOS で確かめた）。
+[go-ios](https://github.com/danielpaulus/go-ios)（MIT）は macOS・Windows・Linux 向けの実行ファイルを配っています。
+
+```bash
+ios tunnel start --userspace     # iOS 17 以降は先にトンネルが要る。--userspace なら管理者権限は要らない。止めずに置く
+ios runwda \
+  --bundleid=<Runner の Bundle ID>.xctrunner \
+  --testrunnerbundleid=<Runner の Bundle ID>.xctrunner \
+  --xctestconfig=WebDriverAgentRunner.xctest \
+  --udid=<端末の識別子>             # これも止めずに置く。口は端末の網のアドレスの 8100 番で開く
+```
+
+- `<Runner の Bundle ID>` は手順 2 で変えたもの（例 `com.example.WebDriverAgentRunner`）。末尾に `.xctrunner` を付けます
+- 端末の識別子は `ios list` で出ます
+- 起こしたあとは、上の「口だけで動かす」と同じです（`GIT_QA_IOS_WDA=http://<端末のアドレス>:8100`）
+- 「Cannot parse test suite start date」という警告が出ることがあります（端末の言語が日本語のとき）。動作には関係しません
+
+**確かめたこと**（macOS・go-ios 1.3.2・iPhone Xs・iOS 18.7）：
+トンネル → `runwda` で口が起き、口だけの形で検証シートが流れた（起動・押す・読む・判定）。
+**窓のライブ映像も、口の MJPEG から映った**（USB で映す道具は使っていない）。
+
+**まだ確かめていないこと（Windows）**：go-ios が端末を見つけるには、Windows に Apple のドライバ（Apple Devices アプリか iTunes）が要るはずです。
+Windows 機で上の手順が通るかは、まだ誰も試していません。**WDA を端末へ入れる（建てて署名する）ところは Mac が要ります**（初回と、署名が切れたとき）。
 
 ---
 
