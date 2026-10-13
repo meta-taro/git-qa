@@ -77,3 +77,40 @@ describe('名乗り — 配布ページの JSON-LD', () => {
     expect(said['url']).toBe('https://meta-taro.github.io/git-qa/');
   });
 });
+
+/**
+ * **英語の配布ページ**（2026-10-13）。英語の記事・README から来た人が、日本語だけの頁に着かないように。
+ * 2 枚は hreflang で互いを指す —— 検索エンジンが「同じ頁の別の言語」と分かるように。
+ */
+describe('名乗り — 英語の配布ページ', () => {
+  const en = (): string => read('site/en/index.html');
+
+  it('lang が en で、title と description に決めた語が入っている', () => {
+    const html = en();
+    expect(html).toMatch(/<html lang="en">/);
+    const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
+    const description = /name="description"\s+content="([^"]*)"/.exec(html)?.[1] ?? '';
+    for (const term of EN_TERMS) expect(`${title}\n${description}`, term).toContain(term);
+  });
+
+  it('JSON-LD は JSON として読め、英語の頁を指す', () => {
+    const raw = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(en())?.[1];
+    const said = JSON.parse(raw ?? '{}') as Record<string, unknown>;
+    expect(said['name']).toBe('git-qa');
+    expect(said['url']).toBe('https://meta-taro.github.io/git-qa/en/');
+    for (const term of EN_TERMS) expect(String(said['description']), term).toContain(term);
+  });
+
+  it.each([
+    ['site/index.html', () => read('site/index.html')],
+    ['site/en/index.html', () => en()],
+  ])('%s は、日本語と英語の両方を hreflang で指す', (_where, text) => {
+    const html = text();
+    expect(html).toContain(
+      '<link rel="alternate" hreflang="ja" href="https://meta-taro.github.io/git-qa/" />',
+    );
+    expect(html).toContain(
+      '<link rel="alternate" hreflang="en" href="https://meta-taro.github.io/git-qa/en/" />',
+    );
+  });
+});

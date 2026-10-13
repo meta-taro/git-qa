@@ -6,7 +6,7 @@ git-qa is an open-source **human-in-the-loop QA** runner. An AI agent works thro
 on Android, iPhone, web and desktop apps; you watch the live screen and sign off each case,
 and the evidence records who verified what. AI agents can also drive it over MCP.
 
-[日本語版はこちら / Japanese](./README.ja.md) · [Download](https://meta-taro.github.io/git-qa/)
+[日本語版はこちら / Japanese](./README.ja.md) · [Download](https://meta-taro.github.io/git-qa/en/)
 
 ![git-qa running a test sheet: cases on the left, the live screen in the middle with the AI pointing at what it found, one-key verdicts on the right](./docs/images/run.png)
 
@@ -33,7 +33,7 @@ in the morning you review the failures. **The pass is still yours to give.**
 
 ## Try it
 
-1. Download the app from the [distribution page](https://meta-taro.github.io/git-qa/) (macOS, Windows x64 / ARM64) and install **Node 22+**
+1. Download the app from the [distribution page](https://meta-taro.github.io/git-qa/en/) (macOS, Windows x64 / ARM64) and install **Node 22+**
 2. Open git-qa. Enter a handle (it goes into the evidence as "who looked"), pick what to look at —
    an `adb` device, a web page URL, or a desktop app by name — and a test sheet
 3. Start, watch, and press `D` / `F` per case
@@ -121,7 +121,7 @@ workspace, so the same run reads the same way on anyone's machine.
 
 ## Install
 
-Download from the [distribution page](https://meta-taro.github.io/git-qa/), or
+Download from the [distribution page](https://meta-taro.github.io/git-qa/en/), or
 run it from source:
 
 ```bash

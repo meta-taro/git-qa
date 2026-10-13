@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      git-qa — human-in-the-loop QA runner for test sheets on Android, iPhone, web and desktop
+    </title>
+    <meta
+      name="description"
+      content="Open-source human-in-the-loop QA runner. An AI agent works through your test sheet on Android, iPhone, web and desktop apps; you watch the live screen and sign off each case with one key, and the evidence records who verified what. AI agents can drive it over MCP. Beta."
+    />
+    <link rel="icon" href="../icon.png" />
+    <!-- 日本語版と互いに指す（2026-10-13）。文面は README.md と同じ主張だけ —— 実測していないことを足さない。 -->
+    <link rel="alternate" hreflang="ja" href="https://meta-taro.github.io/git-qa/" />
+    <link rel="alternate" hreflang="en" href="https://meta-taro.github.io/git-qa/en/" />
+    <meta property="og:title" content="git-qa — human-in-the-loop QA runner" />
+    <meta
+      property="og:description"
+      content="An AI runs your test sheet; you watch and sign off each case with one key. The evidence records who verified what."
+    />
+    <!-- 絵と URL は絶対 URL（相対だと SNS が取りに行かない。日本語版と同じ理由）。 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/en/" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <!-- 語は packages/host/test/discoverability.test.ts が持っている。 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "git-qa",
+        "url": "https://meta-taro.github.io/git-qa/en/",
+        "description": "Open-source human-in-the-loop QA runner. An AI agent works through a test sheet on Android, iPhone, web and desktop apps; a person watches the live screen and signs off each case with one key, and the evidence records who verified what. AI agents can drive it over MCP.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Windows",
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/meta-taro/git-qa",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "inLanguage": "en",
+        "keywords": "human-in-the-loop QA, manual testing, AI testing, test sheet, test evidence, MCP, Claude Code, Android, iPhone, web, desktop"
+      }
+    </script>
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="mark">
+          <img src="../icon.png" alt="" />
+          <h1>git-qa<small>HUMAN-IN-THE-LOOP QA</small></h1>
+        </div>
+        <p class="lead">
+          <b>The AI drives. You watch, and sign off each case with one key.</b>
+          git-qa is an open-source human-in-the-loop QA runner. It works through a test sheet (TSV)
+          on Android devices, web pages and desktop apps — and iPhone / iPad.
+        </p>
+        <p class="split">
+          <b>The AI never passes anything.</b> The most it can give is <code>AUTO_PASS</code> —
+          nobody looked. <b>"A person verified this" appears only when a person presses the key.</b>
+        </p>
+        <div class="state">
+          <span class="tag ver" id="ver">Loading version…</span>
+          <span class="tag">Beta</span>
+          <span class="tag">MIT / OSS</span>
+          <a class="tag lang" href="../" hreflang="ja" lang="ja">日本語</a>
+        </div>
+      </header>
+
+      <figure class="shot">
+        <img
+          src="../screenshot.png"
+          alt="The git-qa window: the cases on the left, the live screen of the target in the middle, the AI verdict and the verdict keys on the right"
+        />
+        <figcaption>
+          <b>The real app.</b> Left: the cases in your test sheet. Middle: the target, live (the red
+          marker is where the AI found the expected text). Right: the AI's verdict and the keys you
+          press. <b>Finished cases show "VERIFIED / who looked".</b> The UI is shown in Japanese; it
+          also speaks English.
+        </figcaption>
+      </figure>
+
+      <h2>Download</h2>
+      <p class="note" id="when">Builds are published on GitHub Releases.</p>
+      <div class="files" id="files">
+        <div class="file">
+          <span class="os">macOS (Apple Silicon)</span>
+          <span class="what">
+            Open the <code>.dmg</code> and drag it into Applications. Drives devices, web pages and
+            desktop apps.
+          </span>
+          <a class="get" id="dl-mac" href="https://github.com/meta-taro/git-qa/releases">
+            Get the .dmg
+          </a>
+          <span class="size" id="size-mac"></span>
+        </div>
+        <div class="file">
+          <span class="os">Windows (x64 · Intel / AMD)</span>
+          <span class="what">
+            Install with the <code>.msi</code>. Drives
+            <b>web pages, Android devices and desktop apps</b> (<b
+              >recording and some input fields are not on Windows yet</b
+            >).
+          </span>
+          <a class="get" id="dl-win" href="https://github.com/meta-taro/git-qa/releases">
+            Get the .msi
+          </a>
+          <span class="size" id="size-win"></span>
+        </div>
+        <div class="file">
+          <span class="os">Windows (ARM64)</span>
+          <span class="what">
+            For Windows on ARM, such as Snapdragon. Installs and works the same as x64.
+          </span>
+          <a class="get" id="dl-win-arm" href="https://github.com/meta-taro/git-qa/releases">
+            Get the .msi
+          </a>
+          <span class="size" id="size-win-arm"></span>
+        </div>
+      </div>
+      <div class="warn">
+        <b>Windows builds are not signed.</b> You will see "Windows protected your PC". Check where
+        the file came from, then choose [More info] → [Run anyway].
+        <b>If you are not sure, do not install it.</b>
+        <br />
+        <b>macOS builds are signed and notarized</b>, so they open as they are.
+      </div>
+
+      <h2>What you need first</h2>
+      <p class="note">
+        <b>Node is required.</b> The app starts a runner process; without Node it stops on start and
+        says why.
+      </p>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Node 22 or newer</th>
+            <td><b>Required.</b> Without it the app stops after launch</td>
+          </tr>
+          <tr>
+            <th>adb (Android SDK Platform Tools)</th>
+            <td>Only for Android devices</td>
+          </tr>
+          <tr>
+            <th>Chrome / Edge / Firefox / Safari</th>
+            <td>
+              Only for web pages. <b>Pick any one that is installed</b> (its version goes into the
+              evidence)
+            </td>
+          </tr>
+          <tr>
+            <th>ffmpeg / cwebp</th>
+            <td>
+              Optional. <b>Nothing stops without them</b>, but evidence images and video stay in the
+              format they were captured in (<code>.jpg</code> / <code>.mov</code>)
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2>First three steps</h2>
+      <ol class="steps">
+        <li>
+          <b>Enter a handle</b>
+          <span>
+            It goes into the evidence as "who looked". <b>Use a handle, not your real name</b> —
+            evidence is designed to be committed to public repositories.
+          </span>
+        </li>
+        <li>
+          <b>Pick what to look at</b>
+          <span>
+            An Android device, a web page URL, or a desktop app by name (the owner of the window).
+          </span>
+        </li>
+        <li>
+          <b>Pick a test sheet (TSV) and start</b>
+          <span>
+            The AI runs one case at a time and <b>stops when it is your turn.</b> <kbd>D</kbd> pass
+            / <kbd>F</kbd> fail / <kbd>A</kbd> cannot decide / <kbd>S</kbd> skip. Moving on with
+            <kbd>Space</kbd> without a verdict leaves <code>AUTO_PASS</code> (<b
+              >it is never promoted to a pass</b
+            >).
+          </span>
+        </li>
+      </ol>
+
+      <h2>Watch mode</h2>
+      <p class="note"><b>It moves on without you.</b> You only watch; the AI runs to the end.</p>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>If you press a key</th>
+            <td>That becomes the verdict (recorded as the verdict of the person watching)</td>
+          </tr>
+          <tr>
+            <th>If you do not</th>
+            <td><code>AUTO_PASS</code>. <b>Never promoted</b></td>
+          </tr>
+          <tr>
+            <th>To stop</th>
+            <td>
+              <kbd>Esc</kbd>, or [Stop watching] on screen.
+              <b>Cases that have not run are not written into the evidence</b> (you can continue
+              from there next time)
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2>One test, one folder</h2>
+      <p class="note">
+        The test sheet, the evidence, the screens and the video pile up in one place.
+        <b>Put the whole folder under git.</b>
+      </p>
+      <pre><code>$ pnpm ws:init ./contacts-check "Contacts check"
+
+contacts-check/
+  git-qa.json     … marks this folder as one test
+  sheet.tsv       … the test sheet (you put it here)
+  runs/           … created when you run
+    20260912-100000/
+      run.json
+      case-001/screen.webp · screen.webm</code></pre>
+      <p class="note" style="margin-top: 14px">
+        <b>Without the marker, nothing changes</b> (runs go to <code>runs/</code> where you ran it).
+      </p>
+
+      <h2>Stop today, continue tomorrow</h2>
+      <p class="note">
+        Stopped runs are listed on the start screen. <b>Pick one and git-qa adds to that run</b> —
+        you do not place yesterday's verdicts again.
+      </p>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Cases that never ran</th>
+            <td>
+              <b>Not written into the evidence.</b> Writing "stopped, so cannot decide" would make
+              them <b>indistinguishable from cases that ran and ended undecided</b>
+            </td>
+          </tr>
+          <tr>
+            <th>Is it unfinished?</th>
+            <td>
+              If <code>run.json</code> has no end time, it is unfinished. <b>That is the marker</b>
+            </td>
+          </tr>
+          <tr>
+            <th>If the sheet changed</th>
+            <td>
+              <b>It does not continue.</b> Yesterday's verdicts were placed against a different text
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2>What is kept</h2>
+      <pre><code>runs/&lt;date-time&gt;/
+  run.json        … verdicts, steps, who placed them and when (written after every case)
+  case-001/
+    screen.webp   … the screen at the moment the verdict was placed
+    screen.webm   … video while the AI drives (in watch mode)</code></pre>
+      <p class="note" style="margin-top: 14px">
+        <b>Nothing about your machine goes in.</b> The sheet's path is kept relative to the
+        workspace, so <b>the same run reads the same way on anyone's machine</b> (no personal names
+        in the evidence).
+      </p>
+      <p class="note" style="margin-top: 14px">
+        You can check later what each verdict was placed against.
+        <b>If the sheet has been rewritten, <code>pnpm check:run</code> exits with 1.</b>
+      </p>
+      <pre><code>$ pnpm check:run runs/&lt;date-time&gt;/run.json</code></pre>
+
+      <h2>What it can do today</h2>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Android devices</th>
+            <td>Real devices and emulators over USB. Tap, swipe, type</td>
+          </tr>
+          <tr>
+            <th>Web pages</th>
+            <td>
+              Chrome-family / Firefox / Safari. <b>Same viewport every run</b>, so you can compare
+              layouts
+            </td>
+          </tr>
+          <tr>
+            <th>Desktop apps</th>
+            <td>
+              <b>macOS and Windows.</b> On macOS it presses without bringing the app to the front
+              and reads text in two stages (Accessibility, then OCR). On Windows it reads and
+              presses through UI Automation (no recording)
+            </td>
+          </tr>
+          <tr>
+            <th>iPhone / iPad</th>
+            <td>
+              Watch, read and record over USB. <b>Tapping, typing and launching apps</b> only with
+              WebDriverAgent installed on the device (signing and installing it is a person's job).
+              Not yet confirmed from Windows
+            </td>
+          </tr>
+          <tr>
+            <th>From an AI agent</th>
+            <td>Over MCP (take screenshots, read the screen, tap)</td>
+          </tr>
+        </table>
+      </div>
+
+      <h2>Not there yet</h2>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Recording on Windows</th>
+            <td>
+              <b>Desktop testing itself works</b> (find the window, capture, read text, press, type,
+              keys). <b>Only recording is missing</b> — a screen is kept per case
+            </td>
+          </tr>
+          <tr>
+            <th>Some input fields on Windows</th>
+            <td>
+              Typing works, but <b>the contents of password fields are not read</b> (even where they
+              could be — that is a decision)
+            </td>
+          </tr>
+          <tr>
+            <th>Signing on Windows</th>
+            <td>
+              Not signed (the certificate needs a physical token or an HSM), so you will see the
+              warning above. <b>macOS is signed and notarized</b>
+            </td>
+          </tr>
+          <tr>
+            <th>Auto-update</th>
+            <td>None. <b>Download new builds from this page again</b></td>
+          </tr>
+          <tr>
+            <th>Detecting that the target was swapped</th>
+            <td>
+              Desktop apps only. <b>Web and Android are recorded as "could not measure"</b> (never
+              as "unchanged")
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2>Read the source, run it locally</h2>
+      <p class="note">
+        You can also clone and run it instead of downloading (development happens here).
+      </p>
+      <pre><code>git clone https://github.com/meta-taro/git-qa.git
+cd git-qa
+pnpm install
+pnpm app</code></pre>
+
+      <footer>
+        <a href="https://github.com/meta-taro/git-qa">GitHub</a> ·
+        <a href="https://github.com/meta-taro/git-qa/releases">Releases</a> ·
+        <a href="https://github.com/meta-taro/git-qa/issues">Requests &amp; bugs</a> ·
+        <a href="../" hreflang="ja" lang="ja">日本語</a> · MIT
+        <br />
+        <b>Please write requests in your own words, right after you hit the problem.</b>
+        Summarizing loses the part that actually hurt.
+      </footer>
+    </main>
+
+    <script src="../release.js"></script>
+  </body>
+</html>

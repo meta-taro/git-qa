@@ -13,6 +13,7 @@ git-qa does not let an AI declare "everything passed". The AI operates the devic
 
 - [README (English)](https://github.com/meta-taro/git-qa/blob/develop/README.md)
 - [README (日本語)](https://github.com/meta-taro/git-qa/blob/develop/README.ja.md)
-- [Download](https://meta-taro.github.io/git-qa/)
+- [Download (English)](https://meta-taro.github.io/git-qa/en/)
+- [Download (日本語)](https://meta-taro.github.io/git-qa/)
 - [iPhone / iPad tapping guide](https://github.com/meta-taro/git-qa/blob/develop/docs/ios-press.md)
 - [Design decisions](https://github.com/meta-taro/git-qa/blob/develop/docs/decisions.md)
