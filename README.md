@@ -88,6 +88,10 @@ tool that exists to save effort expensive to use.
 | **Mobile browsers** | Android Chrome over `adb forward` + CDP. iOS Safari through the iPhone path above. **Not yet tried** |
 | **From an AI agent** | Over MCP — screenshot, read the screen, **list the names you can press**, tap by name. Android, web, desktop, or iPhone / iPad |
 
+![git-qa driving a real iPhone: the Clock app opened and the Stopwatch tab tapped through WebDriverAgent, with the AI verdict AUTO_PASS](./docs/images/iphone.png)
+
+*A real iPhone, driven through WebDriverAgent: git-qa launched the Clock app and tapped "Stopwatch". The case waits for a person's verdict.*
+
 ## What evidence looks like
 
 One folder per test run. **Commit the whole folder** if you want the test itself

@@ -373,6 +373,8 @@ pnpm run:sheet sheets/android-settings.tsv
 
 ### iPhone / iPad を検証する
 
+![git-qa が実機の iPhone を動かしているところ。時計アプリを起動し、「ストップウォッチ」をタップした。AI の判定は AUTO_PASS で、人の判定待ち](./docs/images/iphone.png)
+
 ```bash
 pnpm run:sheet:ios <シート>            # 人が見ている実行
 pnpm run:sheet:ios <シート> --record    # 動画も残す
