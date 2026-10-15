@@ -27,7 +27,13 @@
     const 返り = await fetch('https://api.github.com/repos/meta-taro/git-qa/releases?per_page=10');
     if (!返り.ok) throw new Error(String(返り.status));
     const 並び = await 返り.json();
-    const 版 = (Array.isArray(並び) ? 並び : []).find((x) => !x.draft);
+    // **転がる開発版 `dev` は配らない**（2026-10-15）。develop に入るたびに建て直されるので、
+    // 一覧の先頭にいつも居る。名乗りが版の形（v0.2.0-beta.20）のものだけを採る。
+    // アプリの更新確認（packages/host/src/update.ts）と同じ線引き。
+    const 版の形 = /^v?\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
+    const 版 = (Array.isArray(並び) ? 並び : []).find(
+      (x) => !x.draft && 版の形.test(String(x.tag_name)),
+    );
     if (!版) throw new Error('版が無い');
     置く('ver', 文言.最新(版.tag_name));
     const 日 = new Date(版.published_at);
