@@ -130,7 +130,9 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
     'device_key',
     {
       title: '端末のキーを押す',
-      description: 'HOME / BACK / APP_SWITCH / ENTER などのキーを送る。',
+      description:
+        'HOME / BACK / APP_SWITCH / ENTER などのキーを送る。' +
+        'iPhone / iPad で送れるのは ENTER・HOME・BACK だけ（BACK は画面左上の「<」を押し、無ければ左端からなぞる）。',
       inputSchema: { key: z.string().min(1) },
     },
     async ({ key }) => {

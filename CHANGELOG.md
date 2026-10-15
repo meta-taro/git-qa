@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+- 足した: **iPhone / iPad で「戻る」（`Back キーを押す`・MCP の `device_key` の `BACK`）。**
+  これまでは「送れるのは Enter と Home だけ」と断って止まっていた。画面左上の「<」を押し、
+  無ければ左端から右へなぞる。**どちらでも画面が変わらなければ、戻れたことにせず止まる。**
+  ホーム画面では、戻る先が無いと言って止まる（実機の iPhone XS・iOS 18.7.10 で確かめた）
 - 直した: **Windows で iPhone / iPad を、口（WebDriverAgent）だけの形に自動で切り替えていなかった。**
   `GIT_QA_IOS_ONLY_WDA=1` を付けないと `spawn … git-qa-ios ENOENT` で終わっていた（実行器・MCP とも）
 - 足した: **絵から読む道具が無いとき（Windows）、iPhone / iPad の画面の文字を口の部品の名前から読む。**

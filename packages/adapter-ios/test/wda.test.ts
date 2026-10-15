@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createWdaClient, pickByText, toPoints } from '../src/wda.js';
+import { createWdaClient, findBack, pickByText, toPoints } from '../src/wda.js';
 
 /**
  * **iPhone / iPad を押す口**（WebDriverAgent・2026-10-06 に作ると決めた・C99）。
@@ -196,5 +196,46 @@ describe('createWdaClient — 起動とホーム', () => {
     await wda.home();
 
     expect(sent.some((one) => one.path === '/wda/homescreen' && one.method === 'POST')).toBe(true);
+  });
+});
+
+describe('findBack', () => {
+  /**
+   * **iPhone の「戻る」は、画面左上の「<」**（2026-10-15・Windows の席で BACK を断られた）。
+   * 部品の木から、ナビゲーションバーの左寄りのボタンを探す。座標はポイント（WDA が受け取る単位）。
+   */
+  const app = (children: unknown[]) => ({
+    type: 'Application',
+    rect: { x: 0, y: 0, width: 402, height: 874 },
+    children,
+  });
+  const navBar = (buttons: unknown[]) => ({
+    type: 'NavigationBar',
+    isVisible: '1',
+    rect: { x: 0, y: 62, width: 402, height: 54 },
+    children: buttons,
+  });
+  const button = (label: string, x: number, isVisible: string = '1') => ({
+    type: 'Button',
+    label,
+    isVisible,
+    rect: { x, y: 70, width: 60, height: 40 },
+  });
+
+  it('ナビゲーションバーの左寄りのボタンを返し、画面の大きさも返す', () => {
+    const found = findBack(app([navBar([button('編集', 330), button('設定', 8)])]));
+    expect(found).toEqual({ back: { x: 38, y: 90 }, width: 402, height: 874 });
+  });
+
+  it('右寄りのボタンしか無ければ、戻るボタンは無いとする', () => {
+    expect(findBack(app([navBar([button('編集', 330)])])).back).toBeUndefined();
+  });
+
+  it('見えていないボタンは数えない', () => {
+    expect(findBack(app([navBar([button('設定', 8, '0')])])).back).toBeUndefined();
+  });
+
+  it('ナビゲーションバーが無ければ、戻るボタンは無いとする', () => {
+    expect(findBack(app([button('設定', 8)])).back).toBeUndefined();
   });
 });

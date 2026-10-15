@@ -29,7 +29,7 @@
 ```bash
 GIT_QA_MCP_TARGET=web GIT_QA_MCP_URL=http://localhost:3000/ pnpm mcp   # ウェブ
 GIT_QA_MCP_TARGET=desktop GIT_QA_MCP_APP=メモ pnpm mcp                 # デスクトップ
-GIT_QA_MCP_TARGET=ios pnpm mcp                                         # iPhone / iPad（押せない）
+GIT_QA_MCP_TARGET=ios pnpm mcp                                         # iPhone / iPad（押すには GIT_QA_IOS_WDA）
 pnpm mcp                                                               # Android（既定）
 ```
 
@@ -43,8 +43,12 @@ pnpm mcp                                                               # Android
 `element_list` が空を返したら、**それは「画面に何も無い」ではない** ——
 絵からしか読めない相手（Electron など）で起きる。**`device_screenshot` で見て、人に操作を頼む。**
 
-**iPhone / iPad は押せない**（端末側にアプリを入れるのに署名が要る）。
-`element_list` は理由を言って断る。**見る・読むだけして、操作は人に頼むこと。**
+**iPhone / iPad は、端末で WebDriverAgent が起きているときだけ押せる**（`GIT_QA_IOS_WDA` に URL・C99）。
+署名して端末へ入れるのは人の作業（[ios-press.md](./ios-press.md)）。口が無ければ、押す道具は理由を言って断る。
+
+- **`element_list` はまだ断る**（名前を並べられない）。`device_screen_text` に出た文字を `element_tap` に渡す
+- **キーは Enter・Home・Back だけ**（2026-10-15）。iPhone に物の戻るキーは無いので、Back は
+  **画面左上の「<」を押し、無ければ左端から右へなぞる。**どちらでも画面が変わらなければ、戻れたことにせず断る
 
 **既に起きているブラウザにも繋げる**（`GIT_QA_CDP`）。Playwright が前準備を済ませた
 ブラウザへ、そのまま続けて触れる。
@@ -119,10 +123,10 @@ pnpm mcp                                                               # Android
 | **ウェブ** | ブラウザの中へ命令（CDP / BiDi / WebDriver） | 出ない | 動かない |
 | **Android 実機** | 端末へ命令（`adb shell input`） | 関係ない | 動かない |
 | **デスクトップ（macOS）** | OS の入力（他に口が無い） | 掴んで運ぶときだけ | なぞる・運ぶで動く |
-| **iPhone / iPad** | **動かせない**（押す口が無い） | 出ない | 動かない |
+| **iPhone / iPad** | 端末の中の口（WebDriverAgent）へ命令。**口が無ければ動かせない** | 出ない | 動かない |
 
 **デスクトップだけが、アプリの中に喋る道を持っていない。**
-**iPhone / iPad だけが、そもそも動かせない** —— 見て読むだけ。**操作は人に頼むこと。**
+**iPhone / iPad は、口（WebDriverAgent）が無いと動かせない** —— そのときは見て読むだけ。**操作は人に頼むこと。**
 
 ---
 
@@ -179,12 +183,12 @@ pnpm check:run runs/<日時>/run.json
 
 ## まだ無いもの（**「ある」と言わないこと**）
 
-- **iPhone / iPad を押すこと。**見る・読む・録るは叩きが入っている（2026-09-19）。
-  **押すには端末側にアプリ（WebDriverAgent）が要り、署名が要る＝人の作業。**
+- **iPhone / iPad で押せる名前を並べること**（`element_list`）。押すこと自体は、口（WebDriverAgent）があればできる。
+  **口を端末へ入れるのは署名が要る＝人の作業。**
   **「iOS は 1 行も無い」と書かないこと** —— ここにそう書いてあったせいで、
   **動く Windows のデスクトップ検証まで検討から外させていた**（外部レビュー meta-taro/git-qa#23）
-- **iPhone / iPad は実機で 1 度も測っていない**（2026-09-19 時点）。
-  **「動く」と言わないこと。**建つことと、端末が無いときの振る舞いだけ確かめてある
+- **iPhone / iPad を押すのは、実機では Mac からだけ測ってある**（README の表が正本）。
+  **Windows からは「動く」と言わないこと**
 - **Windows のデスクトップ検証は「ある」。**ただし**録画が無い**（画面は 1 件ごとに残る）。
   **「穴がある」と「無い」を混ぜない**
 - 押す場所は**画面に見えている文字だけ**。同じ文字が複数あると、

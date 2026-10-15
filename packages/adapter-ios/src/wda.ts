@@ -39,12 +39,26 @@ export interface WdaClient {
    * 絵から読む道具（macOS だけ）が無いときに使う（2026-10-13）。
    */
   texts(): Promise<string>;
+  /**
+   * 戻るための手がかり（2026-10-15）。画面左上の「<」の真ん中（**無ければ `back` は無い**）と、
+   * 画面の大きさ（左端からなぞるのに要る）。どちらもポイント。
+   */
+  navigation(): Promise<Navigation>;
   /** なぞる（ポイントの座標で・`durationMs` かけて動かす）。 */
   swipe(
     from: { x: number; y: number },
     to: { x: number; y: number },
     durationMs: number,
   ): Promise<void>;
+}
+
+/** 戻るための手がかり。座標はポイント。 */
+export interface Navigation {
+  readonly back?: { x: number; y: number };
+  /** 前に出ているアプリの識別子。ホーム画面は `com.apple.springboard`。**聞けなければ無い。** */
+  readonly app?: string;
+  readonly width: number;
+  readonly height: number;
 }
 
 /** 断られた理由ごと持ち運ぶ（セッションの作り直しの判断に要る）。 */
@@ -177,6 +191,13 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
       return sourceToLines(said.value, await this.scale());
     },
 
+    async navigation() {
+      const said = (await call('GET', '/source?format=json')) as { value?: unknown };
+      const front = (await call('GET', '/wda/activeAppInfo')) as { value?: { bundleId?: unknown } };
+      const app = front.value?.bundleId;
+      return { ...findBack(said.value), ...(typeof app === 'string' ? { app } : {}) };
+    },
+
     async screenshot() {
       const said = (await call('GET', '/screenshot')) as { value?: string };
       if (typeof said.value !== 'string')
@@ -223,8 +244,7 @@ export function sourceToLines(root: unknown, scale: number): string {
   const by = scale > 0 ? scale : 1;
   const out: string[] = [];
   const walk = (node: SourceNode): void => {
-    const visible =
-      node.isVisible === undefined || node.isVisible === true || node.isVisible === '1';
+    const visible = isShown(node);
     const label = typeof node.label === 'string' ? node.label.trim() : '';
     const { rect } = node;
     if (
@@ -249,6 +269,40 @@ export function sourceToLines(root: unknown, scale: number): string {
   };
   if (typeof root === 'object' && root !== null) walk(root);
   return out.join('\n');
+}
+
+const isShown = (node: SourceNode): boolean =>
+  node.isVisible === undefined || node.isVisible === true || node.isVisible === '1';
+
+/**
+ * **画面左上の「<」を、部品の木から探す**（2026-10-15）。
+ *
+ * ナビゲーションバーの中の、見えているボタンのうち、**画面の左 3 分の 1 に在るもの**の
+ * いちばん左。右寄りのボタン（「編集」など）は戻るボタンではないので採らない。
+ * 画面の大きさはアプリそのもの（いちばん外の部品）の大きさ。座標はポイント。
+ */
+export function findBack(root: unknown): Navigation {
+  if (typeof root !== 'object' || root === null) return { width: 0, height: 0 };
+  const top = root as SourceNode;
+  const width = top.rect?.width ?? 0;
+  const height = top.rect?.height ?? 0;
+
+  const buttons: NonNullable<SourceNode['rect']>[] = [];
+  const walk = (node: SourceNode, inBar: boolean): void => {
+    const bar = inBar || (node.type === 'NavigationBar' && isShown(node));
+    if (inBar && node.type === 'Button' && isShown(node) && node.rect !== undefined) {
+      buttons.push(node.rect);
+    }
+    for (const child of node.children ?? []) walk(child, bar);
+  };
+  walk(top, false);
+
+  const left = buttons
+    .filter((rect) => rect.width > 0 && rect.x + rect.width / 2 < width / 3)
+    .sort((a, b) => a.x - b.x)[0];
+  return left === undefined
+    ? { width, height }
+    : { back: { x: left.x + left.width / 2, y: left.y + left.height / 2 }, width, height };
 }
 
 /** 画素の座標をポイントへ。 */

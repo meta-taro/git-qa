@@ -159,7 +159,7 @@ const BUNDLE_ID = /^[a-zA-Z][a-zA-Z0-9-]*(?:\.[a-zA-Z0-9-]+)+$/;
  * 口が無いのに名乗ると、planning が「操作できる」つもりで回る（C20）。
  */
 export function iosCapabilities(canPress: boolean): AdapterCapabilities {
-  // 口があれば、打てる・キー（Enter / Home）を送れる・**識別子（Bundle ID）で開ける**。
+  // 口があれば、打てる・キー（Enter / Home / Back）を送れる・**識別子（Bundle ID）で開ける**。
   return canPress
     ? { ...IOS_CAPABILITIES, textInput: 'any', keyInput: true, appId: 'package-or-url' }
     : IOS_CAPABILITIES;
@@ -170,6 +170,63 @@ export interface IosActDeps {
   readonly wda: WdaClient | undefined;
   /** いまの画面を撮って、絵から読んだ文字（`文字 \t x \t y \t 幅 \t 高さ`）を返す。 */
   readonly look: () => Promise<string>;
+  /** 戻ったあと、画面が落ち着くまで待つ。**試験では待たない。** */
+  readonly settle?: () => Promise<void>;
+}
+
+/** 押した所を証跡の手順に添える形（ポイント）。 */
+const at = (pt: { x: number; y: number }): string =>
+  `（${String(Math.round(pt.x))}, ${String(Math.round(pt.y))}）`;
+
+/** ホーム画面の識別子。 */
+const HOME_SCREEN = 'com.apple.springboard';
+
+/** 戻る動き（画面が横へ流れる）が終わるまでの間。 */
+const SETTLE_MS = 700;
+
+/**
+ * **iPhone で戻る**（2026-10-15）。物の戻るキーが無いので、
+ * 画面左上の「<」を押し、効かなければ（または無ければ）左端から右へなぞる。
+ *
+ * **画面が変わったかで、戻れたかを決める。**どちらでも変わらなければ、戻れたことにしない（C20）。
+ */
+async function goBack(wda: WdaClient, deps: IosActDeps): Promise<ActReport> {
+  const settle =
+    deps.settle ?? (() => new Promise<void>((resolve) => setTimeout(resolve, SETTLE_MS)));
+  const nav = await wda.navigation();
+  // **ホーム画面で左端からなぞると、ウィジェットの画面が開く**（2026-10-15・実機の Xs で踏んだ）。
+  // 画面は変わるので「戻れた」に見えてしまう。戻る先が無いと言って止まる。
+  if (nav.app === HOME_SCREEN) {
+    throw new AdapterError(
+      KIND,
+      '戻れなかった（いまはホーム画面で、戻る先が無い）。アプリを開く手順を先に入れてください',
+    );
+  }
+  const before = await deps.look();
+
+  if (nav.back !== undefined) {
+    await wda.tap(nav.back);
+    await settle();
+    if ((await deps.look()) !== before) {
+      return { detail: `画面左上の戻るボタンを WebDriverAgent で押した${at(nav.back)}` };
+    }
+  }
+
+  // 左端の数ポイントから、画面の 7 割まで横へ。**縦は真ん中**（上下の部品に掛からないように）。
+  const y = Math.round(nav.height / 2);
+  const from = { x: 2, y };
+  const to = { x: Math.round(nav.width * 0.7), y };
+  await wda.swipe(from, to, 300);
+  await settle();
+  if ((await deps.look()) !== before) {
+    return { detail: `画面の左端から右へなぞって戻った${at(from)}→${at(to)}` };
+  }
+
+  throw new AdapterError(
+    KIND,
+    '戻れなかった（画面左上の戻るボタンも、左端から右へなぞる操作も、画面を変えなかった）。' +
+      'この画面に戻る手段が無いなら、シートは「ホーム」か、アプリの起動からやり直す手順にしてください',
+  );
 }
 
 /**
@@ -201,9 +258,6 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     }
     return { pt: toPoints(found, scale), label: `「${target.ref}」` };
   };
-  const at = (pt: { x: number; y: number }): string =>
-    `（${String(Math.round(pt.x))}, ${String(Math.round(pt.y))}）`;
-
   if (action.kind === 'tap') {
     const { pt, label } = await aim(action.target);
     await wda.tap(pt);
@@ -235,9 +289,13 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     return { detail: `${action.app} を WebDriverAgent で起動した` };
   }
 
-  /** キー。**iOS には物のキーが無い**ので、Enter は改行として打ち、Home はホーム画面へ戻る。 */
+  /**
+   * キー。**iOS には物のキーが無い**ので、Enter は改行として打ち、Home はホーム画面へ戻り、
+   * Back は画面の上で戻る（`goBack`）。
+   */
   if (action.kind === 'key') {
     const key = action.key.trim().toLowerCase();
+    if (key === 'back' || key === '戻る') return goBack(wda, deps);
     if (key === 'enter' || key === 'return') {
       await wda.type('\n');
       return { detail: 'Enter を改行として WebDriverAgent で打った' };
@@ -248,7 +306,7 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     }
     throw new AdapterError(
       KIND,
-      `iPhone / iPad には送れないキー（${action.key}）。送れるのは Enter と Home だけ`,
+      `iPhone / iPad には送れないキー（${action.key}）。送れるのは Enter・Home・Back だけ`,
     );
   }
 

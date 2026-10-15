@@ -22,6 +22,7 @@ const wda = (ready = true): WdaClient => ({
   home: () => Promise.resolve(),
   swipe: () => Promise.resolve(),
   texts: () => Promise.resolve('一般\t300\t600\t120\t60'),
+  navigation: () => Promise.resolve({ width: 402, height: 874 }),
   info: () => Promise.resolve({ model: 'iPhone', osVersion: '17.5.1', id: 'ABCDEF' }),
 });
 

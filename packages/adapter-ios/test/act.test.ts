@@ -31,6 +31,7 @@ const fake = (scale = 3) => {
       return Promise.resolve();
     },
     texts: () => Promise.resolve(''),
+    navigation: () => Promise.resolve({ width: 402, height: 874 }),
     swipe: (from, to, ms) => {
       done.push(
         `swipe ${String(from.x)},${String(from.y)}→${String(to.x)},${String(to.y)} ${String(ms)}ms`,
