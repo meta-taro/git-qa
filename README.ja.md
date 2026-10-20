@@ -707,7 +707,7 @@ AI が続けて触れます。
 | `device_key` | HOME / BACK / APP_SWITCH などを送る |
 | `device_launch` | アプリを起動する（Android ならパッケージ名で） |
 | `device_type` | いま入力先になっている欄へ文字を送る（ASCII のみ） |
-| `device_screenshot` | いまの画面を PNG で取る |
+| `device_screenshot` | いまの画面を絵で取る。`saveTo` に場所と名前を渡すと、そこにも書く（もう在るファイルには書かない） |
 | `device_screen_text` | 画面で読める文字を取る |
 | `element_list` | **押せる名前を並べる**（そのまま `element_tap` へ渡せます） |
 | `device_screen_size` | 端末の実寸（座標を決めるのに使う） |

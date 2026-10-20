@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
+import { saveShot } from './save-shot.js';
 import type { DeviceTools } from './tools.js';
 
 /**
@@ -197,10 +198,19 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
 
   server.registerTool(
     'device_screenshot',
-    { title: '端末の画面を撮る', description: 'いまの画面を PNG で返す。', inputSchema: {} },
-    async () => {
+    {
+      title: '端末の画面を撮る',
+      description:
+        'いまの画面を絵で返す。saveTo に場所と名前を渡すと、そこにも書く（証跡のフォルダへ直接入れる）。' +
+        '相対の場所は MCP を起こした所から数える。拡張子を省くと絵の形に合わせて付く。もう在るファイルには書かない。',
+      inputSchema: { saveTo: z.string().min(1).optional() },
+    },
+    async ({ saveTo }) => {
       const shot = await tools.screenshot();
-      return { content: [{ type: 'image' as const, data: shot.base64, mimeType: shot.mimeType }] };
+      const image = { type: 'image' as const, data: shot.base64, mimeType: shot.mimeType };
+      if (saveTo === undefined) return { content: [image] };
+      const saved = await saveShot(shot, saveTo);
+      return { content: [image, { type: 'text' as const, text: `書いた: ${saved}` }] };
     },
   );
 
