@@ -214,3 +214,30 @@ describe('commandForKey — 1 対 1', () => {
     expect(commandForKey({ key: '0' })).toEqual({ kind: 'zoom', by: 0 });
   });
 });
+
+/**
+ * **押しっぱなしで判定を置かない**（2026-10-20）。
+ *
+ * キーを押し続けると、OS が同じキーを連打する（`repeat`）。これを受けていたので、
+ * `d` を押しっぱなしにすると、各ケースが受け付けを始めた瞬間に VERIFIED になった
+ * —— **人が画面を見ていないのに「見て確かめた」が残る。**
+ * 判定と「置かずに次へ」は、押した 1 回だけを受ける。
+ */
+describe('commandForKey — 押しっぱなし', () => {
+  it.each(['d', 'f', 'a', 's', ' '])('%s の連打は受けない', (key) => {
+    expect(commandForKey({ key, repeat: true })).toBeUndefined();
+  });
+
+  it('押した 1 回目は受ける', () => {
+    expect(commandForKey({ key: 'd', repeat: false })).toEqual({
+      kind: 'verdict',
+      humanResult: 'VERIFIED',
+    });
+  });
+
+  /** 一覧を送る・拡大するのは、押し続けて動いてよい。判定ではない。 */
+  it('ケース移動と拡大は、押し続けても動く', () => {
+    expect(commandForKey({ key: 'ArrowDown', repeat: true })).toEqual({ kind: 'next' });
+    expect(commandForKey({ key: '+', repeat: true })).toEqual({ kind: 'zoom', by: 1 });
+  });
+});

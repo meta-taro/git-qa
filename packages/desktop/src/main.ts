@@ -693,7 +693,11 @@ function startControl(controlUrl: string): void {
     // **文字を打っている最中の `d` を、判定にしない。**
     if (shouldIgnoreKeyPress(event.target)) return;
     const command = commandForKey(event);
-    if (command === undefined) return;
+    if (command === undefined) {
+      // 押しっぱなしの Space は判定にしないが、ページを送らせもしない。
+      if (event.repeat && event.key === ' ') event.preventDefault();
+      return;
+    }
     event.preventDefault();
     place(command);
   });

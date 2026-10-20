@@ -17,6 +17,8 @@ export interface KeyPress {
   readonly ctrlKey?: boolean;
   readonly metaKey?: boolean;
   readonly altKey?: boolean;
+  /** **押しっぱなしで OS が送ってくる連打**（`KeyboardEvent.repeat`）。 */
+  readonly repeat?: boolean;
 }
 
 export type KeyCommand =
@@ -102,6 +104,10 @@ export function commandForKey(press: KeyPress): KeyCommand | undefined {
   const key = press.key.length === 1 ? press.key.toLowerCase() : press.key;
 
   const humanResult = VERDICTS[key];
+  // **押しっぱなしで判定を置かない**（2026-10-20）。連打を受けると、`d` を押し続けるだけで
+  // 各ケースが受け付けを始めた瞬間に VERIFIED になる —— 人が見ていないのに「見た」が残る。
+  // 判定と「置かずに次へ」は、押した 1 回だけを受ける。
+  if ((humanResult !== undefined || key === ' ') && press.repeat === true) return undefined;
   if (humanResult !== undefined) return { kind: 'verdict', humanResult };
   if (key === ' ') return { kind: 'advance' };
   if (key === 'Escape') return { kind: 'stop' };
