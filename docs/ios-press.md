@@ -132,6 +132,33 @@ ios runwda \
   Mac で問題の無いケーブルでも起きました。別のケーブルに替えると安定しました
 - `go-ios agent is not running …` という警告は毎回出ますが、`ios list` には関係しません
 
+### go-ios の 3 本を git-qa に立てさせる（`GIT_QA_IOS_GO`）
+
+トンネル・`runwda`・`forward` を手で立てる代わりに、git-qa に立てて見張らせられます（2026-10-20）。
+`pnpm run:sheet:ios` と MCP のどちらでも効きます。
+
+```powershell
+$env:GIT_QA_IOS_GO = "C:\tools\go-ios\ios.exe"                          # go-ios の場所
+$env:GIT_QA_IOS_UDID = "<端末の識別子>"                                    # ios list で出る
+$env:GIT_QA_IOS_WDA_BUNDLE = "<Runner の Bundle ID>.xctrunner"
+pnpm run:sheet:ios <検証シート.tsv>
+```
+
+- 順に **トンネル → 繋がったら `runwda` → 6 秒おいて `forward` 8100 / 9100 → `/status` が ready** で始めます。窓は出しません
+- **USB が繋がり直したら立て直します。**トンネルは居座って自分で張り直すので触らず、張り直したのを見てから `runwda` と `forward` を立て直します。
+  `runwda` だけが終わったときも立て直します。終わった理由（go-ios の言葉）を `[git-qa]` の行に出します
+- 開発用のディスクイメージが載っていないと言われたら、**1 度だけ** `ios image auto` で載せてから立て直します（初回は取ってきます）。
+  go-ios の作業場所は一時フォルダの `git-qa-go-ios` です。go-ios は今いる所に端末と組むための名乗り（`selfIdentity.plist`）と
+  ディスクイメージを書くので、プロジェクトの中で手で打つと、そこに残ります（commit しないでください）
+- `GIT_QA_IOS_WDA` を渡しているときは、そちらを使います（人が立てた口を奪いません）
+- 終わるときに、立てたものは全部止めます
+- 準備は 3 分待ちます。できなければ、理由を言って止まります。**端末のロックは外しておいてください**
+
+**確かめたこと**（macOS・go-ios 1.3.2・iPhone Xs・iOS 18.7.10）：立てる・落ちたのを知る・理由を出す・
+ディスクイメージを載せる・終わるときに全部止める。**準備完了まで通したのは、まだです**
+（`runwda` が `cannot initiate a IDE session: Timed out …` で終わり続けた。端末のロックを外して確かめ直す）。
+**Windows ではまだ試していません。**
+
 **まだ確かめていないこと（Windows）**：その先（トンネル → `runwda` → git-qa で流す）。**WDA を端末へ入れる（建てて署名する）ところは Mac が要ります**（初回と、署名が切れたとき）。
 
 ---

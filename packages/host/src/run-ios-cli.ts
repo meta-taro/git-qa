@@ -1,6 +1,12 @@
 import { readFile } from 'node:fs/promises';
 
-import { createIosAdapter, listIosDevices, readIosScreenText } from '@git-qa/adapter-ios';
+import {
+  createIosAdapter,
+  keeperSettings,
+  listIosDevices,
+  readIosScreenText,
+  startWdaKeeper,
+} from '@git-qa/adapter-ios';
 import {
   duplicateTargetMessage,
   parseTestSpecTsv,
@@ -38,7 +44,30 @@ if (sheetPath === undefined) {
   process.exit(1);
 }
 
-const wdaUrl = process.env['GIT_QA_IOS_WDA'];
+/**
+ * **go-ios の場所が渡されていれば、口（WebDriverAgent）を git-qa が立てて見張る**（2026-10-20・C103）。
+ * USB が繋がり直しても、tunnel が張り直したら立て直す。人が立てた口（`GIT_QA_IOS_WDA`）があれば、そちらを使う。
+ */
+const kept = await (async () => {
+  try {
+    const settings = keeperSettings(process.env);
+    if (settings === undefined) return undefined;
+    const keeper = startWdaKeeper(settings);
+    // **立てたものは必ず止める**（止め忘れると、go-ios が裏に残り続ける）。
+    process.on('exit', () => {
+      keeper.close();
+    });
+    console.log(
+      '[git-qa] go-ios で WebDriverAgent を立てています（端末のロックを外しておいてください）',
+    );
+    await keeper.ready(180_000);
+    return keeper;
+  } catch (error: unknown) {
+    console.error(`[git-qa] ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+})();
+const wdaUrl = kept?.url ?? process.env['GIT_QA_IOS_WDA'];
 /**
  * **USB の道具が無くても、押す口（WebDriverAgent）があれば WDA だけで動く**（2026-10-07）。
  * Windows では USB の道具が建たない。`GIT_QA_IOS_ONLY_WDA=1` で、macOS でもこの形を試せる

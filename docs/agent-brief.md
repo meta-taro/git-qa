@@ -44,6 +44,7 @@ pnpm mcp                                                               # Android
 絵からしか読めない相手（Electron など）で起きる。**`device_screenshot` で見て、人に操作を頼む。**
 
 **iPhone / iPad は、端末で WebDriverAgent が起きているときだけ押せる**（`GIT_QA_IOS_WDA` に URL・C99）。
+go-ios の場所（`GIT_QA_IOS_GO`）と端末・Bundle ID を渡せば、git-qa が立てて、USB が繋がり直しても立て直す（C103・準備完了までは実機で未確認）。
 署名して端末へ入れるのは人の作業（[ios-press.md](./ios-press.md)）。口が無ければ、押す道具は理由を言って断る。
 
 - **`element_list` も口があれば並べる**（2026-10-20・C102）。並ぶのは押すときに探すのと同じ画面の文字で、そのまま `element_tap` に渡せる
@@ -185,7 +186,7 @@ pnpm check:run runs/<日時>/run.json
 
 ## まだ無いもの（**「ある」と言わないこと**）
 
-- **iPhone / iPad の口（WebDriverAgent）を、git-qa が自分で起こすこと。**押す・名前を並べるは、口があればできる。
+- **iPhone / iPad の口（WebDriverAgent）を端末へ入れること。**起こして見張るのは go-ios があればできる（C103）。押す・名前を並べるは、口があればできる。
   **口を端末へ入れるのは署名が要る＝人の作業。**
   **「iOS は 1 行も無い」と書かないこと** —— ここにそう書いてあったせいで、
   **動く Windows のデスクトップ検証まで検討から外させていた**（外部レビュー meta-taro/git-qa#23）

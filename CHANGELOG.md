@@ -8,6 +8,9 @@
 
 ## 未リリース
 
+- 足した: **iPhone / iPad の口（WebDriverAgent）を、git-qa が go-ios で立てて見張る**（`GIT_QA_IOS_GO`・`GIT_QA_IOS_UDID`・`GIT_QA_IOS_WDA_BUNDLE`）。
+  トンネル → runwda → forward の順に立て、USB が繋がり直したら立て直す。終わるときに全部止める。
+  準備完了まで通したのは、まだ（実機では runwda が端末側で止まった）。Windows では未試験
 - 直した: **判定のキーを押しっぱなしにすると、見ていないケースにも判定が付いた。**
   OS が送る連打を受けていたので、`d` を押し続けるだけで、各ケースが受け付けを始めた瞬間に `VERIFIED` になった。
   判定のキーと `Space` は、押した 1 回だけを受ける（ケース移動と拡大は、押し続けても動く）

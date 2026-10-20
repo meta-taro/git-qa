@@ -12,7 +12,13 @@ import {
   readDesktopScreenText,
   whyNoDesktop,
 } from '@git-qa/adapter-desktop';
-import { createIosAdapter, listIosElements, readIosScreenText } from '@git-qa/adapter-ios';
+import {
+  createIosAdapter,
+  keeperSettings,
+  listIosElements,
+  readIosScreenText,
+  startWdaKeeper,
+} from '@git-qa/adapter-ios';
 import { createWebAdapter, listWebElements, readWebScreenText } from '@git-qa/adapter-web';
 import type { TargetSession } from '@git-qa/core';
 
@@ -51,7 +57,20 @@ const label = process.env['GIT_QA_APP_LABEL'] ?? 'dev';
  * iPhone / iPad を映す道具と、絵から文字を読む道具。
  * **映す道具が無くても、押す口（WebDriverAgent）があれば、絵も口から取る**（2026-10-07・Windows 向け）。
  */
-const wdaUrl = process.env['GIT_QA_IOS_WDA'];
+/**
+ * **go-ios の場所が渡されていれば、口（WebDriverAgent）を git-qa が立てて見張る**（2026-10-20・C103）。
+ * 起動を待たせない —— 準備ができるのを待つのは、最初に端末を触るとき（`connect`）。
+ * 言うことは stderr へ（stdout は MCP の通り道）。
+ */
+const keeperFor = target.kind === 'ios' ? keeperSettings(process.env) : undefined;
+const keeper = keeperFor === undefined ? undefined : startWdaKeeper(keeperFor);
+if (keeper !== undefined) {
+  // **立てたものは必ず止める**（止め忘れると、go-ios が裏に残り続ける）。
+  process.on('exit', () => {
+    keeper.close();
+  });
+}
+const wdaUrl = keeper?.url ?? process.env['GIT_QA_IOS_WDA'];
 const onlyWda = wdaUrl !== undefined && process.env['GIT_QA_IOS_ONLY_WDA'] === '1';
 const toolPath = target.kind === 'ios' && !onlyWda ? await findIosTool() : undefined;
 const ocrPath = target.kind === 'ios' ? await findOcrTool() : undefined;
@@ -94,14 +113,16 @@ const connect = (): Promise<TargetSession> => {
           'ほかの OS なら WebDriverAgent を起こして GIT_QA_IOS_WDA に URL を（docs/ios-press.md）',
       );
     }
-    return createIosAdapter({
-      ...(toolPath === undefined ? {} : { toolPath }),
-      ...(target.device === undefined ? {} : { device: target.device }),
-      ...(ocrPath === undefined ? {} : { ocrPath }),
-      // **押す口**（WebDriverAgent・C99）。無ければ見る・読むだけ。
-      ...(wdaUrl === undefined ? {} : { wdaUrl }),
-      build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
-    }).connect();
+    return (keeper === undefined ? Promise.resolve() : keeper.ready(180_000)).then(() =>
+      createIosAdapter({
+        ...(toolPath === undefined ? {} : { toolPath }),
+        ...(target.device === undefined ? {} : { device: target.device }),
+        ...(ocrPath === undefined ? {} : { ocrPath }),
+        // **押す口**（WebDriverAgent・C99）。無ければ見る・読むだけ。
+        ...(wdaUrl === undefined ? {} : { wdaUrl }),
+        build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
+      }).connect(),
+    );
   }
 
   return createAndroidAdapter({

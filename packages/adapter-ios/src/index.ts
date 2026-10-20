@@ -8,3 +8,5 @@ export {
 export type { IosAdapterOptions } from './adapter.js';
 export { framesFrom, iosArgs, parseIosToolDevices } from './tool.js';
 export type { IosDevice } from './tool.js';
+export { keeperSettings, startWdaKeeper } from './keeper.js';
+export type { WdaKeeper, WdaKeeperOptions } from './keeper.js';

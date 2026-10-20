@@ -51,3 +51,7 @@ packages/desktop/src-tauri/resources/git-qa-record
 packages/adapter-desktop/tools/input/target/
 packages/desktop/src-tauri/resources/git-qa-win.exe
 packages/adapter-desktop/tools/win/target/
+
+# go-ios が今いる所に書く（端末と組むための名乗り・開発用ディスクイメージ）。commit しない
+selfIdentity.plist
+devimages/
