@@ -14,9 +14,8 @@ import { renderColumns } from '../src/render.js';
 /**
  * ライト / ダークの切り替え。
  *
- * **色は決めない**（`DESIGN.md` が空・product-baseline §11）。
- * ここで切り替えるのは `color-scheme` と**ウィンドウの外観**だけで、
- * 実際の色は OS が持っているものを使う。独自の配色を置くと、それが既成事実になる。
+ * ここで切り替えるのは `color-scheme`・ウィンドウの外観・`data-appearance` だけ。
+ * 色そのものは `styles.css` が持つ（ライトは OS の色、ダークは `DESIGN.md` の配色）。
  */
 
 const memoryStore = (initial?: string): AppearanceStore & { value: string | undefined } => {

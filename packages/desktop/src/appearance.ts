@@ -1,11 +1,9 @@
 /**
  * ライト / ダークの切り替え。
  *
- * **色は決めない**（`DESIGN.md` が空・product-baseline §11）。
- * ここで切り替えるのは `color-scheme` と**ウィンドウの外観**だけで、
- * 実際の色は OS が持っているものを使う。
- * **独自の配色をここで置くと、それがそのまま既成事実になる。**
- * `DESIGN.md` が埋まったら、そのときに配色を入れる。
+ * ここで切り替えるのは `color-scheme`・**ウィンドウの外観**・`data-appearance` だけ。
+ * **色そのものはここで持たない。**ライトは OS の色、ダークは `DESIGN.md` の配色で、
+ * どちらも `styles.css` が `data-appearance` を見て掛ける。
  */
 
 export const APPEARANCES = ['system', 'light', 'dark'] as const;

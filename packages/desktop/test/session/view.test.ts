@@ -340,7 +340,9 @@ describe('判定カラム — 幅が足りないときに、下を捨てない',
 
     expect(rule).toContain('position: sticky');
     // 地の色を敷かないと、流れてきた文字が見出しの下に透ける。
-    expect(rule).toContain('background: Canvas');
+    expect(rule).toContain('background: var(--surface)');
+    // **敷く色が透けていないこと。**ライトでは OS の地の色から作る（混ぜる相手が transparent でない）。
+    expect(css).toContain('--surface: color-mix(in srgb, CanvasText 3%, Canvas);');
   });
 
   /**

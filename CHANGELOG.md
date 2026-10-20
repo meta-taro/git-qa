@@ -8,6 +8,9 @@
 
 ## 未リリース
 
+- 変えた: **デスクトップアプリのダークの見た目。**暗い地に、いま人がやることだけが緑で光る配色にした（DESIGN.md「ダークの配色」）。
+  合格のキー（`d`）と選んだ端末だけを光らせ、判定の 5 つは 1 行ずつの札にした。一覧の FAIL は橙、AUTO_PASS は沈んだ緑。
+  ライトは今までどおり OS の色。字面は Inter・Noto Sans JP・JetBrains Mono（同梱はせず、無ければ OS の字面）
 - 足した: **iPhone / iPad の口（WebDriverAgent）を、git-qa が go-ios で立てて見張る**（`GIT_QA_IOS_GO`・`GIT_QA_IOS_UDID`・`GIT_QA_IOS_WDA_BUNDLE`）。
   トンネル → runwda → forward の順に立て、USB が繋がり直したら立て直す。終わるときに全部止める。
   準備完了まで通したのは、まだ（実機では runwda が端末側で止まった）。Windows では未試験
