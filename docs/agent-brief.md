@@ -46,7 +46,7 @@ pnpm mcp                                                               # Android
 **iPhone / iPad は、端末で WebDriverAgent が起きているときだけ押せる**（`GIT_QA_IOS_WDA` に URL・C99）。
 署名して端末へ入れるのは人の作業（[ios-press.md](./ios-press.md)）。口が無ければ、押す道具は理由を言って断る。
 
-- **`element_list` はまだ断る**（名前を並べられない）。`device_screen_text` に出た文字を `element_tap` に渡す
+- **`element_list` も口があれば並べる**（2026-10-20・C102）。並ぶのは押すときに探すのと同じ画面の文字で、そのまま `element_tap` に渡せる
 - **キーは Enter・Home・Back だけ**（2026-10-15）。iPhone に物の戻るキーは無いので、Back は
   **画面左上の「<」を押し、無ければ左端から右へなぞる。**どちらでも画面が変わらなければ、戻れたことにせず断る
 
@@ -183,7 +183,7 @@ pnpm check:run runs/<日時>/run.json
 
 ## まだ無いもの（**「ある」と言わないこと**）
 
-- **iPhone / iPad で押せる名前を並べること**（`element_list`）。押すこと自体は、口（WebDriverAgent）があればできる。
+- **iPhone / iPad の口（WebDriverAgent）を、git-qa が自分で起こすこと。**押す・名前を並べるは、口があればできる。
   **口を端末へ入れるのは署名が要る＝人の作業。**
   **「iOS は 1 行も無い」と書かないこと** —— ここにそう書いてあったせいで、
   **動く Windows のデスクトップ検証まで検討から外させていた**（外部レビュー meta-taro/git-qa#23）

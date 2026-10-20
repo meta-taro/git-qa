@@ -135,7 +135,8 @@ const listElements =
     : target.kind === 'desktop'
       ? listDesktopElements
       : target.kind === 'ios'
-        ? listIosElements
+        ? // **押す口が無ければ、並べずに断る**（押せない名前を並べない・C102）。
+          (session: TargetSession) => listIosElements(session, { canPress: wdaUrl !== undefined })
         : undefined;
 
 const tools = createDeviceTools({

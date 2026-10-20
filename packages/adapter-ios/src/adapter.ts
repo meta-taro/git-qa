@@ -634,18 +634,41 @@ export async function readIosScreenText(session: TargetSession): Promise<string>
 }
 
 /**
- * **押せる名前は並べられない**（2026-09-19）。
+ * **押せる名前を並べる**（2026-10-20・C102）。
  *
- * iOS は**押す口をそもそも持っていない**（WebDriverAgent が要る）。
- * **空を返さない。**「無い」と「この相手では出来ない」を混ぜると、
- * AI は「画面に何も無い」と受け取る。
+ * 押す口（WebDriverAgent）があれば、`element_tap` は画面の文字で探して押せる。
+ * 名前を知る口だけが断っていたので、AI は座標で押す 3 往復に流れていた。
+ *
+ * **並べるのは、押すときに探すのと同じ画面の文字**（`look` と同じ読み方）。
+ * だから**ここに出た名前は、そのまま押す側で見つかる**（他の相手と同じ契約）。
+ * 上から順に、同じ名前は 1 度だけ。
+ *
+ * **空を返さない。**口が無いとき・文字が読めないときは、理由を言って断る
+ * —— 空は「画面に何も無い」と受け取られる。
  */
-export function listIosElements(): Promise<string[]> {
-  return Promise.reject(
-    new AdapterError(
+export async function listIosElements(
+  session: TargetSession,
+  options: { readonly canPress: boolean },
+): Promise<string[]> {
+  if (!options.canPress) {
+    throw new AdapterError(
       KIND,
-      'iPhone / iPad では名前で押せない（押す口が無い）。' +
-        '画面の絵と文字は取れるので、それを見て人に操作を頼んでください',
-    ),
-  );
+      'iPhone / iPad で名前で押す口（WebDriverAgent）が無いので、押せる名前は並べない。' +
+        '端末で WebDriverAgent を起こし、GIT_QA_IOS_WDA にその URL を渡すと押せます（docs/ios-press.md）',
+    );
+  }
+  const lines = (await readIosScreenText(session))
+    .split('\n')
+    .map((line) => line.split('\t'))
+    .filter((cells) => cells.length >= 5 && (cells[0] ?? '').trim() !== '')
+    .map(([name = '', , y]) => ({ name: name.trim(), y: Number(y) }))
+    .sort((a, b) => a.y - b.y);
+  const names = [...new Set(lines.map((one) => one.name))];
+  if (names.length === 0) {
+    throw new AdapterError(
+      KIND,
+      '画面の文字が 1 つも読めなかった（押せる名前を並べられない）。device_screenshot で画面を見てください',
+    );
+  }
+  return names;
 }
