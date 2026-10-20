@@ -90,3 +90,41 @@ describe('sourceToLines', () => {
     expect(said).toBe('開始\t10\t10\t20\t20');
   });
 });
+
+/**
+ * **欄に打った文字も、画面の文字として読む**（2026-10-20・実機の iPhone 17 で踏んだ）。
+ *
+ * 設定の検索欄へ「モバイル通信」を打つと、画面には出ているのに、読んだ文字には無かった。
+ * WDA は打たれた文字を部品の名前（label）ではなく値（value）に置く。
+ * 絵から読む道具が無い Windows では、「欄に〜が入っている」を確かめられなかった。
+ */
+describe('sourceToLines — 欄の中身', () => {
+  const field = (type: string, value: unknown, label = '検索') => ({
+    type,
+    label,
+    value,
+    isVisible: '1',
+    rect: { x: 8, y: 525, width: 326, height: 28 },
+  });
+
+  it('検索欄・入力欄・文章欄に打たれた文字を、欄の位置で並べる', () => {
+    for (const type of ['SearchField', 'TextField', 'TextView']) {
+      const lines = sourceToLines(field(type, 'モバイル通信'), 1).split('\n');
+      expect(lines).toContain('モバイル通信\t171\t539\t326\t28');
+      expect(lines).toContain('検索\t171\t539\t326\t28');
+    }
+  });
+
+  it('値が名前と同じ（空の欄の案内文）なら、重ねて入れない', () => {
+    expect(sourceToLines(field('SearchField', '検索'), 1).split('\n')).toHaveLength(1);
+  });
+
+  /** 伏せ字の欄は、中身を読まない。 */
+  it('パスワードの欄の値は入れない', () => {
+    expect(sourceToLines(field('SecureTextField', '••••', 'パスワード'), 1)).not.toContain('••••');
+  });
+
+  it('ボタンなど、欄でない部品の値は入れない', () => {
+    expect(sourceToLines(field('Switch', '1', 'Wi-Fi'), 1)).toBe('Wi-Fi\t171\t539\t326\t28');
+  });
+});

@@ -187,7 +187,8 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
     {
       title: '端末に文字を送る',
       description:
-        'いま入力先になっている欄へ文字を送る。端末の入力は IME を通らないので ASCII だけ。',
+        'いま入力先になっている欄へ文字を送る。Android は IME を通らないので ASCII だけ。' +
+        'iPhone / iPad（WebDriverAgent）は日本語もそのまま送れる。',
       inputSchema: { text: z.string() },
     },
     async ({ text }) => {

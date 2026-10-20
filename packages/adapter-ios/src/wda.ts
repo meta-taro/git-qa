@@ -225,6 +225,7 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
 interface SourceNode {
   readonly type?: string;
   readonly label?: string | null;
+  readonly value?: unknown;
   readonly isVisible?: string | boolean;
   readonly rect?: { x: number; y: number; width: number; height: number };
   readonly children?: readonly SourceNode[];
@@ -244,32 +245,42 @@ export function sourceToLines(root: unknown, scale: number): string {
   const by = scale > 0 ? scale : 1;
   const out: string[] = [];
   const walk = (node: SourceNode): void => {
-    const visible = isShown(node);
-    const label = typeof node.label === 'string' ? node.label.trim() : '';
     const { rect } = node;
-    if (
-      visible &&
-      label !== '' &&
+    const placed =
+      isShown(node) &&
       node.type !== 'Application' &&
       rect !== undefined &&
       rect.width > 0 &&
-      rect.height > 0
-    ) {
-      out.push(
-        [
-          label.replace(/[\t\n]+/g, ' '),
-          (rect.x + rect.width / 2) * by,
-          (rect.y + rect.height / 2) * by,
-          rect.width * by,
-          rect.height * by,
-        ].join('\t'),
-      );
+      rect.height > 0;
+    if (placed) {
+      const label = typeof node.label === 'string' ? node.label.trim() : '';
+      // **欄に打たれた文字は名前ではなく値に在る**（2026-10-20・実機の iPhone 17）。
+      // 空の欄は案内文が値に入るので、名前と同じなら重ねない。伏せ字の欄は読まない。
+      const typed =
+        node.type !== undefined && TYPED_INTO.has(node.type) && typeof node.value === 'string'
+          ? node.value.trim()
+          : '';
+      for (const said of typed === label ? [label] : [label, typed]) {
+        if (said === '') continue;
+        out.push(
+          [
+            said.replace(/[\t\n]+/g, ' '),
+            (rect.x + rect.width / 2) * by,
+            (rect.y + rect.height / 2) * by,
+            rect.width * by,
+            rect.height * by,
+          ].join('\t'),
+        );
+      }
     }
     for (const child of node.children ?? []) walk(child);
   };
   if (typeof root === 'object' && root !== null) walk(root);
   return out.join('\n');
 }
+
+/** 人が文字を打ち込む部品。**伏せ字の欄（SecureTextField）は入れない。** */
+const TYPED_INTO: ReadonlySet<string> = new Set(['TextField', 'SearchField', 'TextView']);
 
 const isShown = (node: SourceNode): boolean =>
   node.isVisible === undefined || node.isVisible === true || node.isVisible === '1';
