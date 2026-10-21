@@ -30,10 +30,13 @@
   --text: CanvasText;
   --text-2: color-mix(in srgb, CanvasText 80%, Canvas);
   --muted: color-mix(in srgb, CanvasText 62%, Canvas);
-  /* 判定の語の色。**ライトでは足さない**（色は記号が持つ）。 */
-  --result-verified: inherit;
-  --result-fail: inherit;
-  --result-auto: inherit;
+  /* 判定の語の色。ライトでは白い地で読める濃さに落とす（DESIGN.md「ライトの判定の色」）。 */
+  --result-verified: #047857;
+  --result-fail: #c2410c;
+  --result-auto: color-mix(in srgb, CanvasText 55%, Canvas);
+  /* アイコンの地と印（DESIGN.md「アイコン」）。明暗で変えない。 */
+  --icon-ground: #34d399;
+  --icon-mark: #ffffff;
 
   --font: Inter, 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -88,6 +91,8 @@ body {
 }
 
 body {
+  display: flex;
+  flex-direction: column;
   margin: 0;
   font-family: var(--font);
   font-size: 13px;
@@ -98,7 +103,8 @@ body {
 
 #app {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   gap: 1px;
 }
 
@@ -213,10 +219,12 @@ body {
 
 .column-placeholder {
   margin: 0;
-  padding: 0.75rem;
-  font-size: 0.8125rem;
+  padding: 2rem 1rem;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
   /* 中身ではなく「まだ無い」の説明なので、本文より弱く見せる。 */
-  opacity: 0.6;
+  color: var(--muted);
 }
 
 /*
@@ -311,9 +319,8 @@ body {
 
 .case-item {
   display: flex;
-  gap: 0.5rem;
-  justify-content: space-between;
-  align-items: baseline;
+  gap: 0.625rem;
+  align-items: flex-start;
   padding: 0.625rem 0.875rem;
   font-size: 13px;
   color: var(--text-2);
@@ -341,35 +348,85 @@ body {
   background: var(--accent-soft);
 }
 
-/* 記号と判定のあいだ。**題名が伸びる**ので、記号は左、判定は右に留まる。 */
-.case-title {
+/* 題名と 2 行目。**題名が伸びる**ので、札は左に留まる。 */
+.case-body {
+  display: grid;
   flex: 1;
+  gap: 0.125rem;
   min-width: 0;
 }
 
-.case-status {
-  flex: none;
-  font-family: var(--font-mono);
+.case-sub {
   font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
 /*
- * 判定の語の色（DESIGN.md「ダークの配色」）。**ライトでは足さない**（`inherit`・色は記号が持つ）。
- * **人が見た VERIFIED だけを、アクセントで出す。**AI が通しただけの AUTO_PASS は沈んだ緑。
+ * 判定の札（DESIGN.md「ケース一覧の札」）。**語でも色でも読める。**
+ * 人が見た VRF は緑、止まった FAIL は橙、AI が通しただけの AUTO は沈んだ色。
  */
-.case-item[data-result='VERIFIED'] .case-status {
+.case-tag {
+  flex: none;
+  min-width: 3.25rem;
+  margin-top: 0.0625rem;
+  padding: 0.125rem 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--muted);
+  background: var(--raised);
+  border-radius: 4px;
+}
+
+.case-item[data-result='VERIFIED'] .case-tag {
   color: var(--result-verified);
+  background: color-mix(in srgb, var(--result-verified) 14%, transparent);
 }
 
-.case-item[data-result='FAIL'] .case-status {
+.case-item[data-result='FAIL'] .case-tag {
   color: var(--result-fail);
+  background: color-mix(in srgb, var(--result-fail) 14%, transparent);
 }
 
-.case-item[data-result='AUTO_PASS'] .case-status {
+.case-item[data-result='BLOCKED'] .case-tag {
+  color: var(--text);
+}
+
+.case-item[data-result='AUTO_PASS'] .case-tag {
   color: var(--result-auto);
+}
+
+/* いま待っている 1 件の札。**画面の中で光るのは、これと合格のキーだけ。** */
+.case-item[aria-current='true'] .case-tag {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+/* 絞り込み。**押したほうが、いま効いている。** */
+.case-filter {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.case-filter-option {
+  padding: 0.1875rem 0.625rem;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.case-filter-option[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--raised);
+  border-color: var(--line-strong);
 }
 
 .verdict-headline {
@@ -432,9 +489,27 @@ body {
 }
 
 /* 但し書きは畳んでおく。**開く手は残す**（読みたい人は読める）。 */
+/* AI の見立て。**脇の箱**に入れて、人が読むもの（手順・期待結果）と分ける。 */
 .verdict-ai-detail {
-  margin: 0.75rem 0 0;
-  padding: 0 0.75rem;
+  margin: 0 0.875rem;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.verdict-ai-detail .verdict-ai,
+.verdict-ai-detail .verdict-note {
+  padding: 0;
+}
+
+.verdict-ai-detail .verdict-note {
+  margin-top: 0.375rem;
+  font-family: var(--font);
+  line-height: 1.6;
 }
 
 .verdict-ai-detail > summary {
@@ -448,9 +523,42 @@ body {
 .key-help {
   display: grid;
   gap: 0.5rem;
-  margin: 0.75rem 0 0;
-  padding: 0.875rem;
-  border-top: 1px solid var(--line);
+  margin: 0;
+  padding: 0 0.875rem;
+}
+
+/* 移動と拡大。**脇の手なので 2 列に詰め、注記は畳む**（指を載せれば `title` で読める）。 */
+.key-help-more {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0 0.875rem 0.875rem;
+}
+
+.key-help-more .key-action {
+  gap: 0.5rem;
+  padding: 0.25rem 0.375rem;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.key-help-more .key-note {
+  display: none;
+}
+
+.key-help-more .key-binding {
+  min-width: 1.625rem;
+  height: 1.625rem;
+  font-size: 12px;
+}
+
+/* 欄の中の小見出し（あなたの判定・AI の見立て・移動と拡大）。 */
+.verdict-section-label {
+  margin: 1rem 0.875rem 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
 /* **押せる。**打鍵だけにしない（初めて触る人は割り当てを知らない）。 */
@@ -761,9 +869,9 @@ body {
 .setup-device[aria-pressed='true'],
 .setup-sheet[aria-pressed='true'],
 .setup-resume[aria-pressed='true'] {
-  background: color-mix(in srgb, currentColor 14%, transparent);
+  /* **太らせない**（日本語が潰れる）。地と縁で示す。 */
+  background: var(--raised);
   border-color: var(--line-strong);
-  font-weight: 600;
 }
 
 /* 選んだ端末。**準備の画面で光るのはここと「始める」だけ。** */
@@ -839,9 +947,10 @@ body {
  * 色は足さない（DESIGN.md「独自の配色を持たない」）ので、太さと縦罫で差を付ける。
  */
 .setup-hint {
-  margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
-  opacity: 0.7;
+  /* **上の欄の説明。**下の欄との間を空けて、どちらの説明かを取り違えさせない。 */
+  margin: 0.375rem 0 0.875rem;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 /* **新しい版のお知らせ。**急かさないが、見落とさない濃さで置く。 */
@@ -866,6 +975,7 @@ body {
 }
 
 .setup-hint[data-bad='true'] {
+  color: var(--text);
   padding-left: 0.5rem;
   font-weight: 600;
   border-left: 2px solid currentColor;
@@ -985,13 +1095,6 @@ body {
   }
 }
 
-/* ケース一覧の記号。**色は記号が持つ**ので、ここでは幅だけ揃える。 */
-.case-mark {
-  flex: none;
-  width: 1.5em;
-  text-align: center;
-}
-
 /* **できないことの断り。**映像の下に置いて、映像を隠さない（C57）。 */
 .live-note {
   order: 1;
@@ -1102,4 +1205,297 @@ body {
   .live-pointer-arrow {
     animation: none;
   }
+}
+
+/*
+ * **上の帯**（DESIGN.md「上の帯」）。何を・何で見ていて、どこまで済んで、いま誰の番か。
+ * 狭い窓では折り返す（横に流さない）。
+ */
+.topbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar:empty {
+  display: none;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* アイコンと同じ形・同じ色（DESIGN.md「アイコン」）。 */
+.topbar-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: var(--icon-ground);
+  border-radius: 6px;
+}
+
+.topbar-mark svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--icon-mark);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar-crumb {
+  display: flex;
+  gap: 0.375rem;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topbar-sep {
+  color: var(--line-strong);
+}
+
+.topbar-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progress-bar {
+  display: flex;
+  width: 10rem;
+  height: 6px;
+  overflow: hidden;
+  background: var(--raised);
+  border-radius: 3px;
+}
+
+.progress-verified {
+  background: var(--result-verified);
+}
+
+.progress-auto {
+  background: var(--result-auto);
+}
+
+.progress-failed {
+  background: var(--result-fail);
+}
+
+.progress-skipped {
+  background: var(--line-strong);
+}
+
+.topbar-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.topbar-phase {
+  padding: 0.1875rem 0.625rem;
+  color: var(--text-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+
+/* **人の番のときだけ光る**（DESIGN.md「使い所」）。 */
+.topbar[data-phase='waiting'] .topbar-phase {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.topbar[data-phase='watching'] .topbar-phase {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.topbar-stop {
+  padding: 0.25rem 0.75rem;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.topbar-stop:hover {
+  background: var(--raised);
+}
+
+.topbar-operator {
+  padding: 0.1875rem 0.5rem;
+  font-family: var(--font-mono);
+  color: var(--text);
+  background: var(--raised);
+  border-radius: 6px;
+}
+
+/* **映像の上の 1 行**（DESIGN.md「映像の上の 1 行」）。いま見ているケース。 */
+.case-strip {
+  display: flex;
+  flex: none;
+  gap: 0.625rem;
+  align-items: baseline;
+  padding: 0.625rem 0.875rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.case-strip-no {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.case-strip-title {
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/*
+ * **終わったときのまとめ**（DESIGN.md「まとめ」）。
+ * いちばん大きいのは、人が見て確かめた数。AUTO_PASS は合格に混ぜない。
+ */
+.summary {
+  padding: 0 0.875rem 0.875rem;
+}
+
+.summary .verdict-section-label {
+  margin: 0.75rem 0 0.375rem;
+}
+
+.summary-big {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--result-verified);
+}
+
+.summary-of {
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.summary-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  font-family: var(--font-mono);
+}
+
+.summary-counts dt {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.summary-counts dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summary-counts [data-result='AUTO_PASS'] dd {
+  color: var(--result-auto);
+}
+
+.summary-counts [data-result='FAIL'] dd {
+  color: var(--result-fail);
+}
+
+.summary-counts [data-result='SKIP'] dd {
+  color: var(--muted);
+}
+
+.summary-note {
+  margin: 0.75rem 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* 準備の札の中身（名前と、その下に今の様子）。端末の枠を左に描く。 */
+.setup-device {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  padding-left: 2.5rem;
+}
+
+.setup-device::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0.875rem;
+  width: 12px;
+  height: 20px;
+  border: 1.5px solid var(--muted);
+  border-radius: 3px;
+  transform: translateY(-50%);
+}
+
+.setup-device[aria-pressed='true']::before {
+  border-color: var(--accent);
+}
+
+.pick-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pick-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* 証跡を書いた場所。**書き写す所**なので等幅で、長いパスは折り返す。 */
+.verdict-evidence {
+  margin: 0.25rem 0.875rem 0.875rem;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* シートと続きからは、パスを読ませる所なので等幅。 */
+.setup-sheet,
+.setup-resume {
+  font-family: var(--font-mono);
+  font-size: 12px;
 }

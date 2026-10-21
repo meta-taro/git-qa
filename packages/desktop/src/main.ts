@@ -38,7 +38,15 @@ import { startMenuActions } from './session/menu-actions.js';
 import { installTextSender } from './session/typing.js';
 import { installDeviceTouch } from './session/touch.js';
 import { installDeviceWheel } from './session/wheel.js';
-import { installVerdictButtons, renderSession, showSessionError } from './session/view.js';
+import {
+  installCaseFilter,
+  installVerdictButtons,
+  renderSession,
+  showSessionError,
+} from './session/view.js';
+import type { CaseFilter } from './session/view.js';
+import { renderCaseStrip } from './session/strip.js';
+import { renderTopbar } from './topbar.js';
 import { createLivePlayer } from './live/player.js';
 import { createImagePlayer } from './live/images.js';
 import {
@@ -71,6 +79,32 @@ if (!root) {
 
 /** 絞り込み済みの参照。**巻き上げられる関数の中からも使える**ようにするため。 */
 const app: HTMLElement = root;
+
+/** 上の帯（DESIGN.md「上の帯」）。**無くても動く**（古い index.html で開いたとき）。 */
+const topbar = document.querySelector<HTMLElement>('#topbar');
+
+/** 一覧の絞り込み。**既定は全部。** */
+let caseFilter: CaseFilter = 'all';
+
+/** 始めるときに選んだ相手と人。**実行の状態には載っていない**ので、ここで覚えて帯へ出す。 */
+let chosen: { target?: string; operator?: string } = {};
+
+/**
+ * 実行中の画面を描く。**一覧・判定・映像の上の 1 行・上の帯を、同じ状態から一度に描く**
+ * （どれかだけ古い、を作らない）。
+ */
+function paintSession(state: SessionState): void {
+  renderSession(app, state, { ...(cursor === undefined ? {} : { cursor }), filter: caseFilter });
+  renderCaseStrip(app, state, cursor);
+  if (topbar !== null) {
+    renderTopbar(topbar, {
+      phase: state.phase,
+      ...(state.sheetPath === undefined ? {} : { sheetPath: state.sheetPath }),
+      ...chosen,
+      cases: state.cases,
+    });
+  }
+}
 
 // 描く前に言語を決める。決める前に描くと、一瞬だけ別の言語が出る。
 setLocale(effectiveLocale(loadLocaleChoice(defaultStore()), navigator.languages));
@@ -134,7 +168,7 @@ void startAppearanceSync().catch((error: unknown) => {
 const redrawTexts = (): void => {
   updateColumnTexts(root);
   if (latest !== undefined) {
-    renderSession(root, latest);
+    paintSession(latest);
     return;
   }
   renderOnboarding(root, onboarding);
@@ -403,6 +437,9 @@ if (liveUrl !== undefined) {
       // 断られた理由は、実行器の状態ではなくこちらが持っている。**同じ画面に載せる。**
       const shown = startError === undefined ? state : { ...state, error: startError };
 
+      if (topbar !== null) {
+        renderTopbar(topbar, { phase: 'setup', ...(operator === '' ? {} : { operator }) });
+      }
       renderSetup(app, shown, {
         ...(release === undefined ? {} : { release }),
         onDownloads: () => void openDownloads(),
@@ -434,6 +471,8 @@ if (liveUrl !== undefined) {
           writeSetting('git-qa.appName', name, defaultStore());
         },
         onStart: (params) => {
+          // **帯へ出すために覚える。**実行の状態は、選んだ相手と人を運ばない。
+          chosen = { target: params.serial.replace(/^app:/, ''), operator: params.operator };
           // **開いたものを覚える。**次からは探索に頼らずここへ出す。
           recentSheets = rememberSheet(recentSheets, params.sheetPath);
           writeRecentSheets(defaultStore(), recentSheets);
@@ -533,7 +572,7 @@ function startControl(controlUrl: string): void {
       // **指す場所が変わったら、寄る先も変わる。**拡大しているときだけ当て直す。
       if (zoom > 1) applyZoom(app, zoom, state.pointing);
       previousAwaiting = state.awaiting;
-      renderSession(app, state, { ...(cursor === undefined ? {} : { cursor }) });
+      paintSession(state);
     },
   });
 
@@ -544,7 +583,7 @@ function startControl(controlUrl: string): void {
     const next = nextCursor(state.cases, cursor, state.awaiting, step);
     if (next === undefined) return;
     cursor = next;
-    renderSession(app, state, { cursor });
+    paintSession(state);
   };
 
   /** いまの拡大の段。**等倍から始める。** */
@@ -717,8 +756,15 @@ function startControl(controlUrl: string): void {
   });
 
   // **打鍵だけにしない。**初めて触る人は、どのキーが何をするか知らない。
-  installVerdictButtons(app, (key) => {
+  const onButton = (key: string): void => {
     const command = commandForKey({ key });
     if (command !== undefined) place(command);
+  };
+  installVerdictButtons(app, onButton);
+  // 帯の「止める」も同じ道を通す。
+  if (topbar !== null) installVerdictButtons(topbar, onButton);
+  installCaseFilter(app, (filter) => {
+    caseFilter = filter;
+    if (latest !== undefined) paintSession(latest);
   });
 }

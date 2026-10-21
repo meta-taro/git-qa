@@ -103,7 +103,7 @@ function liveColumn(root: HTMLElement): HTMLElement {
  */
 function pickList(
   doc: Document,
-  items: readonly { value: string; label: string }[],
+  items: readonly { value: string; label: string; sub?: string }[],
   className: string,
   attribute: string,
   selected: string | undefined,
@@ -117,7 +117,18 @@ function pickList(
     button.type = 'button';
     button.className = className;
     button.dataset[attribute] = item.value;
-    button.textContent = item.label;
+    if (item.sub === undefined) {
+      button.textContent = item.label;
+    } else {
+      // **札にする**（DESIGN.md「準備の札」）。名前と、その下に今の様子。
+      const name = doc.createElement('span');
+      name.className = 'pick-name';
+      name.textContent = item.label;
+      const sub = doc.createElement('span');
+      sub.className = 'pick-sub';
+      sub.textContent = item.sub;
+      button.append(name, sub);
+    }
     button.setAttribute('aria-pressed', String(item.value === selected));
     button.addEventListener('click', () => {
       for (const sibling of list.querySelectorAll(`.${className}`)) {
@@ -475,7 +486,12 @@ export function renderSetup(
     section.append(
       pickList(
         doc,
-        state.devices.map((d) => ({ value: d.serial, label: `${d.serial}（${d.state}）` })),
+        state.devices.map((d) => ({
+          value: d.serial,
+          label: d.serial,
+          // `device` は adb の「使える」。**それ以外（unauthorized 等）は、その語のまま出す。**
+          sub: d.state === 'device' ? t('setup.device.ready') : d.state,
+        })),
         'setup-device',
         'serial',
         defaultSerial,

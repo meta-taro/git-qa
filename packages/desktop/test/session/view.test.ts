@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { SessionState } from '@git-qa/core/session';
 
 import { renderColumns } from '../../src/render.js';
-import { installVerdictButtons, renderSession, showSessionError } from '../../src/session/view.js';
+import {
+  installCaseFilter,
+  installVerdictButtons,
+  renderSession,
+  showSessionError,
+} from '../../src/session/view.js';
 
 /**
  * 左にケース、右に判定。**中央は映像のまま触らない**（主媒体・C4）。
@@ -399,5 +404,131 @@ describe('ケース一覧 — いま見ている 1 件', () => {
 
     expect(rule).toContain('outline');
     expect(rule).toContain('background');
+  });
+});
+
+/** **一覧・判定の欄の組み直し**（2026-10-21・DESIGN.md）。 */
+describe('ケース一覧の札と 2 行目', () => {
+  it('結果の札は語で出る（人が見た VRF と、AI だけの AUTO は別の語）', () => {
+    renderSession(root, {
+      ...state,
+      cases: [
+        { no: 1, title: 'a', result: 'VERIFIED', verifiedBy: 'octocat' },
+        { no: 2, title: 'b', result: 'AUTO_PASS' },
+        { no: 3, title: 'c' },
+      ],
+    });
+    const tags = [...column('cases').querySelectorAll('.case-tag')].map((el) => el.textContent);
+    expect(tags).toEqual(['VRF', 'AUTO', '···']);
+  });
+
+  it('打鍵待ちの 1 件は NOW の札', () => {
+    renderSession(root, state);
+    expect(column('cases').querySelector('[aria-current="true"] .case-tag')?.textContent).toBe(
+      'NOW',
+    );
+  });
+
+  it('2 行目に、誰が見たか・誰も見ていないかが出る', () => {
+    renderSession(root, {
+      ...state,
+      cases: [
+        { no: 1, title: 'a', result: 'VERIFIED', verifiedBy: 'octocat' },
+        { no: 2, title: 'b', result: 'AUTO_PASS' },
+      ],
+    });
+    const subs = [...column('cases').querySelectorAll('.case-sub')].map((el) => el.textContent);
+    expect(subs[0]).toContain('#01');
+    expect(subs[0]).toContain('octocat');
+    expect(subs[1]).toContain('誰も見ていない');
+  });
+});
+
+describe('ケースの絞り込み', () => {
+  const mixed: SessionState = {
+    runId: 'r',
+    phase: 'waiting',
+    awaiting: 3,
+    cases: [
+      { no: 1, title: '済んだ', result: 'VERIFIED', verifiedBy: 'octocat' },
+      { no: 2, title: 'AI だけ', result: 'AUTO_PASS' },
+      { no: 3, title: '待っている' },
+      { no: 4, title: '見送った', result: 'SKIP', verifiedBy: 'octocat' },
+    ],
+  };
+
+  it('既定は全部出す（絞ったことに気づかず、消えたと思わせない）', () => {
+    renderSession(root, mixed);
+    expect(column('cases').querySelectorAll('.case-item')).toHaveLength(4);
+    expect(column('cases').querySelector('[data-filter="all"]')?.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+  });
+
+  it('要確認は、人がまだ見ていないものだけ（数も出る）', () => {
+    renderSession(root, mixed, { filter: 'attention' });
+    const titles = [...column('cases').querySelectorAll('.case-title')].map((el) => el.textContent);
+    expect(titles).toEqual(['AI だけ', '待っている']);
+    expect(column('cases').querySelector('[data-filter="attention"]')?.textContent).toContain('2');
+  });
+
+  it('絞っても、見ている 1 件は消えない', () => {
+    renderSession(root, mixed, { filter: 'attention', cursor: 1 });
+    const titles = [...column('cases').querySelectorAll('.case-title')].map((el) => el.textContent);
+    expect(titles).toContain('済んだ');
+  });
+
+  it('押すと、絞り込みが変わる', () => {
+    const chosen: string[] = [];
+    renderSession(root, mixed);
+    installCaseFilter(root, (filter) => chosen.push(filter));
+    root.querySelector<HTMLButtonElement>('[data-filter="attention"]')?.click();
+    expect(chosen).toEqual(['attention']);
+  });
+});
+
+describe('判定の欄の組み', () => {
+  it('判定の 5 つと、移動・拡大は別の塊', () => {
+    renderSession(root, state);
+    const main = [...column('verdict').querySelectorAll<HTMLElement>('.key-help .key-action')];
+    expect(main.map((b) => b.dataset['key'])).toEqual(['d', 'f', 'a', 's', ' ']);
+    expect(column('verdict').querySelector('.key-help-more [data-key="ArrowUp"]')).not.toBeNull();
+  });
+
+  it('AI の見立ては、判定の札より上に在る（押す前に見える）', () => {
+    renderSession(root, state);
+    const order = [...column('verdict').querySelectorAll('.verdict-ai, .key-help')].map(
+      (el) => el.className,
+    );
+    expect(order[0]).toBe('verdict-ai');
+  });
+});
+
+describe('終わったときのまとめ', () => {
+  const done: SessionState = {
+    runId: 'r',
+    phase: 'finished',
+    cases: [
+      { no: 1, title: 'a', result: 'VERIFIED', verifiedBy: 'octocat' },
+      { no: 2, title: 'b', result: 'VERIFIED', verifiedBy: 'octocat' },
+      { no: 3, title: 'c', result: 'AUTO_PASS' },
+      { no: 4, title: 'd', result: 'FAIL', verifiedBy: 'octocat' },
+    ],
+  };
+
+  it('いちばん大きいのは、人が見て確かめた数', () => {
+    renderSession(root, done);
+    expect(column('verdict').querySelector('.summary-big')?.textContent).toBe('2 / 4');
+  });
+
+  it('AUTO_PASS は合格に混ぜず、誰も見ていないと言う', () => {
+    renderSession(root, done);
+    expect(column('verdict').querySelector('.summary-note')?.textContent).toContain('1 件');
+    expect(column('verdict').querySelector('[data-result="AUTO_PASS"] dd')?.textContent).toBe('1');
+  });
+
+  it('AUTO_PASS が無ければ、その断りは出さない', () => {
+    renderSession(root, { ...done, cases: done.cases.filter((c) => c.result !== 'AUTO_PASS') });
+    expect(column('verdict').querySelector('.summary-note')).toBeNull();
   });
 });

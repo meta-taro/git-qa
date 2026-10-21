@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { markFor } from '../../src/session/marks.js';
+import { markFor, tagFor } from '../../src/session/marks.js';
 
 /**
  * 判定の記号。
@@ -34,5 +34,24 @@ describe('markFor', () => {
 
   it('知らない値が来ても落ちない', () => {
     expect(markFor('NOPE')).toBe('');
+  });
+});
+
+describe('tagFor', () => {
+  it('人が見たものと、AI が通しただけのものは別の語', () => {
+    expect(tagFor('VERIFIED', false)).toBe('VRF');
+    expect(tagFor('AUTO_PASS', false)).toBe('AUTO');
+    expect(tagFor('FAIL', false)).toBe('FAIL');
+    expect(tagFor('BLOCKED', false)).toBe('BLK');
+    expect(tagFor('SKIP', false)).toBe('SKIP');
+  });
+
+  it('結果がまだなら、打鍵を待っているかで分ける', () => {
+    expect(tagFor(undefined, true)).toBe('NOW');
+    expect(tagFor(undefined, false)).toBe('···');
+  });
+
+  it('知らない結果は空のまま（埋めない）', () => {
+    expect(tagFor('MAYBE', false)).toBe('');
   });
 });
