@@ -127,6 +127,7 @@ function pickList(
       const sub = doc.createElement('span');
       sub.className = 'pick-sub';
       sub.textContent = item.sub;
+      button.title = item.sub;
       button.append(name, sub);
     }
     button.setAttribute('aria-pressed', String(item.value === selected));
@@ -139,6 +140,75 @@ function pickList(
     list.append(button);
   }
   return list;
+}
+
+/** シートのパスを、名前と場所に分ける。区切りが無ければ全部が名前。 */
+export function splitPath(path: string): { label: string; sub: string } {
+  const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return at < 0 ? { label: path, sub: '' } : { label: path.slice(at + 1), sub: path.slice(0, at) };
+}
+
+export type TargetKind = 'device' | 'web' | 'app';
+
+const SVG = 'http://www.w3.org/2000/svg';
+
+/** 札の絵。**飾りなので読ませない**（名前は文字で並ぶ）。線は文字色から作る。 */
+const ICON_PATHS: Readonly<Record<TargetKind, readonly string[]>> = {
+  device: [
+    'M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2z',
+    'M10.5 18.5h3',
+  ],
+  web: [
+    'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z',
+    'M3 12h18',
+    'M12 3c2.6 2.8 2.6 15.2 0 18M12 3c-2.6 2.8-2.6 15.2 0 18',
+  ],
+  app: [
+    'M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+    'M8 21h8M12 17v4',
+  ],
+};
+
+function targetIcon(doc: Document, kind: TargetKind): Element {
+  const svg = doc.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'setup-target-icon');
+  for (const d of ICON_PATHS[kind]) {
+    const path = doc.createElementNS(SVG, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+/**
+ * **見る相手の札**（DESIGN.md「準備の札」）。端末・ウェブ・デスクトップアプリを並べ、
+ * **いまどれを見ることになっているか**を札の光りで出す（URL が入っていればウェブ、が優先の順）。
+ */
+function targetCard(doc: Document, kind: TargetKind, ...body: HTMLElement[]): HTMLElement {
+  const card = doc.createElement('section');
+  card.className = 'setup-target';
+  card.dataset['kind'] = kind;
+  const head = doc.createElement('div');
+  head.className = 'setup-target-head';
+  const name = doc.createElement('span');
+  name.className = 'setup-target-name';
+  name.textContent = t(`setup.target.${kind}`);
+  const active = doc.createElement('span');
+  active.className = 'setup-target-active';
+  active.textContent = t('setup.target.active');
+  head.append(targetIcon(doc, kind), name, active);
+  card.append(head, ...body);
+  return card;
+}
+
+/** 見ることになっている相手の種類。`lookingAt` の返りから決める（同じ順で決める）。 */
+export function targetKindOf(lookingAt: string | undefined): TargetKind | undefined {
+  if (lookingAt === undefined) return undefined;
+  if (/^https?:\/\//.test(lookingAt)) return 'web';
+  if (lookingAt.startsWith('app:')) return 'app';
+  return 'device';
 }
 
 /** いま選ばれているもの。**画面に出ている印がそのまま答え。** */
@@ -327,6 +397,11 @@ export function renderSetup(
       state.phase === 'starting' ? undefined : blockedReason(handle, lookingAt(), defaultSheet);
     start.disabled = state.phase === 'starting' || reason !== undefined;
     operatorRule.dataset['bad'] = handle !== '' && !isValidHandle(handle) ? 'true' : 'false';
+    // **いまどれを見るか**を札の光りで出す。URL を消せば端末へ戻る、が目で分かる。
+    const kind = targetKindOf(lookingAt());
+    for (const card of section.querySelectorAll<HTMLElement>('.setup-target')) {
+      card.dataset['active'] = String(card.dataset['kind'] === kind);
+    }
     blocked.textContent = reason ?? '';
     // **空の行を置かない。**理由が無いときに間だけが空くのは、何かを見落とした形に見える。
     if (reason === undefined) blocked.remove();
@@ -457,16 +532,10 @@ export function renderSetup(
     operator,
     operatorRule,
     deviceHeading,
-    webUrl,
-    webHint,
-    appName,
-    appHint,
-    browser,
-    browserLabel,
-    browserPath,
-    browserPathHint,
   );
 
+  const devicesBox = doc.createElement('div');
+  devicesBox.className = 'setup-target-body';
   if (state.devices.length === 0) {
     const empty = doc.createElement('p');
     empty.className = 'setup-empty';
@@ -481,9 +550,9 @@ export function renderSetup(
       state.deviceError === undefined
         ? t('setup.device.none')
         : t('setup.device.failed', { reason: state.deviceError });
-    section.append(empty);
+    devicesBox.append(empty);
   } else {
-    section.append(
+    devicesBox.append(
       pickList(
         doc,
         state.devices.map((d) => ({
@@ -495,12 +564,19 @@ export function renderSetup(
         'setup-device',
         'serial',
         defaultSerial,
-        () => {},
+        () => reflect(operator.value.trim()),
       ),
     );
   }
 
-  section.append(sheetHeading);
+  const targets = doc.createElement('div');
+  targets.className = 'setup-targets';
+  targets.append(
+    targetCard(doc, 'device', devicesBox),
+    targetCard(doc, 'web', webUrl, webHint, browser, browserLabel, browserPath, browserPathHint),
+    targetCard(doc, 'app', appName, appHint),
+  );
+  section.append(targets, sheetHeading);
 
   // **自分で選んだものも一覧に出す。**選んだのに画面に出ないと、選べたのか分からない。
   const listed =
@@ -517,7 +593,8 @@ export function renderSetup(
     section.append(
       pickList(
         doc,
-        listed.map((path) => ({ value: path, label: path })),
+        // **名前を大きく、場所を小さく。**同じ名前のシートは場所で見分ける。
+        listed.map((path) => ({ value: path, ...splitPath(path) })),
         'setup-sheet',
         'path',
         defaultSheet,

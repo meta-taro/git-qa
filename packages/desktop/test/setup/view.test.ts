@@ -387,8 +387,19 @@ describe('最近開いた検証シート', () => {
     return root;
   };
 
+  /**
+   * 並んでいるシートの場所。**画面の文字は名前と場所に分けて出す**（2026-10-21）ので、
+   * 選ぶときに渡る値（`data-path`）で数える。名前と場所は両方とも札に出ている。
+   */
   const listed = (root: HTMLElement): string[] =>
-    [...root.querySelectorAll('.setup-sheet')].map((el) => el.textContent ?? '');
+    [...root.querySelectorAll<HTMLElement>('.setup-sheet')].map((el) => el.dataset['path'] ?? '');
+
+  it('シートの札は、名前と場所の両方を出す', () => {
+    const root = render({ sheets: ['/repo/sheets/a.tsv'], recent: [] });
+    const card = root.querySelector('.setup-sheet');
+    expect(card?.querySelector('.pick-name')?.textContent).toBe('a.tsv');
+    expect(card?.querySelector('.pick-sub')?.textContent).toBe('/repo/sheets');
+  });
 
   it('探索で見つからなくても、前に開いたものは一覧に出る', () => {
     const root = render({ sheets: [], recent: ['/repo/git-qa/sheets/a.tsv'] });
@@ -658,5 +669,37 @@ describe('新しい版のお知らせ', () => {
     renderSetup(root, idle, { onStart: vi.fn() });
 
     expect(live().querySelector('.setup-update')).toBeNull();
+  });
+});
+
+/** **見る相手の札**（2026-10-21・DESIGN.md「準備の札」）。いまどれを見るかが光る。 */
+describe('見る相手の札', () => {
+  const active = (): string | undefined =>
+    live().querySelector<HTMLElement>('.setup-target[data-active="true"]')?.dataset['kind'];
+
+  it('端末・ウェブ・デスクトップアプリの 3 枚が並ぶ', () => {
+    renderSetup(root, idle, { onStart: vi.fn() });
+    const kinds = [...live().querySelectorAll<HTMLElement>('.setup-target')].map(
+      (el) => el.dataset['kind'],
+    );
+    expect(kinds).toEqual(['device', 'web', 'app']);
+  });
+
+  it('何も入れていなければ、端末の札が光る', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
+    expect(active()).toBe('device');
+  });
+
+  it('URL を入れると、ウェブの札が光る（端末より優先）', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
+    const url = live().querySelector<HTMLInputElement>('.setup-target[data-kind="web"] input')!;
+    url.value = 'http://localhost:3000/';
+    url.dispatchEvent(new Event('input'));
+    expect(active()).toBe('web');
+  });
+
+  it('アプリ名を入れると、デスクトップアプリの札が光る', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat', appName: '計算機' });
+    expect(active()).toBe('app');
   });
 });

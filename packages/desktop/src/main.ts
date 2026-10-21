@@ -94,6 +94,7 @@ let chosen: { target?: string; operator?: string } = {};
  * （どれかだけ古い、を作らない）。
  */
 function paintSession(state: SessionState): void {
+  document.body.dataset['stage'] = 'run';
   renderSession(app, state, { ...(cursor === undefined ? {} : { cursor }), filter: caseFilter });
   renderCaseStrip(app, state, cursor);
   if (topbar !== null) {
@@ -142,6 +143,8 @@ let cursor: number | undefined;
 let onboarding: ConnectionStatus = 'disconnected';
 
 renderColumns(root);
+// **帯は繋がる前から出す。**出ていないと、繋がった後にだけ窓の形が変わる。
+if (topbar !== null) renderTopbar(topbar, { phase: 'setup' });
 // 区切りは、カラムを描いた後に差し込む（描き直すと消えるため）。
 installColumnResizers(root);
 /**
@@ -440,6 +443,8 @@ if (liveUrl !== undefined) {
       if (topbar !== null) {
         renderTopbar(topbar, { phase: 'setup', ...(operator === '' ? {} : { operator }) });
       }
+      // **準備の間は、空の脇を畳む。**一覧も判定もまだ無いので、準備の画面に幅を渡す。
+      document.body.dataset['stage'] = 'setup';
       renderSetup(app, shown, {
         ...(release === undefined ? {} : { release }),
         onDownloads: () => void openDownloads(),

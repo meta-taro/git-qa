@@ -99,6 +99,10 @@ const ja = {
   'summary.autoNote':
     'AUTO_PASS の {count} 件は誰も見ていません。合格ではなく「AI がそう言った」記録です',
   'setup.device.ready': '繋がっています',
+  'setup.target.device': '端末',
+  'setup.target.web': 'ウェブページ',
+  'setup.target.app': 'デスクトップアプリ',
+  'setup.target.active': 'これを見る',
 
   'typing.placeholder': '端末に文字を打ち込む（英数字のみ。日本語は送れない）',
   'typing.send': '送る',
@@ -260,6 +264,10 @@ const en: Record<keyof typeof ja, string> = {
   'summary.autoNote':
     'Nobody watched the {count} AUTO_PASS cases. They record what the AI said, not a pass',
   'setup.device.ready': 'Connected',
+  'setup.target.device': 'Device',
+  'setup.target.web': 'Web page',
+  'setup.target.app': 'Desktop app',
+  'setup.target.active': 'Looking at this',
 
   'typing.placeholder': 'Type into the device (ASCII only; Japanese cannot be sent)',
   'typing.send': 'Send',
