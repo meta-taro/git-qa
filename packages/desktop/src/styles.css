@@ -202,6 +202,15 @@ body {
   content: '⟩';
 }
 
+/* **右の欄は右へ畳まれる。**記号も右を向け、開くときは左を向ける（2026-10-21・逆に見えた）。 */
+.column[data-column-id='verdict'] .column-fold::before {
+  content: '⟩';
+}
+
+.column.is-folded[data-column-id='verdict'] .column-fold::before {
+  content: '⟨';
+}
+
 .column-placeholder {
   margin: 0;
   padding: 0.75rem;

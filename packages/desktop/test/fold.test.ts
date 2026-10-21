@@ -152,3 +152,38 @@ describe('言語の描き直しと、畳む口', () => {
     expect(isFolded(root, 'cases')).toBe(true);
   });
 });
+
+/**
+ * **右の欄の記号は、右を向く**（2026-10-21・人の指摘）。
+ *
+ * 右の欄は右の端へ畳まれるのに、左の欄と同じ `⟨` を出していたので、逆に見えた。
+ * **記号は、畳まれる向きを指す。**開くときは、その逆。
+ */
+describe('畳む口の記号の向き', () => {
+  const readCss = async (): Promise<string> => {
+    const { readFile } = await import('node:fs/promises');
+    const url = await import('node:url');
+    const path = await import('node:path');
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    return readFile(path.resolve(here, '../src/styles.css'), 'utf8');
+  };
+  const contentOf = (css: string, selector: string): string | undefined => {
+    const head = css.indexOf(`${selector} {`);
+    if (head < 0) return undefined;
+    return /content: '(.)'/.exec(css.slice(head, css.indexOf('}', head)))?.[1];
+  };
+
+  it('左の欄は左へ畳み、右へ開く', async () => {
+    const css = await readCss();
+    expect(contentOf(css, '.column-fold::before')).toBe('⟨');
+    expect(contentOf(css, '.column.is-folded .column-fold::before')).toBe('⟩');
+  });
+
+  it('右の欄は右へ畳み、左へ開く', async () => {
+    const css = await readCss();
+    expect(contentOf(css, ".column[data-column-id='verdict'] .column-fold::before")).toBe('⟩');
+    expect(contentOf(css, ".column.is-folded[data-column-id='verdict'] .column-fold::before")).toBe(
+      '⟨',
+    );
+  });
+});
