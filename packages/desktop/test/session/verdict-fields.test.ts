@@ -110,6 +110,29 @@ describe('判定カラム — シートの中身', () => {
     expect(root.querySelector('.verdict-ai')?.textContent).toContain('BLOCKED');
   });
 
+  /**
+   * **AI の判定は札で出す**（2026-10-21・実物の画面で見た）。
+   *
+   * 「▶ AI の判定: AUTO_PASS」と 1 行の文で出ていて、ケース一覧の札と同じものに見えなかった。
+   * **一覧と同じ語・同じ色の札にする**と、どの判定のことか目で繋がる。
+   */
+  it('AI の判定は、証跡の語の札で出る', () => {
+    renderSession(root, stateWith([]));
+
+    const tag = root.querySelector<HTMLElement>('.verdict-ai-tag');
+    expect(tag?.textContent).toBe('AUTO_PASS');
+    expect(tag?.dataset['result']).toBe('AUTO_PASS');
+  });
+
+  /** **開いても何も無い口を出さない。**言い分が無ければ、畳む箱にしない。 */
+  it('AI の言い分が無ければ、開く口を出さない', () => {
+    const state = stateWith([]);
+    renderSession(root, { ...state, cases: [{ no: 1, title: 'ボタン', aiResult: 'BLOCKED' }] });
+
+    expect(root.querySelector('details.verdict-ai-detail')).toBeNull();
+    expect(root.querySelector('.verdict-ai-tag')?.textContent).toBe('BLOCKED');
+  });
+
   /** 欄を持たないシート（前の版の実行）でも、今までどおり出る。 */
   it('欄が無くても、判定は置ける', () => {
     const state = stateWith([]);

@@ -331,23 +331,36 @@ function renderField(doc: Document, field: SessionField): HTMLElement {
  * **判定そのものは畳まない** —— AI が何と言ったかは、押す前に見える所に在るべき。
  */
 function renderAi(doc: Document, subject: SessionCase): HTMLElement {
-  const detail = doc.createElement('details');
-  detail.className = 'verdict-ai-detail';
-
-  const head = doc.createElement('summary');
-  head.className = 'verdict-ai';
   /**
    * **証跡に残る語で出す**（2026-10-13）。素の `PASS` と出していたので、
    * 人が見ていない合格が画面では「合格」に見えた（C1）。
    */
-  head.textContent = t('verdict.ai', {
-    result: subject.aiResult === undefined ? '' : resolveCaseResult({ aiResult: subject.aiResult }),
-  });
+  const result =
+    subject.aiResult === undefined ? '' : resolveCaseResult({ aiResult: subject.aiResult });
 
+  const head = doc.createElement(subject.note === undefined ? 'div' : 'summary');
+  head.className = 'verdict-ai';
+  // **一覧と同じ語・同じ色の札にする**（2026-10-21）。どの判定のことか目で繋がる。
+  const tag = doc.createElement('span');
+  tag.className = 'verdict-ai-tag';
+  tag.dataset['result'] = result;
+  tag.textContent = result;
+  const label = doc.createElement('span');
+  label.className = 'verdict-ai-label';
+  label.textContent = t('verdict.aiSaid');
+  head.append(tag, label);
+
+  // **開いても何も無い口を出さない。**言い分が無ければ、畳む箱にしない。
+  if (subject.note === undefined) {
+    head.classList.add('verdict-ai-detail');
+    return head;
+  }
+
+  const detail = doc.createElement('details');
+  detail.className = 'verdict-ai-detail';
   const note = doc.createElement('p');
   note.className = 'verdict-note';
-  note.textContent = subject.note ?? '';
-
+  note.textContent = subject.note;
   detail.append(head, note);
   return detail;
 }

@@ -103,7 +103,7 @@ function liveColumn(root: HTMLElement): HTMLElement {
  */
 function pickList(
   doc: Document,
-  items: readonly { value: string; label: string; sub?: string }[],
+  items: readonly { value: string; label: string; sub?: string; title?: string }[],
   className: string,
   attribute: string,
   selected: string | undefined,
@@ -127,7 +127,7 @@ function pickList(
       const sub = doc.createElement('span');
       sub.className = 'pick-sub';
       sub.textContent = item.sub;
-      button.title = item.sub;
+      button.title = item.title ?? item.sub;
       button.append(name, sub);
     }
     button.setAttribute('aria-pressed', String(item.value === selected));
@@ -140,6 +140,31 @@ function pickList(
     list.append(button);
   }
   return list;
+}
+
+/** 止まった実行を、初めから出しておく数。 */
+const RESUME_SHOWN = 3;
+
+/**
+ * **古い実行で画面を埋めない**（2026-10-21・実物の画面で見た）。
+ *
+ * 30 本近くが並び、「始める」が画面の外へ押し出されていた。
+ * 新しいほうから 3 本だけ出し、残りは開く口から出す。**消さない**（続きから選べる道は残す）。
+ */
+function foldOlder(doc: Document, list: HTMLElement): HTMLElement[] {
+  const older = [...list.children].slice(RESUME_SHOWN) as HTMLElement[];
+  if (older.length === 0) return [];
+  for (const item of older) item.hidden = true;
+
+  const more = doc.createElement('button');
+  more.type = 'button';
+  more.className = 'setup-pick setup-resume-more';
+  more.textContent = t('setup.resume.more', { count: String(older.length) });
+  more.addEventListener('click', () => {
+    for (const item of older) item.hidden = false;
+    more.remove();
+  });
+  return [more];
 }
 
 /** シートのパスを、名前と場所に分ける。区切りが無ければ全部が名前。 */
@@ -459,12 +484,14 @@ export function renderSetup(
           doc,
           state.resumable.map((r) => ({
             value: r.runId,
-            label: t('setup.resume.item', {
+            // **どのシートの続きかを大きく**（2026-10-21）。実行 ID と置いた数はその下に小さく。
+            label: splitPath(r.sheetPath).label,
+            sub: t('setup.resume.item', {
               runId: r.runId,
               placed: String(r.placed),
               cases: String(r.cases),
-              sheet: r.sheetPath,
             }),
+            title: r.sheetPath,
           })),
           'setup-resume',
           'runId',
@@ -619,7 +646,7 @@ export function renderSetup(
     const note = doc.createElement('p');
     note.className = 'setup-note';
     note.textContent = t('setup.resume.note');
-    section.append(heading, note, resumeList);
+    section.append(heading, note, resumeList, ...foldOlder(doc, resumeList));
   }
 
   section.append(watchLabel, start);

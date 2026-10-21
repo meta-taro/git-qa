@@ -45,13 +45,13 @@ describe('createTranslator', () => {
 
   it('差し込みができる', () => {
     const t = createTranslator('ja');
-    expect(t('verdict.ai', { result: 'PASS' })).toContain('PASS');
+    expect(t('cases.filter.attention', { count: '3' })).toContain('3');
   });
 
   it('差し込みの値が無ければ、印を残す（黙って空にしない）', () => {
     const t = createTranslator('ja');
     // 空にすると「文言が変」なのか「値が来ていない」のか分からなくなる。
-    expect(t('verdict.ai', {})).toContain('{result}');
+    expect(t('cases.filter.attention', {})).toContain('{count}');
   });
 });
 

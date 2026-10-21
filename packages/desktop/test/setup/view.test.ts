@@ -523,6 +523,55 @@ describe('renderSetup — 続きから', () => {
     });
   });
 
+  /**
+   * **シートの名前を大きく出す**（2026-10-21・実物の画面で見た）。
+   * 実行 ID と長い置き場所が 1 行に並び、どのシートの続きか読めなかった。
+   */
+  it('止まった実行は、シートの名前を大きく、実行と置いた数を小さく出す', () => {
+    renderSetup(root, withResumable(), { onStart: vi.fn(), operator: 'octocat' });
+
+    const item = live().querySelector<HTMLElement>('.setup-resume');
+    expect(item?.querySelector('.pick-name')?.textContent).toBe('b.tsv');
+    expect(item?.querySelector('.pick-sub')?.textContent).toContain('20260911-090000');
+    // 置き場所は全部、指を載せれば読める。
+    expect(item?.title).toContain('/repo/docs/b.tsv');
+  });
+
+  /**
+   * **古い実行で画面を埋めない**（2026-10-21・実物の画面で見た）。
+   * 30 本近くが並び、「始める」が画面の外へ押し出されていた。新しい 3 本だけ出し、残りは開く口で。
+   */
+  it('止まった実行は新しい 3 本だけ出し、残りは開く口から出す', () => {
+    const many: SetupState = {
+      ...idle,
+      resumable: [1, 2, 3, 4, 5].map((n) => ({
+        runId: `2026091${String(n)}-090000`,
+        sheetPath: '/repo/docs/b.tsv',
+        startedAt: '2026-09-11T09:00:00.000Z',
+        cases: 4,
+        placed: 1,
+      })),
+    };
+    renderSetup(root, many, { onStart: vi.fn(), operator: 'octocat' });
+
+    const shown = (): number =>
+      [...live().querySelectorAll<HTMLElement>('.setup-resume')].filter((el) => !el.hidden).length;
+    expect(shown()).toBe(3);
+
+    const more = live().querySelector<HTMLButtonElement>('.setup-resume-more');
+    expect(more?.textContent).toContain('2');
+    more?.click();
+
+    expect(shown()).toBe(5);
+    expect(live().querySelector('.setup-resume-more')).toBeNull();
+  });
+
+  it('3 本以下なら、開く口は出さない', () => {
+    renderSetup(root, withResumable(), { onStart: vi.fn(), operator: 'octocat' });
+
+    expect(live().querySelector('.setup-resume-more')).toBeNull();
+  });
+
   /** **止まった実行が無ければ、何も出さない。**要らない案内で画面を埋めない。 */
   it('止まった実行が無ければ、出さない', () => {
     renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
