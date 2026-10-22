@@ -218,7 +218,9 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
   };
 
   const state = async (): Promise<SetupState> => {
-    if (phase !== 'idle' && phase !== 'done') {
+    // **始められなかった後も、選ぶものは全部返す**（2026-10-22）。選び直して始め直す場面なので、
+    // 空で返すと一覧が最近使った分だけに減り、止まった検証は消えていた。
+    if (phase === 'starting' || phase === 'running') {
       return {
         phase,
         devices: [],

@@ -114,6 +114,43 @@ describe('startSetupServer', () => {
     throw new Error('failed にならなかった');
   });
 
+  /**
+   * **始められなかったら、選び直して始め直す場面**（2026-10-22・実物の画面で見た）。
+   *
+   * 失敗したときの state はシート・端末・止まった検証を空で返していたので、
+   * 画面の一覧が最近使った分だけに減り、止まった検証は消えていた。
+   */
+  it('始められなかった後も、選ぶものは全部返す', async () => {
+    server = await startSetupServer(
+      options({
+        start: () => Promise.reject(new Error('Firefox が起きない')),
+        findResumable: () =>
+          Promise.resolve([
+            {
+              runId: '20260911-090000',
+              sheetPath: '/repo/docs/b.tsv',
+              startedAt: '2026-09-11T09:00:00.000Z',
+              cases: 4,
+              placed: 3,
+            },
+          ]),
+      }),
+    );
+
+    await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'x', sheetPath: '/a.tsv' }),
+    });
+    await waitFor(async () => (await phaseOf(server!)) === 'failed');
+
+    const state = await json(`${server.url}/state`);
+    expect(state['error']).toContain('Firefox が起きない');
+    expect(state['sheets']).toEqual(['/repo/docs/a.tsv']);
+    expect(state['devices']).toEqual([{ serial: 'emulator-5554', state: 'device' }]);
+    expect(state['resumable']).toHaveLength(1);
+  });
+
   it('二重に始めない（走っている最中の start は断る）', async () => {
     server = await startSetupServer(options());
 
