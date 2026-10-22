@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process';
-import { access, mkdtemp, rm } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -24,11 +24,14 @@ import {
   FIREFOX_CANDIDATES,
   dragActions,
   firefoxArgs,
+  firefoxLaunch,
+  firefoxPidPattern,
   parseBidiUrl,
   pointerActions,
   typeActions,
 } from './firefox.js';
 import { connectCdpSocket } from './socket.js';
+import { forgetLaunched, rememberLaunched } from './stale.js';
 
 /**
  * Firefox で見る（Issue 018 / C56）。
@@ -96,6 +99,16 @@ async function findFirefox(explicit?: string): Promise<string> {
   );
 }
 
+/** `pgrep -f` で 1 つ探す。**見つからなくても止めない**（片付けは作業場所の名前で探し直す）。 */
+function findPid(pattern: string): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    execFile('pgrep', ['-f', pattern], (_error, stdout) => {
+      const pid = Number.parseInt(String(stdout).trim().split('\n')[0] ?? '', 10);
+      resolve(Number.isInteger(pid) && pid > 0 ? pid : undefined);
+    });
+  });
+}
+
 export function createFirefoxAdapter(options: FirefoxAdapterOptions): TargetAdapter {
   const now = options.now ?? (() => new Date());
 
@@ -107,18 +120,44 @@ export function createFirefoxAdapter(options: FirefoxAdapterOptions): TargetAdap
       const binary = await findFirefox(options.firefoxPath);
       // **人のプロファイルを触らない。**開いているタブ・履歴・ログインに手を出さない。
       const profileDir = await mkdtemp(join(tmpdir(), 'git-qa-ff-'));
-      const child = spawn(
+      const stderrPath = join(profileDir, 'git-qa-stderr.log');
+      const launch = firefoxLaunch({
         binary,
-        firefoxArgs({
+        args: firefoxArgs({
           port: 0,
           profileDir,
           ...(options.size === undefined ? {} : { size: options.size }),
         }),
-        { stdio: ['ignore', 'ignore', 'pipe'] },
-      );
+        platform: process.platform,
+        stderrPath,
+      });
+      const child = spawn(launch.command, [...launch.args], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+
+      /**
+       * LaunchServices から起こした Firefox 本体の番号。**`open` の子ではない**ので、
+       * 止められたときに道連れにならない。見つけたら覚え、合図の中からも落とせるようにする
+       * （`killLaunchedSync`・meta-taro/git-qa#20）。
+       */
+      let firefoxPid: number | undefined;
 
       const cleanup = async (): Promise<void> => {
-        child.kill();
+        if (!launch.viaLaunchServices) {
+          child.kill();
+        } else if (firefoxPid !== undefined) {
+          forgetLaunched(firefoxPid);
+          try {
+            process.kill(firefoxPid, 'SIGTERM');
+          } catch {
+            // もう居ない。**片付けは済んでいる。**
+          }
+        } else {
+          // 番号を掴む前に落ちた。**この実行の作業場所の名前で探して止める。**
+          await new Promise<void>((resolve) => {
+            execFile('pkill', ['-f', firefoxPidPattern(profileDir)], () => resolve());
+          });
+        }
         await rm(profileDir, { recursive: true, force: true }).catch(() => undefined);
       };
 
@@ -127,7 +166,13 @@ export function createFirefoxAdapter(options: FirefoxAdapterOptions): TargetAdap
         const url = await new Promise<string>((resolve, reject) => {
           const limitMs = options.startTimeoutMs ?? 30_000;
           let seen = '';
+          let poll: ReturnType<typeof setInterval> | undefined;
+          const settle = (): void => {
+            clearTimeout(timer);
+            if (poll !== undefined) clearInterval(poll);
+          };
           const timer = setTimeout(() => {
+            settle();
             // **黙って待ち続けない。**何を待っていたのかを言う。
             reject(
               new AdapterError(
@@ -139,19 +184,36 @@ export function createFirefoxAdapter(options: FirefoxAdapterOptions): TargetAdap
               ),
             );
           }, limitMs);
-
-          child.stderr?.on('data', (chunk: Buffer) => {
-            seen += chunk.toString();
+          const look = (text: string): void => {
+            seen = text;
             const found = parseBidiUrl(seen);
             if (found === undefined) return;
-            clearTimeout(timer);
+            settle();
             resolve(found);
-          });
+          };
+
+          if (launch.viaLaunchServices) {
+            // `open` は標準エラーをファイルへ書かせる。**出てくるまで読み直す。**
+            poll = setInterval(() => {
+              readFile(stderrPath, 'utf8').then(look, () => undefined);
+            }, 200);
+          } else {
+            child.stderr?.on('data', (chunk: Buffer) => {
+              look(seen + chunk.toString());
+            });
+          }
           child.on('exit', (code) => {
-            clearTimeout(timer);
+            // `open` は Firefox を頼んだらすぐ終わる。**終わったこと自体は失敗ではない。**
+            if (launch.viaLaunchServices && code === 0) return;
+            settle();
             reject(new AdapterError(KIND, `Firefox が起動せずに終わった（${String(code)}）`));
           });
         });
+
+        if (launch.viaLaunchServices) {
+          firefoxPid = await findPid(firefoxPidPattern(profileDir));
+          rememberLaunched(firefoxPid);
+        }
 
         bidi = createBidiClient(await connectCdpSocket(`${url}/session`));
 

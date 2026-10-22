@@ -3462,3 +3462,38 @@ macOS は使用目的が書かれていないと**許可を聞く画面すら出
 - 単体試験 14 件（立てる順・落ちたら畳む・張り直したら立て直す・runwda だけの立て直し・tunnel の立て直し・閉じたら全部止める・ディスクイメージ・理由を添える・環境変数）
 - macOS・iPhone Xs で本物の go-ios を立て、落ちたのを知り、理由を出し、ディスクイメージを載せ、閉じたら 1 本も残らないことを確かめた。
   **準備完了までは通っていない**（runwda が `cannot initiate a IDE session` で終わり続けた）。Windows では未試験
+
+### C104: macOS では、Firefox を LaunchServices（`open -n -a`）から起こす（2026-10-22）
+
+**決めたこと**
+
+1. macOS で `.app` の中の Firefox を使うときは、実行ファイルを直に起こさず `open -n -a <Firefox.app> --stderr <ファイル> --args …` で起こす。
+   繋ぎ先（`WebDriver BiDi listening on ws://…`）は、そのファイルを読み直して拾う
+2. Firefox は git-qa の子にならないので、本体の番号を `pgrep -f` で探して覚え（手がかりはこの実行だけの作業場所）、
+   閉じるときと止められたとき（`killLaunchedSync`）に落とす
+3. Windows・Linux と、`.app` の外の Firefox は、これまでどおり直に起こす
+
+**根拠**
+
+- macOS・Firefox 155.0.1 で、直に起こすと「プロファイルが見つかりません」の小窓で止まり、BiDi の口を開かなかった
+  （git-qa には「繋ぎ先を言ってこない（30000 ms 待った）」とだけ見えた）
+- 起こした側から `~/Library/Application Support/Firefox` を読もうとすると `Operation not permitted` が返る。
+  macOS は、直に起こした Firefox を起こした側として扱い、Firefox 自身の置き場を読ませない
+- `open -n -a` で起こすと、同じ引数で BiDi の口が開き、見本のシートが動いた
+
+**採らなかった案とその理由**
+
+- **人に「フルディスクアクセス」を許してもらう** —— 人の手が要り、許す範囲が広すぎる
+- **作業場所を別の所に置く** —— 一時フォルダ・`~/Library/Caches`・`/tmp` のどれでも同じ小窓で止まった（置き場所ではなく、Firefox 自身の置き場が読めないため）
+- **`XRE_PROFILE_PATH` で作業場所を渡す** —— 同じく止まった
+
+**これを止めるべき条件**
+
+- 直に起こしても Firefox が自分の置き場を読めるようになったら（標準エラーを直に読めるほうが単純）
+- `open` が `--stderr` を持たない macOS を対象にするなら
+
+**実行状況**
+
+- 単体試験 5 件（起こし方の選び分け 3・本体だけを掴む印 2）
+- macOS・Firefox 155.0.1 で、画面から Firefox を選んで始め、見本のページが映って AI がボタンを押した。
+  実行器に終了の合図を送ると Firefox 本体は 1 つも残らなかった。Windows・Linux は変えていない

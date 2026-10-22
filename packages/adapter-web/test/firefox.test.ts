@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { firefoxArgs, parseBidiUrl, pointerActions, typeActions } from '../src/firefox.js';
+import {
+  firefoxArgs,
+  firefoxLaunch,
+  firefoxPidPattern,
+  parseBidiUrl,
+  pointerActions,
+  typeActions,
+} from '../src/firefox.js';
 
 /**
  * Firefox で見る（Issue 018 / C56）。
@@ -32,6 +39,95 @@ describe('firefoxArgs', () => {
 
     expect(args).toContain('--window-size');
     expect(args).toContain('1280,900');
+  });
+});
+
+/**
+ * **macOS では、Firefox を LaunchServices（`open`）から起こす**（2026-10-22・実機の Firefox 155 で踏んだ）。
+ *
+ * git-qa から直に起こすと、macOS はその Firefox を git-qa の側として扱い、
+ * Firefox 自身の置き場（`~/Library/Application Support/Firefox`）を読ませない。
+ * Firefox は「プロファイルが見つかりません」の小窓で止まり、BiDi の口を開かない。
+ * `open -n -a` で起こすと、Firefox は Firefox として自分の置き場を読める。
+ */
+describe('firefoxLaunch', () => {
+  const args = ['--remote-debugging-port', '0', '--profile', '/tmp/git-qa-ff-1'];
+
+  it('macOS の .app は open で起こし、標準エラーはファイルで受ける', () => {
+    const launch = firefoxLaunch({
+      binary: '/Applications/Firefox.app/Contents/MacOS/firefox',
+      args,
+      platform: 'darwin',
+      stderrPath: '/tmp/git-qa-ff-1/stderr.log',
+    });
+
+    expect(launch.viaLaunchServices).toBe(true);
+    expect(launch.command).toBe('open');
+    expect(launch.args).toEqual([
+      '-n',
+      '-a',
+      '/Applications/Firefox.app',
+      '--stderr',
+      '/tmp/git-qa-ff-1/stderr.log',
+      '--args',
+      ...args,
+    ]);
+  });
+
+  it('macOS でも .app の外の実行ファイルは、そのまま起こす', () => {
+    const launch = firefoxLaunch({
+      binary: '/opt/firefox/firefox',
+      args,
+      platform: 'darwin',
+      stderrPath: '/tmp/x.log',
+    });
+
+    expect(launch).toEqual({ command: '/opt/firefox/firefox', args, viaLaunchServices: false });
+  });
+
+  it('Windows と Linux は、そのまま起こす', () => {
+    const exe = 'C:\\Program Files\\Mozilla Firefox\\firefox.exe';
+    expect(firefoxLaunch({ binary: exe, args, platform: 'win32', stderrPath: 'x' })).toEqual({
+      command: exe,
+      args,
+      viaLaunchServices: false,
+    });
+  });
+});
+
+/**
+ * **LaunchServices から起こした Firefox は、git-qa の子ではない。**
+ * 止められたときに道連れにならないので、番号を探して覚え、こちらで落とす。
+ * 探す手がかりは、この実行だけの作業場所。**人が開いている Firefox を掴まない。**
+ */
+describe('firefoxPidPattern', () => {
+  const dir = '/var/folders/8_/x/T/git-qa-ff-AbC.1';
+
+  it('この実行の作業場所で起きた Firefox 本体だけに当たる', () => {
+    const pattern = new RegExp(firefoxPidPattern(dir));
+
+    expect(
+      pattern.test(
+        `/Applications/Firefox.app/Contents/MacOS/firefox --remote-debugging-port 0 --profile ${dir} --no-remote`,
+      ),
+    ).toBe(true);
+    // 人が普段使っている Firefox。
+    expect(pattern.test('/Applications/Firefox.app/Contents/MacOS/firefox')).toBe(false);
+    // 別の実行の作業場所（名前の頭が同じでも）。
+    expect(pattern.test(`/Applications/Firefox.app/Contents/MacOS/firefox --profile ${dir}2`)).toBe(
+      false,
+    );
+    // 中の部品（plugin-container）は本体が止めるので、掴まない。
+    expect(
+      pattern.test(
+        `/Applications/Firefox.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container --profile ${dir}`,
+      ),
+    ).toBe(false);
+  });
+
+  it('作業場所の名前の . を、何にでも当たる印として読まない', () => {
+    const pattern = new RegExp(firefoxPidPattern(dir));
+    expect(pattern.test(`MacOS/firefox --profile ${dir.replace('.1', 'x1')}`)).toBe(false);
   });
 });
 

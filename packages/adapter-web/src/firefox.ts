@@ -45,6 +45,53 @@ export function firefoxArgs(options: FirefoxArgsOptions): string[] {
   ];
 }
 
+export interface FirefoxLaunchOptions {
+  readonly binary: string;
+  readonly args: readonly string[];
+  readonly platform: NodeJS.Platform;
+  /** LaunchServices から起こすとき、標準エラーを書かせるファイル。 */
+  readonly stderrPath: string;
+}
+
+export interface FirefoxLaunch {
+  readonly command: string;
+  readonly args: readonly string[];
+  /** 真なら、起こした `open` はすぐ終わる。**Firefox はその子ではない**ので、名前で止める。 */
+  readonly viaLaunchServices: boolean;
+}
+
+/**
+ * どう起こすか。
+ *
+ * **macOS の .app は LaunchServices（`open -n -a`）から起こす**（C104・Firefox 155 で踏んだ）。
+ * 直に起こすと、macOS はその Firefox を起こした側（git-qa）として扱い、
+ * Firefox 自身の置き場（`~/Library/Application Support/Firefox`）を読ませない。
+ * Firefox は「プロファイルが見つかりません」の小窓で止まり、BiDi の口を開かない。
+ */
+export function firefoxLaunch(options: FirefoxLaunchOptions): FirefoxLaunch {
+  const app = /^(.+\.app)\/Contents\/MacOS\/[^/]+$/.exec(options.binary)?.[1];
+  if (options.platform !== 'darwin' || app === undefined) {
+    return { command: options.binary, args: options.args, viaLaunchServices: false };
+  }
+  return {
+    command: 'open',
+    // `-n`：開いている人の Firefox に頼まず、新しく 1 つ起こす。
+    args: ['-n', '-a', app, '--stderr', options.stderrPath, '--args', ...options.args],
+    viaLaunchServices: true,
+  };
+}
+
+/**
+ * LaunchServices から起こした Firefox 本体を探す印（`pgrep -f` に渡す）。
+ *
+ * **Firefox は git-qa の子ではない**ので、止められたときに道連れにならない。
+ * 手がかりは、この実行だけの作業場所。**人が開いている Firefox と、中の部品は掴まない。**
+ */
+export function firefoxPidPattern(profileDir: string): string {
+  const escaped = profileDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return `MacOS/firefox .*--profile ${escaped}( |$)`;
+}
+
 /**
  * 起こした Firefox が標準エラーへ書く 1 行から、繋ぎ先を読む。
  *
