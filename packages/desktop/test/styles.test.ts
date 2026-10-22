@@ -24,7 +24,11 @@ const rulesOf = (css: string, selector: string): string => {
   for (const [, selectors = '', body = ''] of plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (selectors.split(',').some((one) => one.trim() === selector)) bodies.push(body);
   }
-  return bodies.join('\n');
+  // 整形で折り返された値も 1 行で比べる（`linear-gradient(\n  to top right` など）。
+  return bodies
+    .join('\n')
+    .replace(/\(\s+/g, '(')
+    .replace(/[ \t]*\n[ \t]+(?=[^-\s])/g, ' ');
 };
 
 describe('styles.css — 実物で崩れていた所', () => {
@@ -59,5 +63,51 @@ describe('styles.css — 実物で崩れていた所', () => {
   it('畳んだ続きからの札は出ない', async () => {
     const css = await readCss();
     expect(rulesOf(css, '.setup-resume[hidden]')).toContain('display: none');
+  });
+});
+
+/**
+ * **キートップは、デザイン案の線画のキーキャップにする**（2026-10-22・持ち主の指示）。
+ *
+ * 天面を枠の内側に置き、左右と手前の側面に 45° の斜線、四隅を面取りの線で結ぶ。
+ * 押すと天面が沈む。色はキーの名前（`--key-*`）だけを使い、明暗はそこで切り替える。
+ */
+describe('styles.css — キーキャップ', () => {
+  it('側面は右上がりの斜線で、四隅に面取りの線が入る', async () => {
+    const cap = rulesOf(await readCss(), '.key-binding');
+    expect(cap).toContain('repeating-linear-gradient(135deg, var(--key-hatch)');
+    for (const corner of ['to top right', 'to top left']) {
+      expect(cap).toContain(`linear-gradient(${corner}`);
+    }
+    expect(cap).toContain('border: 1px solid var(--key-edge)');
+  });
+
+  it('天面は枠の内側に置き、押すと沈む', async () => {
+    const css = await readCss();
+    const face = rulesOf(css, '.key-binding::before');
+    expect(face).toContain('background: var(--key-face)');
+    expect(face).toContain('border: 1px solid var(--key-face-line)');
+    expect(rulesOf(css, '.key-action:active:not(:disabled) .key-binding')).toContain('--kc-top');
+  });
+
+  /** 合格（`d`）だけが緑のキー。**押せないときは光らせない**（DESIGN.md「判定の札」）。 */
+  it('合格のキーだけ、緑の天面にする', async () => {
+    const d = rulesOf(await readCss(), ".key-action[data-key='d']:not(:disabled) .key-binding");
+    expect(d).toContain('--key-face: var(--accent)');
+  });
+
+  /** Space は札いっぱいの横長。キーの下に説明を置く。 */
+  it('Space は札の幅いっぱいに伸ばす', async () => {
+    const css = await readCss();
+    expect(rulesOf(css, ".key-action[data-key=' ']")).toContain('flex-direction: column');
+    expect(rulesOf(css, ".key-action[data-key=' '] .key-binding")).toContain('width: 100%');
+  });
+
+  it('キーの色は、ダークでデザイン案の値になる', async () => {
+    const css = await readCss();
+    const dark = rulesOf(css, ":root[data-appearance='dark']");
+    for (const value of ['#7c8b87', '#4a5754', '#262e2c', '#9aa8a4']) {
+      expect(dark).toContain(value);
+    }
   });
 });
