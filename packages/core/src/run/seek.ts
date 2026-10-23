@@ -90,10 +90,22 @@ export async function seekUntilVisible(
        */
       throw new Error(
         `${way}へ送っても画面の文字が変わらなくなった（端に着いたか、送れていない）。` +
-          `「${step.target}」は見えなかった（${String(strokes)} 回送った）`,
+          `「${step.target}」は見えなかった（${String(strokes)} 回送った）。` +
+          `最後に見えていたのは「${lastLineOf(again, step.direction)}」`,
       );
     }
     text = again;
   }
   throw new Error(`${way}へ ${String(MAX_STROKES)} 回送っても「${step.target}」が見えなかった`);
+}
+
+/** 画面の文字の端の 1 行。下へ送っていたなら最後の行、上へなら最初の行。**長ければ切る。** */
+const LAST_LINE_MAX = 40;
+function lastLineOf(screenText: string, direction: PlannedSeek['direction']): string {
+  const lines = screenText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const line = (direction === 'down' ? lines.at(-1) : lines[0]) ?? '';
+  return line.length > LAST_LINE_MAX ? `${line.slice(0, LAST_LINE_MAX)}…` : line;
 }

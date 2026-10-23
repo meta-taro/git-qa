@@ -49,7 +49,7 @@ async function run(steps: string, screen: Screen) {
   };
   const notes: string[] = [];
   const runner = createSheetCaseRunner({
-    readScreenText: () => Promise.resolve(`${screen.pages[page] ?? ''}\n済`),
+    readScreenText: () => Promise.resolve(`済\n${screen.pages[page] ?? ''}`),
     expectation: { waitMs: 0, stepMs: 1 },
     seek: { pauseMs: 0 },
   });
@@ -97,6 +97,8 @@ describe('見えるまで送る', () => {
 
     expect(verdict.aiResult).toBe('BLOCKED');
     expect(verdict.note).toMatch(/送っても画面の文字が変わらなくなった.*「無い札」は見えなかった/);
+    // **最後に見えていた文字を添える。**画面を開かずに、端に着いたのか送れていないのかを読めるように。
+    expect(verdict.note).toMatch(/最後に見えていたのは「下」/);
     expect(swipes).toHaveLength(2);
   });
 
