@@ -162,6 +162,38 @@ describe('Windows の「押す」が言うこと', () => {
     expect(detail).toContain('Invoke で押した');
   });
 
+  /**
+   * **本物のクリックが断られた理由を残す**（2026-10-23・Windows の Electron で実測）。
+   *
+   * タブと、開くボタン（`aria-haspopup`）だけが押せなかった。足跡は空で、
+   * **なぜ本物のクリックが通らなかったのかが、どこにも出ていなかった。**
+   */
+  it('代わりの押し方に落ちたら、本物のクリックが断られた理由も言う', async () => {
+    const detail = await withTool(
+      '開く\t560\t390\t80\t28\tButton\n',
+      'invoke\t（560, 390）の一番上が相手の窓ではないので、クリックしなかった',
+    );
+
+    expect(detail).toContain('Invoke で押した');
+    expect(detail).toContain('一番上が相手の窓ではない');
+  });
+
+  /**
+   * **Invoke を持たないものは、その作りに合う口で押す**（2026-10-23）。
+   * Chromium は `role="tab"` を選ぶ口（SelectionItem）、`aria-expanded` を開く口（ExpandCollapse）で出す。
+   */
+  it.each([
+    ['select', '選ぶ口（SelectionItem）で選んだ'],
+    ['expand', '開く口（ExpandCollapse）で開いた'],
+    ['collapse', '開く口（ExpandCollapse）で閉じた'],
+    ['default', '既定の動作（LegacyIAccessible）で押した'],
+  ])('%s に落ちたら、どの口で押したかを言う', async (said, expected) => {
+    const detail = await withTool('開く\t1189\t211\t60\t28\tTabItem\n', `${said}\tなにか`);
+
+    expect(detail).toContain(expected);
+    expect(detail).toContain('なにか');
+  });
+
   it('同じ名前が 2 つあれば、候補の数と選び方も言う', async () => {
     const detail = await withTool(
       '開く\t400\t300\t480\t240\tWindow\n開く\t560\t390\t80\t28\tButton\n',

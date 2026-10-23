@@ -8,7 +8,7 @@
 //!
 //! | | 使うもの | 前面に出るか |
 //! |---|---|---|
-//! | 押す | **本物のクリック**（#42）。確かめられなければ `InvokePattern` | **出る**（戻す） |
+//! | 押す | **本物のクリック**（#42）。確かめられなければ `Invoke` → `SelectionItem` → `ExpandCollapse` → `LegacyIAccessible`（C106） | **出る**（戻す） |
 //! | 打つ | `ValuePattern.SetValue` | 出ない |
 //! | 回す | `ScrollPattern.Scroll` | 出ない |
 //!
@@ -32,12 +32,17 @@ use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
 };
 use windows::Win32::UI::Accessibility::{
-    CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationInvokePattern,
-    IUIAutomationScrollPattern, IUIAutomationValuePattern, ScrollAmount_LargeDecrement,
+    CUIAutomation, ExpandCollapseState_Expanded, IUIAutomation, IUIAutomationCondition,
+    IUIAutomationElement, IUIAutomationExpandCollapsePattern, IUIAutomationInvokePattern,
+    IUIAutomationLegacyIAccessiblePattern, IUIAutomationScrollPattern,
+    IUIAutomationSelectionItemPattern, IUIAutomationValuePattern, ScrollAmount_LargeDecrement,
     ScrollAmount_LargeIncrement, ScrollAmount_NoAmount, TreeScope_Descendants,
-    UIA_InvokePatternId, UIA_IsInvokePatternAvailablePropertyId,
-    UIA_IsScrollPatternAvailablePropertyId, UIA_IsValuePatternAvailablePropertyId, UIA_PROPERTY_ID,
-    UIA_ScrollPatternId, UIA_ValuePatternId,
+    UIA_ExpandCollapsePatternId, UIA_InvokePatternId,
+    UIA_IsExpandCollapsePatternAvailablePropertyId, UIA_IsInvokePatternAvailablePropertyId,
+    UIA_IsLegacyIAccessiblePatternAvailablePropertyId, UIA_IsScrollPatternAvailablePropertyId,
+    UIA_IsSelectionItemPatternAvailablePropertyId, UIA_IsValuePatternAvailablePropertyId,
+    UIA_LegacyIAccessiblePatternId, UIA_ScrollPatternId, UIA_SelectionItemPatternId,
+    UIA_ValuePatternId, UIA_PROPERTY_ID,
 };
 
 use crate::wake::ensure_awake;
@@ -51,36 +56,108 @@ use crate::wake::ensure_awake;
 /// **代わりに、相手が一瞬前面に出る。**前に出たことを確かめ、**その点の一番上が相手の窓だと
 /// 確かめてから**押す（別の窓を押さない・C57 で macOS が踏んだ）。押したら前面とカーソルを戻す。
 ///
-/// **確かめられなければ、`Invoke` で押す**（これまでの押し方）。要素そのものに伝えるので、
+/// **確かめられなければ、要素の口で押す**（これまでの押し方）。要素そのものに伝えるので、
 /// 別の窓を押すことは無い。**押せないよりは、今までどおり押すほうがよい。**
+///
+/// 答えは `押し方` か `押し方<TAB>本物のクリックが断られた理由`。
+/// **断られた理由は捨てない**（2026-10-23・Windows の Electron で、タブと開くボタンだけが押せず、
+/// 足跡が空で、なぜ本物のクリックが通らなかったのかが分からなかった）。
 pub fn press(hwnd: &str, x: &str, y: &str) -> Result<String, String> {
     let (target, px, py) = place(hwnd, x, y)?;
-    // **どちらで押したかを言う**（#42）。証跡の手順の足跡に付く。
-    if crate::click::click_at(target, px, py).is_ok() {
-        return Ok("click".into());
+    // **どれで押したかを言う**（#42）。証跡の手順の足跡に付く。
+    let refused = match crate::click::click_at(target, px, py) {
+        Ok(()) => return Ok("click".into()),
+        Err(reason) => reason,
+    };
+    match by_pattern(target, px, py) {
+        Ok(how) => Ok(format!("{how}\t{refused}")),
+        Err(why) => Err(format!("{refused}。要素の口でも押せなかった: {why}")),
     }
-    invoke(target, px, py).map(|_| "invoke".into())
 }
 
-/// `Invoke` で押す。**その窓の中で**、その場所にある押せるものに伝える。
-fn invoke(hwnd: HWND, x: i32, y: i32) -> Result<String, String> {
-    with_automation(hwnd, |automation, root| {
-        let element = unsafe {
-            at_point(
-                automation,
-                root,
+/// 要素の口で押す。**その窓の中で**、その場所にあるいちばん小さいものに伝える。
+///
+/// **Invoke だけでは足りない**（2026-10-23）。Chromium は
+/// `role="tab"` を選ぶ口（SelectionItem）、`aria-expanded` のボタンを開く口（ExpandCollapse）で出し、
+/// **Invoke を持たせない。**人が押したときに起きることに合わせて、口を選ぶ。
+///
+/// **先に 3 つの口のどれかを持つものを探す。**口ごとに探すと、Invoke を持つ大きな親が
+/// 小さなタブより先に当たり、**押すつもりの無い所を押す。**
+/// 既定の動作（LegacyIAccessible）は、ほぼ全部が持っているので最後に回す。
+fn by_pattern(hwnd: HWND, x: i32, y: i32) -> Result<String, String> {
+    with_automation(hwnd, |automation, root| unsafe {
+        let any = any_of(
+            automation,
+            &[
                 UIA_IsInvokePatternAvailablePropertyId,
-                x,
-                y,
-                "押せる",
-            )
-        }?;
-        let pattern: IUIAutomationInvokePattern =
-            unsafe { element.GetCurrentPatternAs(UIA_InvokePatternId) }
-                .map_err(|e| format!("押す口を取り出せない: {e}"))?;
-        unsafe { pattern.Invoke() }.map_err(|e| format!("押せなかった: {e}"))?;
-        Ok(String::new())
+                UIA_IsSelectionItemPatternAvailablePropertyId,
+                UIA_IsExpandCollapsePatternAvailablePropertyId,
+            ],
+        )?;
+        if let Ok(element) = smallest_at(root, &any, x, y, "押せる") {
+            return press_element(&element);
+        }
+        let legacy = any_of(
+            automation,
+            &[UIA_IsLegacyIAccessiblePatternAvailablePropertyId],
+        )?;
+        let element = smallest_at(root, &legacy, x, y, "押せる")?;
+        let pattern: IUIAutomationLegacyIAccessiblePattern = element
+            .GetCurrentPatternAs(UIA_LegacyIAccessiblePatternId)
+            .map_err(|e| format!("既定の動作の口を取り出せない: {e}"))?;
+        pattern
+            .DoDefaultAction()
+            .map_err(|e| format!("既定の動作で押せなかった: {e}"))?;
+        Ok("default".into())
     })
+}
+
+/// 持っている口で押す。**Invoke → 選ぶ → 開く／閉じる**の順。
+unsafe fn press_element(element: &IUIAutomationElement) -> Result<String, String> {
+    if let Ok(pattern) =
+        element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId)
+    {
+        pattern.Invoke().map_err(|e| format!("押せなかった: {e}"))?;
+        return Ok("invoke".into());
+    }
+    if let Ok(pattern) =
+        element.GetCurrentPatternAs::<IUIAutomationSelectionItemPattern>(UIA_SelectionItemPatternId)
+    {
+        pattern.Select().map_err(|e| format!("選べなかった: {e}"))?;
+        return Ok("select".into());
+    }
+    let pattern: IUIAutomationExpandCollapsePattern = element
+        .GetCurrentPatternAs(UIA_ExpandCollapsePatternId)
+        .map_err(|e| format!("押す口を取り出せない: {e}"))?;
+    // **人が押したのと同じく、開いていれば閉じる。**
+    if pattern.CurrentExpandCollapseState() == Ok(ExpandCollapseState_Expanded) {
+        pattern
+            .Collapse()
+            .map_err(|e| format!("閉じられなかった: {e}"))?;
+        return Ok("collapse".into());
+    }
+    pattern.Expand().map_err(|e| format!("開けなかった: {e}"))?;
+    Ok("expand".into())
+}
+
+/// 「どれかの口を持つ」条件。
+unsafe fn any_of(
+    automation: &IUIAutomation,
+    available: &[UIA_PROPERTY_ID],
+) -> Result<IUIAutomationCondition, String> {
+    let mut condition: Option<IUIAutomationCondition> = None;
+    for id in available {
+        let one = automation
+            .CreatePropertyCondition(*id, &windows::core::VARIANT::from(true))
+            .map_err(|e| format!("探す条件を作れない: {e}"))?;
+        condition = Some(match condition {
+            None => one,
+            Some(before) => automation
+                .CreateOrCondition(&before, &one)
+                .map_err(|e| format!("探す条件を作れない: {e}"))?,
+        });
+    }
+    condition.ok_or_else(|| "探す条件が無い".into())
 }
 
 /// 文字を入れる。
@@ -215,23 +292,35 @@ unsafe fn at_point(
     y: i32,
     what: &str,
 ) -> Result<IUIAutomationElement, String> {
-    let condition = automation
-        .CreatePropertyCondition(available, &windows::core::VARIANT::from(true))
-        .map_err(|e| format!("探す条件を作れない: {e}"))?;
+    let condition = any_of(automation, &[available])?;
+    smallest_at(root, &condition, x, y, what)
+}
 
+/// その点を含む、いちばん小さいもの。**画面に出ていないものは選ばない。**
+unsafe fn smallest_at(
+    root: &IUIAutomationElement,
+    condition: &IUIAutomationCondition,
+    x: i32,
+    y: i32,
+    what: &str,
+) -> Result<IUIAutomationElement, String> {
     let found = root
-        .FindAll(TreeScope_Descendants, &condition)
+        .FindAll(TreeScope_Descendants, condition)
         .map_err(|e| format!("中身を数えられない: {e}"))?;
     let count = found.Length().unwrap_or(0);
 
     let mut best: Option<(IUIAutomationElement, i64)> = None;
     for i in 0..count {
-        let Ok(element) = found.GetElement(i) else { continue };
+        let Ok(element) = found.GetElement(i) else {
+            continue;
+        };
         // **画面に出ていないものは押さない**（#42。裏のタブの要素が同じ座標に重なっている）。
         if element.CurrentIsOffscreen().unwrap_or_default().as_bool() {
             continue;
         }
-        let Ok(rect) = element.CurrentBoundingRectangle() else { continue };
+        let Ok(rect) = element.CurrentBoundingRectangle() else {
+            continue;
+        };
         if x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom {
             continue;
         }

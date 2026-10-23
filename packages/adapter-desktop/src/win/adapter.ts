@@ -41,7 +41,7 @@ import type { DesktopAdapterOptions } from '../adapter.js';
  * | | macOS | Windows |
  * |---|---|---|
  * | 文字 | AX（段 1）＋ Vision OCR（段 2） | **UI Automation だけ**（段 2 はまだ無い） |
- * | 押す | `AXPress` | **本物のクリック**（#42）。確かめられなければ `Invoke` |
+ * | 押す | `AXPress` | **本物のクリック**（#42）。確かめられなければ `Invoke`・選ぶ・開く・既定の動作（C106） |
  * | 録る | ScreenCaptureKit | **まだ無い**（`unsupported`） |
  *
  * **録画はまだ無い。**画面（`screen.webp`）は残るので、証跡としては成立する。
@@ -595,13 +595,31 @@ const KIND_WORDS: Readonly<Record<ElementKind, string>> = {
  * > 候補が 2 つ以上あったら、選んだものを証跡に書く（種類・名前・座標）。
  * > 本物のクリックは…証跡に残しておくと、人が触っていたときの誤作動を切り分けやすくなります。
  */
-function pressReport(target: PointerRef, aimed: Aimed, said: string): string {
+/**
+ * 道具が答えた押し方（`押し方` か `押し方<TAB>本物のクリックが断られた理由`）。
+ *
+ * **Invoke を持たないものは、その作りに合う口で押す**（2026-10-23・Windows の Electron で実測）。
+ * Chromium は `role="tab"` を選ぶ口、`aria-expanded` のボタンを開く口で出す。
+ */
+const PRESSED_BY: Record<string, string> = {
+  dblclick: 'ダブルクリックした',
+  click: '本物のクリックで押した',
+  invoke: 'Invoke で押した',
+  select: '選ぶ口（SelectionItem）で選んだ',
+  expand: '開く口（ExpandCollapse）で開いた',
+  collapse: '開く口（ExpandCollapse）で閉じた',
+  default: '既定の動作（LegacyIAccessible）で押した',
+};
+
+function pressReport(target: PointerRef, aimed: Aimed, answer: string): string {
+  const [said = '', ...rest] = answer.split('\t');
+  const refused = rest.join(' ').trim();
+  const by = PRESSED_BY[said] ?? PRESSED_BY['click'];
+  // **本物のクリックでなかったなら、なぜ通らなかったかを添える**（理由を捨てると、次に直す所が分からない）。
   const how =
-    said === 'dblclick'
-      ? 'ダブルクリックした'
-      : said === 'invoke'
-        ? 'Invoke で押した（本物のクリックは確かめられなかった）'
-        : '本物のクリックで押した';
+    said === 'click' || said === 'dblclick'
+      ? by
+      : `${by}（本物のクリックは確かめられなかった${refused === '' ? '' : `: ${refused}`}）`;
   const at = `（${String(Math.round(aimed.point.x))}, ${String(Math.round(aimed.point.y))}）`;
   const picked = aimed.candidates?.[0];
   if (target.at === 'point' || picked === undefined) return `座標${at}を${how}`;
