@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { fromInvocationDir, runsDir } from '../src/paths.js';
+import { fromInvocationDir, runHomeFor, runsDir } from '../src/paths.js';
 
 /**
  * その OS での、その場所。
@@ -58,5 +58,36 @@ describe('証跡の置き場', () => {
     const path = runsDir('runs', {}, '/');
 
     expect(path).toBe(join(homedir(), 'Documents', 'git-qa', 'runs'));
+  });
+});
+
+/**
+ * **コマンドから回しても、証跡は試験の家へ出す**（2026-10-23）。
+ *
+ * 画面から始める道（`app-cli`）は、シートの近くの `git-qa.json` を見て、その `runs/` へ出していた。
+ * コマンドの道（`run:sheet:web` / `run:sheet:desktop`）は**打った場所の `runs/`** へ出していて、
+ * **シートのフォルダから打ったときしか、家に出なかった。**同じシートで、入口によって証跡が割れる。
+ */
+describe('runHomeFor', () => {
+  const sheet = at('/proj/docs/test-specs/web.tsv');
+  const env = { INIT_CWD: at('/elsewhere') };
+
+  it('git-qa.json があれば、その runs/ へ出し、シートは家からの相対で書く', () => {
+    const exists = (p: string): boolean => p === join(at('/proj/docs/test-specs'), 'git-qa.json');
+
+    // シートのフォルダではない所（/elsewhere）から、絶対パスで渡しても家へ出る。
+    expect(runHomeFor(sheet, env, at('/elsewhere'), exists)).toEqual({
+      sheetPath: sheet,
+      runsRoot: join(at('/proj/docs/test-specs'), 'runs'),
+      sheetRefPath: 'web.tsv',
+    });
+  });
+
+  it('印が無ければ今までどおり（打った場所の runs/・シートは打ったまま）', () => {
+    expect(runHomeFor('docs/a.tsv', env, at('/elsewhere'), () => false)).toEqual({
+      sheetPath: at('/elsewhere/docs/a.tsv'),
+      runsRoot: at('/elsewhere/runs'),
+      sheetRefPath: 'docs/a.tsv',
+    });
   });
 });

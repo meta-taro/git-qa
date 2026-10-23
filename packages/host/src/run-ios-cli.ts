@@ -20,7 +20,7 @@ import {
 import { findIos, findOcr } from './ocr-path.js';
 import { headlessExitCode, headlessSummary, runHeadless } from './headless.js';
 import { startRunSession } from './run-session.js';
-import { fromInvocationDir } from './paths.js';
+import { runHomeFor } from './paths.js';
 import { positional } from './argv.js';
 import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 import { installSaveOnExit } from './save-on-exit.js';
@@ -83,7 +83,9 @@ if (toolPath === undefined && wdaUrl === undefined) {
   process.exit(1);
 }
 
-const resolvedSheet = fromInvocationDir(sheetPath);
+// **証跡は試験の家へ出す**（`git-qa.json` があればその `runs/`・`runHomeFor`）。
+const home = runHomeFor(sheetPath);
+const resolvedSheet = home.sheetPath;
 const text = await readFile(resolvedSheet, 'utf8');
 const sheet = parseTestSpecTsv(text);
 
@@ -138,7 +140,7 @@ const runIdFrom = (at: Date): string =>
     .replace(/^(\d{8})(\d{6})$/, '$1-$2');
 
 const sheetRef = {
-  path: sheetPath,
+  path: home.sheetRefPath,
   sha256: sheetDigest(text),
   ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
   ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
@@ -150,19 +152,21 @@ if (process.argv.includes('--no-ui')) {
     sheet,
     sheetRef,
     runId: runIdFrom(new Date()),
-    runsRoot: fromInvocationDir('runs'),
+    runsRoot: home.runsRoot,
     ...(process.argv.includes('--record') ? { record: true } : {}),
     operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
     readScreenText: readIosScreenText,
   });
 
   console.log(`[git-qa] 無人で走らせた（誰も見ていない）: ${headlessSummary(run.cases)}`);
-  console.log(`[git-qa] 証跡: ${fromInvocationDir('runs')}/${run.runId}/run.json`);
+  console.log(`[git-qa] 証跡: ${home.runsRoot}/${run.runId}/run.json`);
   process.exit(headlessExitCode(run.cases));
 }
 
 const session = await startRunSession({
   adapter,
+  // **映像の絵も、証跡と同じ家へ**（渡さないと、打った場所の runs/ へ割れる）。
+  runsRoot: home.runsRoot,
   ...(process.argv.includes('--record') ? { record: true } : {}),
   sheet,
   sheetRef,
@@ -217,7 +221,7 @@ installSaveOnExit({
     killTree(child);
     const partial = await session.done;
     await session.close();
-    const saved = await saveRunProgress(fromInvocationDir('runs'), partial);
+    const saved = await saveRunProgress(home.runsRoot, partial);
     console.log(`\n[git-qa] 途中で止めた。ここまでの証跡: ${saved}`);
   },
   exit: (code) => process.exit(code),
@@ -226,7 +230,7 @@ installSaveOnExit({
 const run = await session.done;
 await session.close();
 
-const path = await saveRunProgress(fromInvocationDir('runs'), run);
+const path = await saveRunProgress(home.runsRoot, run);
 console.log(`[git-qa] 証跡: ${path}`);
 
 const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;

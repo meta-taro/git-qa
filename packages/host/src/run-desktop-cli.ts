@@ -20,7 +20,7 @@ import { findInput, findOcr, findWinTool } from './ocr-path.js';
 import { installSaveOnExit } from './save-on-exit.js';
 import { headlessExitCode, headlessSummary, runHeadless } from './headless.js';
 import { startRunSession } from './run-session.js';
-import { fromInvocationDir } from './paths.js';
+import { runHomeFor } from './paths.js';
 import { positional } from './argv.js';
 import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 
@@ -48,7 +48,12 @@ const runIdFrom = (at: Date): string => {
   return `${date}-${pad(at.getHours())}${pad(at.getMinutes())}${pad(at.getSeconds())}`;
 };
 
-const resolvedSheet = fromInvocationDir(sheetPath);
+/**
+ * 人が打った場所を基準に解決する（pnpm --filter は cwd をパッケージへ移す）。
+ * **証跡は試験の家へ出す** —— シートの近くに `git-qa.json` があればその `runs/`（画面から始める道と同じ）。
+ */
+const home = runHomeFor(sheetPath);
+const resolvedSheet = home.sheetPath;
 
 let text: string;
 try {
@@ -145,13 +150,13 @@ if (process.argv.includes('--no-ui')) {
     adapter,
     sheet,
     sheetRef: {
-      path: sheetPath,
+      path: home.sheetRefPath,
       sha256: sheetDigest(text),
       ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
       ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
     },
     runId: runIdFrom(new Date()),
-    runsRoot: fromInvocationDir('runs'),
+    runsRoot: home.runsRoot,
     // **動画は頼まれたときだけ**（#31）。夜間に何本も流すと、黙って場所を食う。
     ...(process.argv.includes('--record') ? { record: true } : {}),
     operator: { handle: process.env['GIT_QA_OPERATOR'] ?? 'unknown' },
@@ -159,12 +164,14 @@ if (process.argv.includes('--no-ui')) {
   });
 
   console.log(`[git-qa] 無人で走らせた（誰も見ていない）: ${headlessSummary(run.cases)}`);
-  console.log(`[git-qa] 証跡: ${fromInvocationDir('runs')}/${run.runId}/run.json`);
+  console.log(`[git-qa] 証跡: ${home.runsRoot}/${run.runId}/run.json`);
   process.exit(headlessExitCode(run.cases));
 }
 
 const session = await startRunSession({
   adapter,
+  // **映像の絵も、証跡と同じ家へ**（渡さないと、打った場所の runs/ へ割れる）。
+  runsRoot: home.runsRoot,
   // **人が見ている実行でも動画を残す**（#31 の続き）。頼まれたときだけ。
   ...(process.argv.includes('--record') ? { record: true } : {}),
   registerPointing: (report) => {
@@ -172,7 +179,7 @@ const session = await startRunSession({
   },
   sheet,
   sheetRef: {
-    path: sheetPath,
+    path: home.sheetRefPath,
     sha256: sheetDigest(text),
     ...(sheet.meta['タイトル'] === undefined ? {} : { title: sheet.meta['タイトル'] }),
     ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
@@ -233,7 +240,7 @@ installSaveOnExit({
     killTree(child);
     const partial = await session.done;
     await session.close();
-    const saved = await saveRunProgress(fromInvocationDir('runs'), partial);
+    const saved = await saveRunProgress(home.runsRoot, partial);
     console.log(`\n[git-qa] 途中で止めた。ここまでの証跡: ${saved}`);
   },
   exit: (code) => process.exit(code),
@@ -242,7 +249,7 @@ installSaveOnExit({
 const run = await session.done;
 await session.close();
 
-const path = await saveRunProgress(fromInvocationDir('runs'), run);
+const path = await saveRunProgress(home.runsRoot, run);
 console.log(`[git-qa] 証跡: ${path}`);
 
 const placed = run.cases.filter((c) => c.verifiedBy !== undefined).length;
