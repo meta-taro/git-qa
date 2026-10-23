@@ -42,7 +42,7 @@ export const winArgs = {
     String(Math.round(notches)),
   ],
   /**
-   * キーを押す。**ここだけ、相手が前面に一瞬出る**（2026-09-14・実測）。
+   * キーを押す。**相手が前面に出る**（2026-09-14・実測）。返すのは手が止まってから（C108）。
    * UI Automation にキーを送る口が無く、`SendInput` は焦点のある窓へ届く仕組みのため。
    */
   key: (hwnd: number, key: string): string[] => ['key', String(hwnd), key],
@@ -56,10 +56,15 @@ export const winArgs = {
   /**
    * **焦点のある欄へ 1 文字ずつ打つ**（meta-taro/git-qa#42）。`type` と違い、値を置き換えない。
    * 1 キーごとに走る制限（日付欄の年 4 桁など）を、人が打ったときと同じ道で通すため。
-   * **前面に一瞬出る**（`key` と同じ仕組み）。
+   * **相手が前面に出る**（`key` と同じ仕組み）。
    */
   keys: (hwnd: number, text: string): string[] => ['keys', String(hwnd), text],
   exe: (pid: number): string[] => ['exe', String(pid)],
+  /**
+   * **前面へ出すだけ**（C108）。押し終えて静かになったら、人が見ている git-qa の窓へ返すのに使う。
+   * 出られなくても無理はしない（前面ロックを外す ALT は、相手の窓へ入るので使わない）。
+   */
+  front: (hwnd: number): string[] => ['front', String(hwnd)],
 } as const;
 
 /** 見つかった窓 1 つ。 */

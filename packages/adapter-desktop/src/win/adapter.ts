@@ -60,7 +60,7 @@ const capabilities: AdapterCapabilities = {
   recording: false,
   // **日本語もそのまま入る**（2026-09-14・実測）。`SetValue` は IME を通らない。
   textInput: 'any',
-  // **前面に一瞬出るが、届く**（2026-09-14・実測。#10）。
+  // **相手が前面に出るが、届く**（2026-09-14・実測。#10）。
   keyInput: true,
   // **種類で絞れる**（#42）。UI Automation の ControlType を道具が返す。
   elementKinds: true,
@@ -127,6 +127,8 @@ export interface WindowsDesktopAdapterOptions extends DesktopAdapterOptions {
    * 初めて起こすときの OS の検査で 5 秒を超え、時々落ちた**（2026-09-27）。
    */
   readonly runTool?: (args: readonly string[]) => Promise<string>;
+  /** 待つ（**試験のため**）。渡さなければ本当に待つ。 */
+  readonly pause?: (ms: number) => Promise<void>;
 }
 
 export function createWindowsDesktopAdapter(options: WindowsDesktopAdapterOptions): TargetAdapter {
@@ -184,6 +186,11 @@ function createSession(deps: SessionDeps): TargetSession {
   let window = deps.window;
   let closed = false;
   let liveOpen = false;
+  /** キーや回すで画面を送った。**次に押す前に、位置が落ち着くのを待つ**（C108）。 */
+  let moved = false;
+  const pause =
+    deps.pause ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const giveBack = createGiveBack(tool);
 
   const ensureOpen = (): void => {
     if (closed) throw new AdapterError(KIND, 'アプリとの接続はもう閉じている');
@@ -276,12 +283,22 @@ function createSession(deps: SessionDeps): TargetSession {
 
     async act(action: Action): Promise<ActReport | void> {
       ensureOpen();
-      return dispatch(action, {
-        tool,
-        window: () => window,
-        read: readText,
-        onPointed: deps.onPointed,
-      });
+      // **続けて押している間は、前面を返さない**（C108）。
+      giveBack.cancel();
+      const settle = moved;
+      moved = action.kind === 'key' || action.kind === 'swipe';
+      try {
+        return await dispatch(action, {
+          tool,
+          window: () => window,
+          read: readText,
+          onPointed: deps.onPointed,
+          settle,
+          pause,
+        });
+      } finally {
+        if (TAKES_FRONT.has(action.kind)) giveBack.later();
+      }
     },
 
     async observe(): Promise<Observation> {
@@ -316,8 +333,55 @@ function createSession(deps: SessionDeps): TargetSession {
     close(): Promise<void> {
       closed = true;
       liveOpen = false;
+      giveBack.cancel();
       // **アプリは閉じない。**人が開いていたものを、こちらの都合で落とさない。
       return Promise.resolve();
+    },
+  };
+}
+
+/** 相手を前面に出す操作。**終わっても、道具は前面を返さない**（C108）。 */
+const TAKES_FRONT: ReadonlySet<Action['kind']> = new Set(['tap', 'doubleTap', 'key', 'type']);
+
+/**
+ * **静かになったら、git-qa の窓へ前面を返す**（C108・macOS の #32 と同じ）。
+ *
+ * 道具が押すたびに返していたころ、相手の窓が裏へ回り、**Chromium が開いた一覧を畳んだ**
+ * （`select` を押して開き、次の手順で項目を探すと、もう無かった）。
+ * 押し続けている間は相手を前に置き、**手が止まってから**返す。
+ * **git-qa の窓が無ければ何もしない**（無人の実行では、返す先が無い）。
+ */
+const GIVE_BACK_AFTER_MS = 1_200;
+const GIT_QA_OWNERS = ['git-qa', 'git-qa-desktop'] as const;
+
+function createGiveBack(tool: (args: readonly string[]) => Promise<string>): {
+  later: () => void;
+  cancel: () => void;
+} {
+  let timer: NodeJS.Timeout | undefined;
+  const cancel = (): void => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+  };
+  const back = async (): Promise<void> => {
+    for (const owner of GIT_QA_OWNERS) {
+      const found = pickWindow(parseWinWindows(await tool(winArgs.windows(owner))), owner);
+      if (found === undefined) continue;
+      await tool(winArgs.front(found.hwnd));
+      return;
+    }
+  };
+  return {
+    cancel,
+    later: () => {
+      cancel();
+      timer = setTimeout(() => {
+        timer = undefined;
+        // **返せなくても、押したこと自体には効かない。**人が見る窓が裏に残るだけ。
+        void back().catch(() => undefined);
+      }, GIVE_BACK_AFTER_MS);
+      // 返す待ちで、プロセスの終わりを遅らせない。
+      timer.unref?.();
     },
   };
 }
@@ -327,6 +391,9 @@ interface DispatchDeps {
   readonly window: () => WinWindow;
   readonly read: () => Promise<OcrLine[]>;
   readonly onPointed?: DesktopAdapterOptions['onPointed'];
+  /** 直前にキーや回すで画面を送った。**位置が落ち着くまで読み直す**（C108）。 */
+  readonly settle?: boolean;
+  readonly pause?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -385,7 +452,7 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<ActReport |
    *
    * **欄を指さない（#42）—— 焦点のある欄へ 1 文字ずつ打つ**（macOS の `keystroke` と同じ意味）。
    * 日付欄の年を 4 桁で止める、のような**1 キーごとに走る制限**は、`SetValue` では通らない ——
-   * **確かめたいものを迂回してしまう。**だから打つ。**前面に一瞬出る**（`key` と同じ仕組み）。
+   * **確かめたいものを迂回してしまう。**だから打つ。**相手が前面に出る**（`key` と同じ仕組み）。
    *
    * 以前はここを断っていた（「焦点のある所へ黙って入れると、人が見ていない欄が書き変わる」）。
    * **欄を指さずに書いたのはシートの書き手で、焦点を置く手順はその前の行に在る。**
@@ -417,9 +484,9 @@ async function dispatch(action: Action, deps: DispatchDeps): Promise<ActReport |
   /**
    * キーを押す（meta-taro/git-qa#10 / #6 の残り）。
    *
-   * **ここだけ、相手が前面に一瞬出る。**UI Automation にキーを送る口が無く、
+   * **相手が前面に出る。**UI Automation にキーを送る口が無く、
    * `SendInput` は**焦点のある窓へ届く**仕組みなので、出すしかない（2026-09-14・実測）。
-   * 送り終えたら**前面は元へ返す。**
+   * 前面は、**手が止まってから** git-qa の窓へ返す（C108）。
    *
    * **キーは、その窓で焦点のある所へ行く。**欄を指した `type`（`SetValue`）は焦点を動かさないので、
    * 「欄に入力してから Enter」と書いても、**その欄に焦点があるとは限らない。**
@@ -471,7 +538,7 @@ async function byText(
   deps: DispatchDeps,
   kind?: ElementKind,
 ): Promise<{ point: { x: number; y: number }; candidates: readonly OcrLine[] }> {
-  const lines = await deps.read();
+  const lines = deps.settle === true ? await settled(text, deps) : await deps.read();
   const candidates =
     kind === undefined
       ? pressableFirst(matchesInOcr(lines, text), text)
@@ -482,6 +549,32 @@ async function byText(
   }
   // UI Automation は画面の座標で返す。窓の中へ直さずそのまま使う（押すのも画面の座標）。
   return { point: { x: best.x, y: best.y }, candidates };
+}
+
+/**
+ * **位置が落ち着くまで読み直す**（C108）。
+ *
+ * PageDown で送った直後に押したら、**送る前の位置**を押した。なめらかに動く画面では、
+ * 読んだ時点でまだ動いている。指す名前の位置が 2 回続けて同じになるまで読む。
+ * **落ち着かなければ、最後に読んだものを使う**（止まらない。待つのは長くて 2 秒）。
+ */
+const SETTLE_STEP_MS = 150;
+const SETTLE_TRIES = 13;
+
+async function settled(text: string, deps: DispatchDeps): Promise<OcrLine[]> {
+  const where = (lines: readonly OcrLine[]): string => {
+    const [best] = matchesInOcr(lines, text);
+    return best === undefined ? '' : `${String(best.x)},${String(best.y)}`;
+  };
+  let lines = await deps.read();
+  for (let tries = 0; tries < SETTLE_TRIES; tries += 1) {
+    await deps.pause?.(SETTLE_STEP_MS);
+    const again = await deps.read();
+    const same = where(again) === where(lines);
+    lines = again;
+    if (same) break;
+  }
+  return lines;
 }
 
 /**

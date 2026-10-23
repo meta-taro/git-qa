@@ -24,7 +24,8 @@
 //! **端末へ文字が入った。**画面には何も出ず、送った側は成功したと思っている。
 //! **いちばん悪い壊れ方**なので、**前面に出たことを確かめてからでないと送らない。**
 //!
-//! 終わったら**元の窓へ前面を返す。**macOS 側と同じ扱い（C57 追記）。
+//! **前面は、ここでは返さない**（C108）。返すと Chromium が開いた一覧を畳む。
+//! 手が止まってから、呼ぶ側（TypeScript）が `front` で git-qa の窓へ返す（macOS の #32 と同じ）。
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -124,7 +125,7 @@ fn unicode(unit: u16, up: bool) -> INPUT {
     }
 }
 
-/// 相手を前面に出し、**出たことを確かめてから**送り、終わったら前面を返す。
+/// 相手を前面に出し、**出たことを確かめてから**送る。**前面は返さない**（C108）。
 ///
 /// キーを押すのも、文字を打つのも、**ここを通る**（出ていないのに送る道を作らない）。
 pub(crate) fn in_front(hwnd: HWND, deliver: impl FnOnce()) -> Result<String, String> {
@@ -168,12 +169,34 @@ pub(crate) fn in_front(hwnd: HWND, deliver: impl FnOnce()) -> Result<String, Str
          */
         sleep(SETTLE);
 
-        // **前面を元へ返す。**返せなくても、キーは既に届いている。
-        if came_from != hwnd && !came_from.is_invalid() {
-            let _ = SetForegroundWindow(came_from);
-        }
+        /*
+         * **前面はここで返さない**（C108）。返すと相手の窓が裏へ回り、
+         * Chromium は開いている選択肢（`select` の一覧）を畳む ——
+         * 「開く → 選ぶ」の 2 手目で、もう一覧が無かった。
+         * 手が止まってから、呼ぶ側が `front` で人の見ている窓へ返す。
+         */
     }
     Ok(String::new())
+}
+
+/// **前面へ出すだけ**（C108）。手が止まったあと、人が見ている git-qa の窓へ返すのに使う。
+///
+/// **前面ロックは外さない**（`unlock_front` の ALT は、そのとき前面にある相手の窓へ入る）。
+/// 出られなければ、そう言うだけ。押したこと自体には効かない。
+pub fn front(hwnd: &str) -> Result<String, String> {
+    let hwnd = crate::parse_hwnd(hwnd)?;
+    // SAFETY: 触るのは渡された窓と、いま前面にある窓だけ。
+    unsafe {
+        if !IsWindow(hwnd).as_bool() {
+            return Err(format!("その窓はもう無い（{}）", hwnd.0 as isize));
+        }
+        bring_to_front(hwnd, GetForegroundWindow());
+        if waited_front(hwnd) {
+            Ok(String::new())
+        } else {
+            Err("前面へ返せなかった".into())
+        }
+    }
 }
 
 /// 前面に出るまで、少しだけ待つ。**出なければ `false`。**

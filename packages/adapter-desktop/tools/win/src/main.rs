@@ -8,9 +8,10 @@
 //! git-qa-win windows <アプリ名>      窓を探す
 //! git-qa-win shot <窓> <出力.png>    その窓だけを撮る
 //! git-qa-win text <窓>               読める文字と、その位置
-//! git-qa-win press <窓> <x> <y>      押す（本物のクリック。前面に一瞬出る）
+//! git-qa-win press <窓> <x> <y>      押す（本物のクリック。相手が前面に出る）
 //! git-qa-win keys <窓> <文字>        焦点のある欄へ 1 文字ずつ打つ
 //! git-qa-win exe <プロセス番号>      実行ファイルの場所（指紋用）
+//! git-qa-win front <窓>              前面へ出すだけ（押し終えたあと、人の窓へ返す）
 //! ```
 //!
 //! **出す形は macOS 側と揃える**（TSV・1 行 1 件）。読む側（TypeScript）を分けないため。
@@ -47,6 +48,7 @@ fn main() -> ExitCode {
         ["key", hwnd, key] => key::press_key(hwnd, key),
         ["keys", hwnd, text] => key::type_focused(hwnd, text),
         ["exe", pid] => window::exe_path(pid),
+        ["front", hwnd] => key::front(hwnd),
         _ => {
             eprintln!("{}", USAGE);
             return ExitCode::from(2);
@@ -104,10 +106,11 @@ const USAGE: &str = "\
   git-qa-win windows <アプリ名>      窓を探す
   git-qa-win shot <窓> <出力.png>    その窓だけを撮る
   git-qa-win text <窓>               読める文字と、その位置
-  git-qa-win press <窓> <x> <y>      押す（本物のクリック。前面に一瞬出る）
-  git-qa-win dblclick <窓> <x> <y>   ダブルクリック（前面に一瞬出る）
+  git-qa-win press <窓> <x> <y>      押す（本物のクリック。相手が前面に出る）
+  git-qa-win dblclick <窓> <x> <y>   ダブルクリック（相手が前面に出る）
   git-qa-win type <窓> <x> <y> <文字>  その欄の中身を置き換える
   git-qa-win scroll <窓> <x> <y> <回数>  回す（正で下・負で上）
-  git-qa-win key <窓> <キー>         キーを押す（前面に一瞬出る）
-  git-qa-win keys <窓> <文字>        焦点のある欄へ 1 文字ずつ打つ（前面に一瞬出る）
-  git-qa-win exe <プロセス番号>      実行ファイルの場所";
+  git-qa-win key <窓> <キー>         キーを押す（相手が前面に出る）
+  git-qa-win keys <窓> <文字>        焦点のある欄へ 1 文字ずつ打つ（相手が前面に出る）
+  git-qa-win exe <プロセス番号>      実行ファイルの場所
+  git-qa-win front <窓>              前面へ出すだけ";
