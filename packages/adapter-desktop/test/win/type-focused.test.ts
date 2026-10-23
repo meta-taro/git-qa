@@ -348,6 +348,39 @@ describe('Windows の種類つき — 選び方の順番', () => {
 
     expect(sent.find((c) => c[0] === 'press')).toEqual(['press', '4242', '300', '200']);
   });
+
+  /**
+   * 「SAORI」が、選ぶ項目より小さい地の文「誰の: SAORI（…）」に当たった（C107）。
+   * **部分一致どうしなら、地の文より押せるものを先に採る。**
+   */
+  it('部分一致しか無ければ、地の文より押せるものを押す', async () => {
+    says({
+      text:
+        '誰の: SAORI（結び付いています）\t100\t100\t40\t10\tText\n' +
+        'SAORI（沙織）\t300\t200\t200\t24\tListItem\n',
+      press: 'click',
+    });
+    const session = await connect();
+
+    const done = await session.act({ kind: 'tap', target: { at: 'element', ref: 'SAORI' } });
+
+    expect(sent.find((c) => c[0] === 'press')).toEqual(['press', '4242', '300', '200']);
+    expect(done === undefined ? '' : done.detail).toMatch(
+      /地の文を除いて、いちばん小さいものを採った/,
+    );
+  });
+
+  it('完全一致の地の文は、今までどおり押す', async () => {
+    says({
+      text: 'SAORI\t100\t100\t40\t10\tText\n' + 'SAORI（沙織）\t300\t200\t200\t24\tListItem\n',
+      press: 'click',
+    });
+    const session = await connect();
+
+    await session.act({ kind: 'tap', target: { at: 'element', ref: 'SAORI' } });
+
+    expect(sent.find((c) => c[0] === 'press')).toEqual(['press', '4242', '100', '100']);
+  });
 });
 
 /**

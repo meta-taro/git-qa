@@ -472,13 +472,28 @@ async function byText(
   kind?: ElementKind,
 ): Promise<{ point: { x: number; y: number }; candidates: readonly OcrLine[] }> {
   const lines = await deps.read();
-  const candidates = kind === undefined ? matchesInOcr(lines, text) : ofKind(lines, text, kind);
+  const candidates =
+    kind === undefined
+      ? pressableFirst(matchesInOcr(lines, text), text)
+      : ofKind(lines, text, kind);
   const [best] = candidates;
   if (best === undefined) {
     throw new AdapterError(KIND, `画面に「${text}」が見つからない`);
   }
   // UI Automation は画面の座標で返す。窓の中へ直さずそのまま使う（押すのも画面の座標）。
   return { point: { x: best.x, y: best.y }, candidates };
+}
+
+/**
+ * **部分一致どうしなら、地の文を後ろへ回す**（C107）。
+ *
+ * 「SAORI」が、選ぶ項目より小さい地の文「誰の: SAORI（…）」に当たった。
+ * 押したいのは、たいてい押せるもの。**完全一致は今までどおり**（地の文でも、書いた人はその 1 つを指している）。
+ */
+function pressableFirst(candidates: readonly OcrLine[], text: string): OcrLine[] {
+  if (candidates.some((one) => isExactOcrMatch(one, text))) return [...candidates];
+  const prose = (one: OcrLine): boolean => one.role === 'Text';
+  return [...candidates.filter((one) => !prose(one)), ...candidates.filter(prose)];
 }
 
 /**
@@ -629,7 +644,10 @@ function pressReport(target: PointerRef, aimed: Aimed, answer: string): string {
   const all = aimed.candidates ?? [];
   if (all.length < 2) return head;
   const roles = all.map((one) => one.role ?? '種類不明').join(' / ');
-  return `${head}。同じ名前が ${String(all.length)} つ（${roles}）。いちばん小さいものを採った`;
+  // **地の文を後ろへ回したなら、そう書く**（C107）。「いちばん小さい」と書くと嘘になる。
+  const skipped = picked.role !== 'Text' && all.some((one) => one.role === 'Text');
+  const rule = skipped ? '地の文を除いて、いちばん小さいもの' : 'いちばん小さいもの';
+  return `${head}。同じ名前が ${String(all.length)} つ（${roles}）。${rule}を採った`;
 }
 
 export { KIND as WINDOWS_DESKTOP_KIND };
