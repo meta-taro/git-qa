@@ -129,7 +129,7 @@ export {
 
 // 流した日から決まる日付の言い方（外部レビュー #29）。
 export { DATE_FORMAT_KEY, expandDates, formatDate } from './run/dates.js';
-export { WAIT_KEY, sheetWaitMs } from './run/wait.js';
+export { WAIT_KEY, rowWait, sheetWaitMs, type RowWait } from './run/wait.js';
 export { alreadyThereMessage, wasAlreadyThere } from './run/already-there.js';
 export { RESULT_COLUMN, fillSheetResults, writeBackToSheet } from './run/fill-sheet.js';
 export type { FillSheetOptions, FilledCase, FilledSheet } from './run/fill-sheet.js';

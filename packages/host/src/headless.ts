@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 import {
   DATE_FORMAT_KEY,
+  assertRunnableSheet,
   sheetWaitMs,
   caseDir,
   createSheetCaseRunner,
@@ -98,6 +99,8 @@ export interface RunHeadlessOptions {
  * **どの行を人が見て、どの行を機械が流しただけなのか**を取り違えないため。**ここは緩めない。**
  */
 export async function runHeadless(options: RunHeadlessOptions): Promise<Run> {
+  // **繋ぐ前にシートを見る**（画面のある道と同じ）。繋いでから落ちると、触った跡だけが残る。
+  assertRunnableSheet(options.sheet);
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
     ...(sheetDestination(options.sheet.meta) === undefined

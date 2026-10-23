@@ -6,6 +6,7 @@ import type { PlannedAction, PlannedStep } from './steps.js';
 import { expandDates } from './dates.js';
 import { alreadyThereMessage, wasAlreadyThere } from './already-there.js';
 import { judgeExpectation, planExpectation, planSteps } from './steps.js';
+import { rowWait } from './wait.js';
 
 /**
  * 検証シートの 1 行を実際に動かして、AI の判定を出す。
@@ -116,6 +117,21 @@ export function assertRunnableSheet(
       throw new Error(`検証シートに「${column}」列が無い（列: ${names.join(' / ')}）`);
     }
   }
+  /**
+   * **行ごとの待ちも、繋ぐ前に読む**（#39 の提案 2）。
+   * 走っている途中で読めないと分かると、それまでの行の跡だけが残る。
+   */
+  const expectationColumn = options.expectationColumn ?? EXPECTATION_COLUMN;
+  for (const row of sheet.rows) {
+    try {
+      rowWait(row.cells[expectationColumn] ?? '');
+    } catch (error: unknown) {
+      const no = row.cells['No.'] ?? String(row.index + 1);
+      throw new Error(`No.${no}（${String(row.line)} 行目）: ${errorMessage(error)}`, {
+        cause: error,
+      });
+    }
+  }
 }
 
 /** 落とせなかった手順をまとめる。**1 つでもあれば端末に触らない。** */
@@ -170,11 +186,13 @@ export function createSheetCaseRunner(
       now,
       options.dateFormat,
     );
-    const expectedText = expandDates(
-      ctx.subject.row.cells[expectationColumn] ?? '',
-      now,
-      options.dateFormat,
-    );
+    /**
+     * **その行だけの待ち**を先に外す（#39 の提案 2）。見る文字には混ぜない。
+     * 読めないものは `assertRunnableSheet` が繋ぐ前に止めている。
+     * ここで投げても、**黙って既定に落とすよりはまし**（C20）。
+     */
+    const thisRow = rowWait(ctx.subject.row.cells[expectationColumn] ?? '');
+    const expectedText = expandDates(thisRow.text, now, options.dateFormat);
     const dates = [...stepsText.dates, ...expectedText.dates];
     /** **どの結末でも、何日を押したかを残す。**落ちた行を追うときに、いちばん要る。 */
     const withDates = (verdict: CaseVerdict): CaseVerdict =>
@@ -233,7 +251,8 @@ export function createSheetCaseRunner(
      * 実例では**クエリの実行に 518 ms** かかっていて、押した直後の 1 回では
      * 間に合っていなかった。**出たら即座に抜ける**ので、通る場合は今までと同じ速さ。
      */
-    const waitMs = options.expectation?.waitMs ?? DEFAULT_EXPECTATION_WAIT_MS;
+    // **行に添えた待ちが、見出しより勝つ**（遅い行だけ延ばすための口）。
+    const waitMs = thisRow.waitMs ?? options.expectation?.waitMs ?? DEFAULT_EXPECTATION_WAIT_MS;
     const stepMs = options.expectation?.stepMs ?? DEFAULT_EXPECTATION_STEP_MS;
     const began = Date.now();
     const until = began + waitMs;

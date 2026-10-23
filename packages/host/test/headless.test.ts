@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { headlessExitCode, headlessSummary } from '../src/headless.js';
-import type { RunCase } from '@git-qa/core';
+import { headlessExitCode, headlessSummary, runHeadless } from '../src/headless.js';
+import { createFakeAdapter, parseTestSpecTsv, type RunCase } from '@git-qa/core';
 
 /**
  * **無人で流す口**（外部レビュー meta-taro/git-qa#21）。
@@ -61,5 +61,43 @@ describe('headlessSummary', () => {
   /** **`VERIFIED` は出ない。**無人の実行に「人が見た」は在りえない（C17）。 */
   it('人が見た、とは言わない', () => {
     expect(headlessSummary([caseWith('AUTO_PASS')])).not.toContain('VERIFIED');
+  });
+});
+
+/**
+ * **無人の道も、繋ぐ前にシートを見る**（#39 の提案 2・2026-10-23）。
+ *
+ * 画面のある道（`startRunSession`）は繋ぐ前に `assertRunnableSheet` を通していたが、
+ * **無人の道は通していなかった。**行に添えた待ちが読めないまま繋ぐと、
+ * **対象を触った跡だけが残る。**
+ */
+describe('runHeadless — 繋ぐ前にシートを見る', () => {
+  it('行に添えた待ちが読めなければ、繋がずに止める', async () => {
+    const sheet = parseTestSpecTsv(
+      '#! md-business:test-spec-tsv/v1\nNo.:number!\t項目!\t手順:multiline!\t期待結果:multiline!\n' +
+        '1\tあ\t1. 「保存」を押す\t「済」と表示される（しばらくまで待つ）\n',
+    );
+    let connected = false;
+    const adapter = createFakeAdapter({});
+    const watched = {
+      ...adapter,
+      connect: () => {
+        connected = true;
+        return adapter.connect();
+      },
+    };
+
+    await expect(
+      runHeadless({
+        adapter: watched,
+        sheet,
+        sheetRef: { path: 'x.tsv', sha256: 'x' },
+        runId: 'r',
+        runsRoot: '/nonexistent',
+        operator: { handle: 'qa' },
+        readScreenText: () => Promise.resolve(''),
+      }),
+    ).rejects.toThrow(/待つ/);
+    expect(connected).toBe(false);
   });
 });

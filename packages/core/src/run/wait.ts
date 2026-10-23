@@ -56,3 +56,62 @@ export function sheetWaitMs(meta: Record<string, string>): number | undefined {
   if (ms > MAX_WAIT_MS) throw bad(said);
   return Math.round(ms);
 }
+
+/**
+ * **その行だけの待ち**（外部レビュー meta-taro/git-qa#39 の提案 2・2026-10-23・C105）。
+ *
+ * 相手先のサイトを人の速さで回るアプリでは、結果が出るまで**数分**かかる。
+ * 見出しの `# 待つ:` で全体を延ばすと、**落ちる行がみな数分ずつ遅くなる。**
+ * **遅い行だけ**、期待結果の欄に `（最大 5 分）` / `（15秒まで待つ）` を添える。
+ *
+ * **上限は 10 分。**行ごとなので見出しより長くてよいが、
+ * 打ち間違い（`50 分`）で人が止めるしかなくなる実行は作らない。
+ */
+const MAX_ROW_WAIT_MS = 600_000;
+
+/**
+ * `（最大 5 分）` / `（15秒まで待つ）`。半角の括弧も。**中身は後で読む。**
+ *
+ * **「最大」は時間の単位で終わるときだけ**待ちとみなす ——
+ * `（最大 10 件）` のような但し書きはよくあり、それを止めてはいけない。
+ * **「まで待つ」は言い方そのものが待ち**なので、読めなければ止める。
+ */
+const ROW_WAIT =
+  /\s*[（(]\s*(?:最大\s*([^（）()]*?(?:ミリ秒|秒|ms|s|分|min|時間|h))|([^（）()]*?)\s*まで待つ)\s*[）)]/g;
+
+const badRow = (said: string): Error =>
+  new Error(
+    `期待結果に添えた待つ長さが読めない: ${said}。` +
+      `「（最大 5 分）」「（15秒まで待つ）」の形で、秒か分で書く。上限は ${String(MAX_ROW_WAIT_MS / 60_000)} 分`,
+  );
+
+export interface RowWait {
+  /** 待ちの言い方を外した期待結果。**見る文字に混ぜない。** */
+  readonly text: string;
+  /** 添えていなければ無し（見出しか既定のまま）。 */
+  readonly waitMs?: number;
+}
+
+/**
+ * 期待結果の欄から、その行だけの待ちを取り出す。
+ *
+ * **待ちの言い方なのに読めないものは投げる**（C20）。
+ * 「5 分待つつもりで 2 秒だった」が、**いちばん気づけない。**
+ */
+export function rowWait(expected: string): RowWait {
+  const found = [...expected.matchAll(ROW_WAIT)];
+  if (found.length === 0) return { text: expected };
+  if (found.length > 1) throw badRow(found.map((m) => m[0].trim()).join(' と '));
+
+  const hit = found[0] as RegExpMatchArray;
+  const said = (hit[1] ?? hit[2] ?? '').trim();
+  const matched = /^(\d+(?:\.\d+)?)\s*(秒|s|分|min)$/.exec(said);
+  if (matched === null) throw badRow(hit[0].trim());
+
+  const amount = Number(matched[1]);
+  const ms = Math.round(amount * (matched[2] === '分' || matched[2] === 'min' ? 60_000 : 1000));
+  if (!Number.isFinite(ms) || ms <= 0 || ms > MAX_ROW_WAIT_MS) throw badRow(hit[0].trim());
+
+  const at = hit.index ?? 0;
+  return { text: expected.slice(0, at) + expected.slice(at + hit[0].length), waitMs: ms };
+}

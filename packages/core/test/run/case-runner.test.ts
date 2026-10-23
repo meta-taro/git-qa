@@ -287,6 +287,16 @@ describe('assertRunnableSheet — 繋ぐ前にシートを見る', () => {
 
     expect(() => assertRunnableSheet(sheet)).toThrow(/期待結果/);
   });
+
+  /** **行ごとの待ちが読めないなら、繋ぐ前に止める**（#39 の提案 2）。 */
+  it('期待結果に添えた待ちが読めなければ、繋ぐ前に落とす（何行目かも言う）', () => {
+    const sheet = parseTestSpecTsv(
+      '#! md-business:test-spec-tsv/v1\nNo.:number!\t項目!\t手順:multiline!\t期待結果:multiline!\n' +
+        '1\tあ\t1. 「保存」を押す\t「済」と表示される（しばらくまで待つ）\n',
+    );
+
+    expect(() => assertRunnableSheet(sheet)).toThrow(/No\.1.*待つ|待つ.*No\.1/s);
+  });
 });
 
 describe('createSheetCaseRunner — 起動', () => {
@@ -418,6 +428,62 @@ describe('createSheetCaseRunner — 出るまで少し待つ', () => {
  *
  * **落ちると言う前に、必ずもう一度見る。**
  */
+/**
+ * **その行だけ長く待つ**（#39 の提案 2・2026-10-23）。
+ *
+ * 見出しの待ち（ここでは 10 ms）では間に合わない行に、期待結果の欄で
+ * `（最大 1 秒）` を添える。**添えた行だけが、その長さまで待つ。**
+ */
+describe('createSheetCaseRunner — 行ごとの待ち', () => {
+  const runRow = async (expectation: string): Promise<{ verdict: CaseVerdict; reads: number }> => {
+    let reads = 0;
+    let asked = 0;
+    const runner = createSheetCaseRunner({
+      readScreenText: () => {
+        asked += 1;
+        if (asked === 1) return Promise.resolve('');
+        reads += 1;
+        // 押してから 8 回目に出る（stepMs 10 なら 70 ms ほど）。
+        return Promise.resolve(reads >= 8 ? '反映しました' : '読み込み中');
+      },
+      expectation: { waitMs: 10, stepMs: 10 },
+    });
+    const session = await createFakeAdapter({}).connect();
+    const verdict = await runner({
+      subject: {
+        no: 1,
+        title: 'あ',
+        row: {
+          index: 0,
+          line: 2,
+          raw: '',
+          rawCells: {},
+          cells: { 'No.': '1', 項目: 'あ', 手順: '1. 「反映」を押す', 期待結果: expectation },
+        },
+      },
+      session,
+      step: () => undefined,
+    });
+    return { verdict, reads };
+  };
+
+  it('添えていなければ、見出しの待ちで見切る', async () => {
+    const { verdict } = await runRow('「反映しました」と表示される');
+
+    expect(verdict.aiResult).toBe('FAIL');
+  });
+
+  it('（最大 1 秒）を添えた行は、出るまで待って通す', async () => {
+    const { verdict, reads } = await runRow('「反映しました」と表示される（最大 1 秒）');
+
+    expect(verdict.aiResult).toBe('PASS');
+    expect(reads).toBe(8);
+    // 添えた待ちは見る文字に混ざらない。
+    expect(verdict.note).toContain('「反映しました」');
+    expect(verdict.note).not.toContain('最大');
+  });
+});
+
 describe('createSheetCaseRunner — 遅い相手でも、もう一度見る', () => {
   it('1 回目で締切を過ぎていても、2 回は読む', async () => {
     let reads = 0;
