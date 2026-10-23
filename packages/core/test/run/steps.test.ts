@@ -699,3 +699,39 @@ describe('planSteps — ダブルクリック', () => {
     expect(planned?.kind === 'hold' && planned.reason).toContain('ダブルクリック');
   });
 });
+
+describe('planSteps — 見えるまで送る', () => {
+  it('「X」が見えるまで送る は、下へ探す', () => {
+    expect(planSteps('1. 「開発中の掲載先を入れる」が見えるまで送る')).toEqual([
+      {
+        kind: 'seek',
+        text: '「開発中の掲載先を入れる」が見えるまで送る',
+        target: '開発中の掲載先を入れる',
+        direction: 'down',
+      },
+    ]);
+  });
+
+  it('上へ・スクロールする とも書ける', () => {
+    expect(planSteps('「先頭」が見えるまで上へ送る')[0]).toMatchObject({
+      kind: 'seek',
+      target: '先頭',
+      direction: 'up',
+    });
+    expect(planSteps('「末尾」が見えるまで下にスクロールする')[0]).toMatchObject({
+      kind: 'seek',
+      target: '末尾',
+      direction: 'down',
+    });
+    expect(planSteps('「末尾」が表示されるまでスクロールする')[0]).toMatchObject({
+      kind: 'seek',
+      target: '末尾',
+    });
+  });
+
+  it('鉤括弧が無ければ、送らずに書き方を言う', () => {
+    const [step] = planSteps('末尾が見えるまで送る');
+    expect(step?.kind).toBe('hold');
+    expect(step?.kind === 'hold' ? step.reason : '').toMatch(/「末尾」が見えるまで送る/);
+  });
+});

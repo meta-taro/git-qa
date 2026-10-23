@@ -23,7 +23,19 @@ export interface PlannedHold {
   readonly reason: string;
 }
 
-export type PlannedStep = PlannedAction | PlannedHold;
+/**
+ * **見えるまで送る**（C109）。1 つの操作ではなく「送っては読む」の繰り返しなので、
+ * `Action` にはしない。走らせる側（`case-runner`）が読みながら送る。
+ */
+export interface PlannedSeek {
+  readonly kind: 'seek';
+  readonly text: string;
+  /** 画面に出たら止まる文字。 */
+  readonly target: string;
+  readonly direction: 'down' | 'up';
+}
+
+export type PlannedStep = PlannedAction | PlannedSeek | PlannedHold;
 
 export interface PlanOptions {
   /**
@@ -120,6 +132,18 @@ const BARE_PRESS = /^(?<what>[^「」]+?)を押(?:す|下する)$/;
 /** `「X」を起動する` / `X を起動する` */
 const LAUNCH = /^(?:「(?<target>[^」]+)」|(?<bare>.+?))\s*を(?:(?:起動|開始)する|開く)$/;
 /** シートの見出しが宣言したアプリを指す言い方。**特定のアプリ名は含めない。** */
+/**
+ * `「X」が見えるまで送る` / `「X」が見えるまで上へ送る` / `「X」が表示されるまでスクロールする`（C109）。
+ *
+ * キーを決まった回数押す書き方は、**画面が長くなると同じ所に来なくなる。**
+ * 止まる所を「何が見えたか」で書けば、長さに左右されない。**向きを書かなければ下。**
+ */
+const SEEK =
+  /^「(?<target>[^」]+)」が(?:見える|表示される|出る)まで(?:(?<dir>下|上)[へに])?(?:送る|スクロールする)$/;
+/** 括弧なしの「見えるまで送る」。**書き方を教えるためだけに見る。** */
+const BARE_SEEK =
+  /^(?<what>[^「」]+?)が(?:見える|表示される|出る)まで(?:(?:下|上)[へに])?(?:送る|スクロールする)$/;
+
 /** `「A」を「B」へドラッグする`。**なぞる（スクロール）とは別物。** */
 const DRAG =
   /^(?:「(?<from>[^」]+)」|(?<fromBare>.+?))を(?:「(?<to>[^」]+)」|(?<toBare>.+?))[へに](?:ドラッグ(?:＆|&|アンド)?(?:ドロップ)?)する$/;
@@ -251,6 +275,22 @@ function planOneStep(
 ): PlannedStep {
   const double = DOUBLE_TAP.exec(text);
   if (double?.groups) return planDoubleTap(text, double.groups, can);
+
+  const seek = SEEK.exec(text);
+  if (seek?.groups) {
+    const direction = seek.groups['dir'] === '上' ? 'up' : 'down';
+    return { kind: 'seek', text, target: seek.groups['target'] ?? '', direction };
+  }
+  const bareSeek = BARE_SEEK.exec(text);
+  if (bareSeek?.groups) {
+    // **鉤括弧＝画面の文字、の決まりは崩さない。**どう書けばよいかを言う。
+    const what = (bareSeek.groups['what'] ?? '').trim();
+    return {
+      kind: 'hold',
+      text,
+      reason: `何が見えたら止まるかを鉤括弧で囲んでください（例: 「${what}」が見えるまで送る）`,
+    };
+  }
 
   const kinded = TAP_KIND.exec(text);
   if (kinded?.groups) return planKindTap(text, kinded.groups, can.elementKinds);

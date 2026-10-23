@@ -50,6 +50,7 @@ export type {
   ExpectationHold,
   PlannedAction,
   PlannedHold,
+  PlannedSeek,
   PlannedStep,
 } from './run/steps.js';
 export { RUN_SCHEMA, validateRun } from './run/validate.js';

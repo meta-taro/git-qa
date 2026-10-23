@@ -2,7 +2,8 @@ import type { TargetSession } from '../adapter/types.js';
 import type { TestSpecSheet } from '../tsv/types.js';
 import type { AiResult } from './types.js';
 import type { CaseContext, CaseVerdict } from './execute.js';
-import type { PlannedAction, PlannedStep } from './steps.js';
+import type { PlannedAction, PlannedSeek, PlannedStep } from './steps.js';
+import { seekUntilVisible } from './seek.js';
 import { expandDates } from './dates.js';
 import { alreadyThereMessage, wasAlreadyThere } from './already-there.js';
 import { judgeExpectation, planExpectation, planSteps } from './steps.js';
@@ -74,6 +75,8 @@ export interface SheetCaseRunnerOptions {
    * 落ちる場合だけ、ここに書いた分だけ余計にかかる。
    */
   readonly expectation?: { readonly waitMs?: number; readonly stepMs?: number };
+  /** **見えるまで送る**の、送ってから読むまでの間（C109）。**検査では 0 にする。** */
+  readonly seek?: { readonly pauseMs?: number };
   /**
    * **手順が終わり、見る番になった**（2026-09-25・人の指摘）。
    *
@@ -150,10 +153,24 @@ function holdBeforeTouching(steps: PlannedStep[]): CaseVerdict | undefined {
 }
 
 /** 順に操作する。落ちたら、どの手順で落ちたかを返す。 */
-async function actAll(ctx: CaseContext, steps: PlannedAction[]): Promise<string | undefined> {
+async function actAll(
+  ctx: CaseContext,
+  steps: (PlannedAction | PlannedSeek)[],
+  options: SheetCaseRunnerOptions,
+): Promise<string | undefined> {
   for (const step of steps) {
     ctx.step(step.text);
     try {
+      if (step.kind === 'seek') {
+        // **見えるまで送る**（C109）。何回送って見えたかを足跡へ。
+        ctx.note?.(
+          await seekUntilVisible(ctx.session, step, {
+            readScreenText: options.readScreenText,
+            ...(options.seek?.pauseMs === undefined ? {} : { pauseMs: options.seek.pauseMs }),
+          }),
+        );
+        continue;
+      }
       const report = await ctx.session.act(step.action);
       // **何をどう押したか**を足跡へ（#42）。言えない相手は何も返さない。
       if (report !== undefined) ctx.note?.(report.detail);
@@ -211,7 +228,9 @@ export function createSheetCaseRunner(
     if (held !== undefined) return withDates(held);
 
     // ここまで来た時点で hold は無い。型の上でも落として、キャストを持ち込まない。
-    const actions = planned.filter((step): step is PlannedAction => step.kind === 'action');
+    const actions = planned.filter(
+      (step): step is PlannedAction | PlannedSeek => step.kind !== 'hold',
+    );
 
     /**
      * **押す前の画面を読んでおく**（2026-09-24・人の指示）。
@@ -226,7 +245,7 @@ export function createSheetCaseRunner(
      */
     const before = await options.readScreenText(ctx.session).catch(() => undefined);
 
-    const failure = await actAll(ctx, actions);
+    const failure = await actAll(ctx, actions, options);
     if (failure !== undefined) {
       return withDates({ aiResult: 'BLOCKED', note: failure });
     }
