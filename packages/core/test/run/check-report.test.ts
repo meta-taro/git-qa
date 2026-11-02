@@ -70,3 +70,49 @@ describe('renderSheetCheck', () => {
     expect(text).toContain('ある検証');
   });
 });
+
+/**
+ * **途中で止まった実行を、そう言う**（meta-taro/git-qa#38・提案 3）。
+ *
+ * 判定待ちのまま外から止めると、人が置いていないケースは `AUTO_PASS` で残る。
+ * 「人が見送った」と「人がそこまで来ていない」が同じ値になるので、
+ * **run の `finishedAt` の有無を読み出すときに使い切る。**
+ */
+describe('renderSheetCheck — 途中で止まった実行', () => {
+  it('finishedAt が無ければ、途中で止まったと言い、人が置いていない No. を並べる', () => {
+    const text = renderSheetCheck(
+      {
+        ...run,
+        cases: [
+          { no: 1, result: 'VERIFIED', humanResult: 'VERIFIED' },
+          { no: 2, result: 'AUTO_PASS' },
+          { no: 3, result: 'AUTO_PASS' },
+        ],
+      },
+      { kind: 'same', reason: 'シートは同じ' },
+    );
+
+    expect(text).toContain('途中で止まっている');
+    expect(text).toContain('No. 2, 3');
+    expect(text).toContain('AUTO_PASS として読まない');
+  });
+
+  it('finishedAt が在れば、何も言わない', () => {
+    const text = renderSheetCheck(
+      { ...run, finishedAt: '2026-09-24T05:00:00.000Z' },
+      { kind: 'same', reason: 'シートは同じ' },
+    );
+
+    expect(text).not.toContain('途中で止まっている');
+  });
+
+  it('人が全部置いていれば、止まったことだけ言う', () => {
+    const text = renderSheetCheck(
+      { ...run, cases: [{ no: 1, result: 'VERIFIED', humanResult: 'VERIFIED' }] },
+      { kind: 'same', reason: 'シートは同じ' },
+    );
+
+    expect(text).toContain('途中で止まっている');
+    expect(text).not.toContain('区別できない');
+  });
+});

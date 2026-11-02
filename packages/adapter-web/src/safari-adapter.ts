@@ -345,6 +345,13 @@ export function createSafariSession(deps: SessionDeps): TargetSession {
       };
     },
 
+    /** **いま居る URL**（#40）。判定した時点のページを証跡に残すため。伏せるのは core。 */
+    async url(): Promise<string | undefined> {
+      ensureOpen();
+      const value = await evaluate('location.href');
+      return typeof value === 'string' ? value : undefined;
+    },
+
     async screenshot(): Promise<Screenshot> {
       ensureOpen();
       const bytes = await shoot();

@@ -245,6 +245,11 @@
             "$ref": "#/$defs/step"
           }
         },
+        "url": {
+          "description": "判定した時点の URL（画面の絵と同じ時点）。クエリの値は伏せてある（?email=***）。URL を言えない相手（端末・デスクトップ）には無い — meta-taro/git-qa#40。",
+          "type": "string",
+          "minLength": 1
+        },
         "dates": {
           "description": "流した日から決めた日付（シートに「今日から 2 日後」と書かれていたもの）。残さないと、後から読んだ人がその実行が何日を押したのか復元できない — 外部レビュー meta-taro/git-qa#29。",
           "type": "array",

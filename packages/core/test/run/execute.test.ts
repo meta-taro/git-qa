@@ -362,3 +362,47 @@ describe('executeRun — 既に繋いだセッションで走らせる', () => {
     await expect(executeRun(rest as ExecuteRunOptions)).rejects.toThrow(/どちらか/);
   });
 });
+
+describe('executeRun — 判定した時点の URL を残す（meta-taro/git-qa#40）', () => {
+  /**
+   * ウェブでは「同じ見た目の別ページ」が普通に起きる（認証の戻り・リダイレクト）。
+   * **絵だけでは区別が付かない**ので、判定した時点の URL をケースごとに残す。
+   * **クエリの値は伏せる** —— 証跡は commit されるので、メールやトークンをリポに入れない。
+   */
+  it('URL を言える相手では、ケースにクエリの値を伏せた URL が残る', async () => {
+    const adapter = createFakeAdapter({ recording: { requested: false } });
+    const base = await adapter.connect();
+    // 偽物はクラスなので、広げると close などが落ちる。**口を 1 つ足すだけ**にする。
+    const session: TargetSession = Object.assign(base, {
+      url: () => Promise.resolve('http://localhost:3000/ja/auth/login?email=a%40b.c&next=%2F'),
+    });
+    const { adapter: _unused, ...rest } = options({ mode: 'auto' });
+
+    const run = await executeRun({ ...rest, session });
+
+    expect(run.cases[0]?.url).toBe('http://localhost:3000/ja/auth/login?email=***&next=***');
+    expect(validateRun(run).errors).toEqual([]);
+    await session.close();
+  });
+
+  it('URL を言えない相手（端末・デスクトップ）では、ケースに url を持たない', async () => {
+    const run = await executeRun(options({ mode: 'auto' }));
+
+    expect(run.cases[0]).not.toHaveProperty('url');
+  });
+
+  it('URL を聞く途中で投げられても、判定は残る', async () => {
+    const adapter = createFakeAdapter({ recording: { requested: false } });
+    const base = await adapter.connect();
+    const session: TargetSession = Object.assign(base, {
+      url: () => Promise.reject(new Error('口が閉じた')),
+    });
+    const { adapter: _unused, ...rest } = options({ mode: 'auto' });
+
+    const run = await executeRun({ ...rest, session });
+
+    expect(run.cases[0]?.result).toBe('AUTO_PASS');
+    expect(run.cases[0]).not.toHaveProperty('url');
+    await session.close();
+  });
+});

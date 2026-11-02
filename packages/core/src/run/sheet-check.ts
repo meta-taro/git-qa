@@ -80,6 +80,11 @@ const short = (digest: string): string => digest.slice(0, 12);
 /** 突き合わせるのに要る、証跡の最小限。**`run.json` を全部知らなくてよい。** */
 export interface CheckedRun {
   readonly runId: string;
+  /**
+   * **走り切ったときにだけ在る**（`types.ts` の約束）。無ければ途中で止まった実行（#38）。
+   * 古い証跡（途中経過にも押していた時期）では、在っても走り切ったとは限らない。
+   */
+  readonly finishedAt?: string;
   readonly sheet: SheetRef;
   readonly cases: readonly {
     readonly no: number;
@@ -165,6 +170,26 @@ function renderTargetCheck(check: TargetCheck | undefined): string[] {
  * **失われるのは人が見て置いた分**なので、そこが何件あるのかを
  * 読んだ人はいちばん知りたい。
  */
+/**
+ * **途中で止まった実行を、そう言う**（meta-taro/git-qa#38・提案 3）。
+ *
+ * 判定待ちのまま外から止めると、人が置いていないケースは `AUTO_PASS` で残る。
+ * 値そのものは正しい（人は見ていない）が、**「人が見送った」と「人がそこまで来ていない」が
+ * 同じ値になる。**run 単位では `finishedAt` の有無で既に区別できているので、
+ * **読み出すときにそれを使い切る。**ケースの値は変えない（既にある証跡をそのまま読めるように）。
+ */
+function renderInterrupted(run: CheckedRun): string[] {
+  if (run.finishedAt !== undefined) return [];
+  const unplaced = run.cases.filter((one) => one.humanResult === undefined).map((one) => one.no);
+  const head = 'この実行は途中で止まっている（終わりの時刻が無い）。';
+  if (unplaced.length === 0) return [head];
+  return [
+    head +
+      `人が置いていない ${String(unplaced.length)} 件（No. ${unplaced.map(String).join(', ')}）は、` +
+      '見送られたのか、そこまで来ていないのかを区別できない。AUTO_PASS として読まないこと',
+  ];
+}
+
 export function renderSheetCheck(run: CheckedRun, check: SheetCheck): string {
   /*
    * **人の判定の欄で数える**（2026-09-28・実物で見つけた）。
@@ -180,6 +205,7 @@ export function renderSheetCheck(run: CheckedRun, check: SheetCheck): string {
     `証跡: ${run.runId}`,
     `シート: ${head}`,
     `人が見て置いた判定: ${String(placed)} 件 / 全 ${String(run.cases.length)} 件`,
+    ...renderInterrupted(run),
     ...renderTargetCheck(run.targetCheck),
     ...renderLiveView(run.liveView),
     '',

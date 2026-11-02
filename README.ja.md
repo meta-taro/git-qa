@@ -432,6 +432,8 @@ pnpm run:sheet:web sheets/web-sample-ja.tsv --no-ui  # 誰も見ずに流す（�
 **`行き先` が在ればそちらを見に行き、無ければ今までどおり `対象` を見に行きます。**
 `run.json` には**両方**残ります（`target.build.source` と `target.destination`）。
 **同じ見出しが 2 行あると走りません** —— どちらを見たのかが証跡から辿れなくなるため（C40）。
+**判定した時点の URL は、ケースごとにも残ります**（`cases[].url`・クエリの値は `***` に伏せる・meta-taro/git-qa#40）。
+手順の途中で別のページへ移る流れでも、どのページで判定したかが辿れます。
 
 > 使ってみる人への案内は **`docs/alpha-guide.md`**。
 > **別の OS で開発する人への案内は `docs/dev-check.md`。**

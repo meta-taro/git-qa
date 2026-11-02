@@ -118,6 +118,14 @@ export interface TargetSession {
    * **持たない相手は、持たないことが読めるほうがよい。**
    */
   fingerprint?(): Promise<string | undefined>;
+  /**
+   * **いま居る場所**（meta-taro/git-qa#40）。ウェブなら URL。
+   *
+   * 判定を置いた時点のものを証跡に残す。**同じ見た目の別ページ**（認証の戻り・リダイレクト）を、
+   * 読んだ人が絵だけで見分けられないため。**言える相手だけが持つ**（端末・デスクトップは持たない）。
+   * クエリの値を伏せるのは core の仕事（`case-url.ts`）。ここは有りのままを返す。
+   */
+  url?(): Promise<string | undefined>;
   close(): Promise<void>;
 }
 

@@ -442,6 +442,17 @@ function createSession(deps: SessionDeps): TargetSession {
       };
     },
 
+    /** **いま居る URL**（#40）。判定した時点のページを証跡に残すため。伏せるのは core。 */
+    async url(): Promise<string | undefined> {
+      ensureOpen();
+      const result = await cdp.send('Runtime.evaluate', {
+        expression: 'location.href',
+        returnByValue: true,
+      });
+      const value = (result['result'] as { value?: unknown } | undefined)?.value;
+      return typeof value === 'string' ? value : undefined;
+    },
+
     async screenshot(): Promise<Screenshot> {
       ensureOpen();
       /**

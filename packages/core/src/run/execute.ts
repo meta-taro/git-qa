@@ -3,6 +3,7 @@ import type { ImageTools } from '../adapter/to-webp.js';
 import { captureCaseShot } from './case-shot.js';
 import { saveRunProgress } from './save-progress.js';
 import { compareFingerprint } from './target-check.js';
+import { captureCaseUrl } from './case-url.js';
 import { resolveCaseResult } from './result.js';
 import type {
   Actor,
@@ -260,6 +261,12 @@ async function runOneCase(
     runId: options.runId,
     caseNo: subject.no,
   });
+  /**
+   * **判定した時点の URL**（#40）。絵と同じ時点で聞く。
+   * 遷移を含む流れで、**どのページで判定したか**を読んだ人が復元できるように。
+   * 言えない相手は `undefined`（持たない）。クエリの値は伏せてある。
+   */
+  const url = await captureCaseUrl(session);
 
   const human = await options.askHuman?.(ctx, verdict);
 
@@ -284,6 +291,7 @@ async function runOneCase(
     steps,
     // **何日を押したのか**（#29）。無ければ持たない（日付の言い方が無かったケース）。
     ...(verdict.dates === undefined || verdict.dates.length === 0 ? {} : { dates: verdict.dates }),
+    ...(url === undefined ? {} : { url }),
     recording,
     screenshot,
     ...(note === undefined ? {} : { note }),
