@@ -684,6 +684,9 @@ pnpm mcp
 
 Claude Code などの MCP クライアントから、端末を触って画面を取れます（`.mcp.json` に登録済み）。
 
+公式の MCP 一覧（[registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io/)）には `io.github.meta-taro/git-qa` で載っています。
+起こすのはこの clone からです（npm の包みは出していません）。
+
 **相手は選べます**（2026-09-17）。
 
 ```bash

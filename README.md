@@ -30,6 +30,7 @@ with the name, the time, and the screen at that moment.
 Over MCP, Claude Code (or any agent) can screenshot, read the screen, list what can be pressed and tap it,
 on Android, web, desktop or iPhone. It can run the sheet unattended overnight (`--no-ui`);
 in the morning you review the failures. **The pass is still yours to give.**
+The server is listed in the official MCP registry as `io.github.meta-taro/git-qa`; it runs from this clone (there is no npm package).
 
 ## Try it
 
