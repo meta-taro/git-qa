@@ -114,3 +114,38 @@ describe('名乗り — 英語の配布ページ', () => {
     );
   });
 });
+
+/**
+ * **MCP の公式一覧（registry.modelcontextprotocol.io）に載せる名乗り**（2026-11-04・C111）。
+ *
+ * `server.json` は一覧が読む。**放っておくと必ず腐る** —— 版を上げるたびに手で直す所なので、
+ * 忘れた日に古い版を名乗り続ける。リリースノートの最新の見出し（版ごとに必ず書く）と突き合わせて持つ。
+ */
+describe('名乗り — MCP の公式一覧（server.json）', () => {
+  const said = (): Record<string, unknown> =>
+    JSON.parse(read('server.json')) as Record<string, unknown>;
+
+  it('名前・置き場所・サイトが、ほかの名乗りと同じ所を指す', () => {
+    const s = said();
+    expect(s['name']).toBe('io.github.meta-taro/git-qa');
+    expect(s['websiteUrl']).toBe('https://meta-taro.github.io/git-qa/');
+    expect((s['repository'] as Record<string, unknown>)['url']).toBe(
+      'https://github.com/meta-taro/git-qa',
+    );
+  });
+
+  it('説明は英語で 100 字以内、決めた語を含む（一覧の上限）', () => {
+    const description = String(said()['description']);
+    expect(description.length).toBeLessThanOrEqual(100);
+    expect(description).toContain('human-in-the-loop QA');
+    expect(description).toContain('test sheet');
+  });
+
+  it('版は、リリースノートの最新の見出しの版と同じ', () => {
+    const version = String(said()['version']);
+    expect(version).toMatch(/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/);
+    const latest = /^## (v\S+) で入ったもの$/m.exec(read('.github/release-notes.md'))?.[1];
+    expect(latest, 'リリースノートに「## vX で入ったもの」が無い').toBeDefined();
+    expect(`v${version}`).toBe(latest);
+  });
+});

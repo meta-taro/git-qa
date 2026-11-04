@@ -1,0 +1,122 @@
+name: mcp-registry
+
+# MCP の公式一覧（registry.modelcontextprotocol.io）へ、`server.json` の名乗りを出し直す（C111）。
+#
+# **Secrets は要りません。**`github-oidc` は GitHub Actions の id-token で
+# `io.github.meta-taro` の持ち主を示します（人が `mcp-publisher login github` を叩くのと同じ所へ行きます）。
+#
+# 走るのは 2 つのとき。
+#   1. release が成功したあと（タグ `v*` の分だけ）
+#   2. 人が手で走らせたとき（一覧が止まっていて出し直せなかった日・最初の 1 回）
+# どちらも **Release が実在する版しか出しません。**server.json の版に対応する Release が無ければ赤で止まります。
+#
+# 配布物はここが赤くても失われません（release が既に添付しています）。赤は「一覧だけ人が見てください」の合図です。
+
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # **この 1 行が認証の全部。**鍵も token も置きません。
+  id-token: write
+
+jobs:
+  registry:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: server.json の版に、Release が在るか確かめる
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -eu
+          VER="$(node -p "require('./server.json').version")"
+          TAG="v${VER}"
+          if [ -n "$HEAD_BRANCH" ] && [ "$HEAD_BRANCH" != "$TAG" ]; then
+            echo "::error::server.json の版 ${VER} が、出したタグ ${HEAD_BRANCH} と違います。server.json の \"version\" を揃えてください"
+            exit 1
+          fi
+          DRAFT="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null || echo 'missing')"
+          if [ "$DRAFT" != "false" ]; then
+            echo "::error::タグ ${TAG} の Release が無いか、下書きのままです（${DRAFT}）。出ていない版は一覧に載せません"
+            exit 1
+          fi
+          echo "出す版: ${VER}"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: 既に同じ版が載っていないか見る
+        id: already
+        env:
+          WANT: ${{ steps.version.outputs.version }}
+        run: |
+          set -eu
+          # **見えなかっただけで「載っていない」と決めません**（決めると二重に出す）。
+          # 読めるまで粘り、読めなければ赤にする（緑で何もしないと「出し直した」と読まれる）。
+          BODY=""
+          for wait in 0 30 60 120; do
+            [ "$wait" = 0 ] || sleep "$wait"
+            CODE="$(curl -sS --max-time 20 -o /tmp/latest.json -w '%{http_code}' \
+              'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.meta-taro%2Fgit-qa/versions/latest' || true)"
+            case "$CODE" in
+              200) BODY="$(cat /tmp/latest.json)"; break ;;
+              404) BODY="none"; break ;;
+              *) echo "一覧が読めません（${CODE:-無応答}）。間を置いて、もう一度試します" ;;
+            esac
+          done
+          if [ -z "$BODY" ]; then
+            echo "::error::一覧が 4 回（約 3.5 分）読めませんでした。**出し直していません。**"
+            echo "::error::一覧が戻ったら、この workflow を手で走らせてください"
+            exit 1
+          fi
+          NOW="$(printf '%s' "$BODY" | jq -r '.server.version // empty' 2>/dev/null || true)"
+          echo "いま載っている版: ${NOW:-（無し）}"
+          if [ "$NOW" = "$WANT" ]; then
+            echo "既に ${WANT} が載っています。何もしません"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: mcp-publisher を入れる
+        if: steps.already.outputs.skip != 'true'
+        run: |
+          set -eu
+          # **版を固定します。**ここが勝手に上がると、タグを押した日に初めて壊れ方が分かります。
+          VER=1.8.7
+          curl -fsSL -o /tmp/mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${VER}/mcp-publisher_linux_amd64.tar.gz"
+          tar -xzf /tmp/mcp-publisher.tar.gz -C /tmp mcp-publisher
+          /tmp/mcp-publisher --version
+
+      - name: 出し直す
+        if: steps.already.outputs.skip != 'true'
+        run: |
+          set -eu
+          /tmp/mcp-publisher login github-oidc
+          /tmp/mcp-publisher publish
+
+      - name: 載ったことを確かめる
+        if: steps.already.outputs.skip != 'true'
+        env:
+          WANT: ${{ steps.version.outputs.version }}
+        run: |
+          set -eu
+          sleep 10
+          NOW="$(curl -fsS --max-time 20 \
+            'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.meta-taro%2Fgit-qa/versions/latest' \
+            | jq -r '.server.version // empty')"
+          echo "一覧の最新: ${NOW:-（読めず）}"
+          if [ "$NOW" != "$WANT" ]; then
+            echo "::warning::出したあと、一覧の最新が ${WANT} になっていません（${NOW:-無し}）。反映待ちか、出し損ねです。しばらくして一覧を見てください"
+          fi
