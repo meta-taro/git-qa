@@ -33,3 +33,5 @@ export { parseWinWindows, winArgs } from './win/tool.js';
 export type { WinWindow } from './win/tool.js';
 export { whyNoDesktop } from './win/pick.js';
 export { keyScript } from './keys.js';
+export { findWinTool, winToolCandidates } from './win/find.js';
+export { pickWindow, whyUnusable } from './win/tool.js';

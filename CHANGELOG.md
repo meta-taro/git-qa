@@ -8,6 +8,9 @@
 
 ## 未リリース
 
+- 直した: **Windows では MCP（`pnpm mcp`）からデスクトップアプリを見られなかった。**窓を見る道具（`git-qa-win`）を MCP の道では探しておらず、
+  `app_screenshot` も macOS の口（`osascript` / `screencapture`）を呼んでいた。探し方を adapter-desktop に 1 つにして MCP でも使い、
+  Windows の `app_screenshot` は `git-qa-win` で窓を撮る（画面全体は撮れない、と言う）。実機の Windows では未確認
 - 直した: **配布版（Finder から起動した `.app`）で、ケースの画面と途中経過の `run.json` が `/runs` へ書こうとして毎回落ちていた**（`mkdir '/runs'` で ENOENT）。
   画面から始める道が証跡の置き場（書類フォルダの下の `git-qa/runs`）を実行器に渡しておらず、既定の「打った場所の `runs/`」が `/` 起点になっていた。
   置き場を渡し、既定も `run.json` と同じ逃がし方にした。途中で落ちても置いた判定が残り、「続きから」で見つかる（#43）

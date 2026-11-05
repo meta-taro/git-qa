@@ -2,6 +2,8 @@ import { access } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { findWinTool as findWinToolFrom } from '@git-qa/adapter-desktop';
+
 /**
  * 絵から文字を読む道具（段 2・C55）を探す。
  *
@@ -112,42 +114,15 @@ export async function findRecord(
 /**
  * Windows で窓を見る道具（`git-qa-win.exe`）を探す（2026-09-12）。
  *
- * macOS 側の 3 本（OCR / 触る / 録る）に当たるものが、Windows ではこれ 1 本。
- * **無ければデスクトップ検証が丸ごとできない** —— `git-qa-ocr` のような
- * 「あると良い」ではなく「**無いと何もできない**」。
+ * **探し方は adapter-desktop に 1 つ**（MCP の道と同じものを使う・2026-11-05）。
+ * ここは、配布物の隣＝この包みの置き場所を既定にするだけ。
  */
-export function winToolCandidates(fromDir: string): string[] {
-  const beside = join(fromDir, 'git-qa-win.exe');
-  const inRepo = resolve(
-    fromDir,
-    '..',
-    '..',
-    'adapter-desktop',
-    'tools',
-    'win',
-    'target',
-    'release',
-    'git-qa-win.exe',
-  );
-  return [...new Set([beside, inRepo])];
-}
+export { winToolCandidates } from '@git-qa/adapter-desktop';
 
-/** 実際にあるものを 1 つ返す。**無ければ undefined**（デスクトップ検証ができない）。 */
-export async function findWinTool(
+export function findWinTool(
   fromDir = dirname(fileURLToPath(import.meta.url)),
 ): Promise<string | undefined> {
-  const fromEnv = process.env['GIT_QA_WIN'];
-  if (fromEnv !== undefined) return fromEnv;
-
-  for (const path of winToolCandidates(fromDir)) {
-    try {
-      await access(path);
-      return path;
-    } catch {
-      // ここには無い。次を見る。**macOS では無いのが普通。**
-    }
-  }
-  return undefined;
+  return findWinToolFrom(fromDir);
 }
 
 /**

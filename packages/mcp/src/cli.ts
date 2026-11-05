@@ -8,6 +8,8 @@ import { promisify } from 'node:util';
 import { createAndroidAdapter } from '@git-qa/adapter-android';
 import {
   createDesktopAdapter,
+  createWindowsDesktopAdapter,
+  findWinTool,
   listDesktopElements,
   readDesktopScreenText,
   whyNoDesktop,
@@ -28,6 +30,7 @@ import { mcpTargetFrom, targetHint } from './target.js';
 import { renderAbout } from './about.js';
 import { sheetGuideOr } from './sheet-guide.js';
 import { createWindowCapture } from './screen.js';
+import { createWinWindowCapture } from './win-capture.js';
 import { createMcpServer, serveOverStdio } from './server.js';
 import { createDeviceTools } from './tools.js';
 
@@ -74,6 +77,14 @@ const wdaUrl = keeper?.url ?? process.env['GIT_QA_IOS_WDA'];
 const onlyWda = wdaUrl !== undefined && process.env['GIT_QA_IOS_ONLY_WDA'] === '1';
 const toolPath = target.kind === 'ios' && !onlyWda ? await findIosTool() : undefined;
 const ocrPath = target.kind === 'ios' ? await findOcrTool() : undefined;
+/**
+ * **Windows で窓を見る道具**（`git-qa-win`）。画面から始める道と同じ探し方（2026-11-05）。
+ * 前はここで探しておらず、**Windows では MCP からデスクトップを見られなかった。**
+ */
+const winToolPath =
+  target.kind === 'desktop' && process.platform === 'win32'
+    ? await findWinTool(dirname(fileURLToPath(import.meta.url)))
+    : undefined;
 
 const connect = (): Promise<TargetSession> => {
   if (target.kind === 'web') {
@@ -92,13 +103,18 @@ const connect = (): Promise<TargetSession> => {
   }
 
   if (target.kind === 'desktop') {
-    const why = whyNoDesktop(process.platform, undefined);
+    const why = whyNoDesktop(process.platform, winToolPath);
     if (why !== undefined) throw new Error(why);
-    return createDesktopAdapter({
-      app: target.app,
-      build: { source: target.app, label },
-      destination: target.app,
-    }).connect();
+    const build = { source: target.app, label };
+    // **OS ごとに別のもの**（画面から始める道と同じ分け方）。`whyNoDesktop` が通っているので道具は在る。
+    if (process.platform === 'win32') {
+      return createWindowsDesktopAdapter({
+        app: target.app,
+        build,
+        toolPath: winToolPath as string,
+      }).connect();
+    }
+    return createDesktopAdapter({ app: target.app, build, destination: target.app }).connect();
   }
 
   if (target.kind === 'ios') {
@@ -178,17 +194,25 @@ process.on('SIGTERM', release);
 /**
  * git-qa 自身の窓を撮る。**AI が自分の画面を見るための口。**
  * macOS では画面収録の許可が要る（許可が無ければ理由が返る）。
+ * **Windows では `git-qa-win` で撮る**（macOS の口は `osascript` を呼ぶので、Windows では撮れなかった・2026-11-05）。
+ * 道具が無ければ、この口は出さない（デスクトップ以外の相手では探していない）。
  */
-const captureWindow = createWindowCapture({
-  run: async (command, args) => (await run(command, [...args])).stdout,
-  readFile: async (path) => {
+const captureDeps = {
+  run: async (command: string, args: readonly string[]) => (await run(command, [...args])).stdout,
+  readFile: async (path: string) => {
     const bytes = await readFile(path);
     // 撮った絵は残さない。**人の画面が temp に溜まり続けるのは、頼まれていない。**
     await rm(path, { force: true });
     return bytes;
   },
   tmpPath: () => join(tmpdir(), `git-qa-window-${String(Date.now())}.png`),
-});
+};
+const captureWindow =
+  process.platform === 'win32'
+    ? winToolPath === undefined
+      ? undefined
+      : createWinWindowCapture({ ...captureDeps, toolPath: winToolPath })
+    : createWindowCapture(captureDeps);
 
 /**
  * この道具の説明を組み立てる（`about`）。
@@ -234,4 +258,10 @@ const readSheetGuide = async (): Promise<string> => {
   return sheetGuideOr(said);
 };
 
-await serveOverStdio(createMcpServer(tools, { captureWindow, readAbout, readSheetGuide }));
+await serveOverStdio(
+  createMcpServer(tools, {
+    ...(captureWindow === undefined ? {} : { captureWindow }),
+    readAbout,
+    readSheetGuide,
+  }),
+);
