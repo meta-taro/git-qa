@@ -49,7 +49,7 @@ const AFTER_ACTION_MS = 1_500;
 const LIVE_FPS = 8;
 const runTool = promisify(execFile);
 import { imageTools } from './image-tools.js';
-import { fromInvocationDir } from './paths.js';
+import { runsDir } from './paths.js';
 
 /**
  * 一本道 — シートを読む → 端末を操作する → **人が 1 打鍵で置く** → `run.json` の中身が出る。
@@ -88,8 +88,9 @@ export interface StartRunSessionOptions {
    * **知らせ先を後から預ける**形にして、輪にならないようにする。
    */
   /**
-   * 証跡の置き場所。**ケースごとの画面もここへ置く。**
-   * 省くと、打った場所の `runs/`。
+   * 証跡の置き場所。**ケースごとの画面も途中経過もここへ置く。**
+   * 省くと、打った場所の `runs/`（打った場所が `/` なら書類フォルダの下・#43）。
+   * **画面から始める道は必ず渡す** —— 省くと `run.json` と別の所へ行き、配布版では `/runs` へ書こうとして落ちた。
    */
   readonly runsRoot?: string;
   readonly registerPointing?: (
@@ -685,6 +686,12 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   };
 
   /**
+   * **証跡の置き場**（ケースの画面・途中経過・録画）。渡されなければ `run.json` と同じ逃がし方
+   * （打った場所の `runs/`。打った場所が `/` なら書類フォルダの下・#43）。
+   */
+  const runsRoot = options.runsRoot ?? runsDir('runs');
+
+  /**
    * **録ってよい相手かを、繋いでから決める**（#31 の続き）。
    *
    * 絵で流れる相手だけ（H.264 を `.jpg` として並べると**開けない動画**が出来る）。
@@ -697,7 +704,6 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       already: options.recording !== undefined,
     })
   ) {
-    const runsRoot = options.runsRoot ?? fromInvocationDir('runs');
     frames = createFrameRecording({
       dirFor: (caseNo) => join(caseDir(runsRoot, options.runId, caseNo), 'frames'),
       ensureDir: async (dir) => {
@@ -754,7 +760,7 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
       ? {}
       : { recording: (options.recording ?? frames) as RecordingControl }),
     // **ケースごとに画面を 1 枚残す**（2026-09-11）。証跡と同じ所へ置く。
-    runsRoot: options.runsRoot ?? fromInvocationDir('runs'),
+    runsRoot,
     // **在れば webp にする。**無ければ撮れた形のまま（前提を増やさない・§12）。
     imageTools: imageTools(),
     // **途中経過を書けなかったら言う。**黙ると、残っていないことに気づけない。

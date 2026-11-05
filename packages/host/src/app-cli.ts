@@ -336,6 +336,9 @@ const setup = await startSetupServer({
         ...(sheet.meta['文書番号'] === undefined ? {} : { documentNumber: sheet.meta['文書番号'] }),
       },
       runId,
+      // **証跡の置き場を実行器にも渡す**（#43）。渡さないと既定（打った場所の `runs/`）へ行き、
+      // Finder から起動した配布版では `/runs` になって、ケースの画面と途中経過が毎回落ちていた。
+      runsRoot,
       sheetPath,
       ...(previous === undefined ? {} : { previous }),
       // **鑑賞モード。**押さなくても 1 件ごとに間をおいて進む（止める口はある）。
