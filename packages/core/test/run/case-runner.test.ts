@@ -559,3 +559,41 @@ describe('createSheetCaseRunner — アダプタの言い分を足跡に残す',
     expect(notes).toEqual(['「開く」（Button）を本物のクリックで押した']);
   });
 });
+
+/**
+ * **値を外から入れる手順は、相手の報告ごと伏せる**（C113）。
+ * Windows のデスクトップは「打ったあとの値」を報告に書く。足跡・報告のどこにも値を残さない。
+ */
+describe('値を外から入れる（C113）', () => {
+  it('端末には値を打ち、足跡と報告には $NAME だけが残る', async () => {
+    const { adapter, session } = await connect();
+    const steps: string[] = [];
+    const notes: string[] = [];
+    const run = createSheetCaseRunner({
+      readScreenText: () => Promise.resolve('登録しました'),
+      expectation: { waitMs: 0, stepMs: 1 },
+      textInput: 'any',
+      values: (name) => (name === 'LICENSE_KEY' ? 'ABCD-1234' : undefined),
+    });
+
+    await run({
+      ...context(
+        session,
+        {
+          [STEPS_COLUMN]: '1. 「ライセンスキー」に「$LICENSE_KEY」と入力する',
+          [EXPECTATION_COLUMN]: '「登録しました」と表示される',
+        },
+        steps,
+      ),
+      note: (text: string) => {
+        notes.push(text);
+      },
+    });
+
+    expect(adapter.actions).toEqual([
+      { kind: 'type', text: 'ABCD-1234', target: { at: 'element', ref: 'ライセンスキー' } },
+    ]);
+    expect(steps).toEqual(['「ライセンスキー」に「$LICENSE_KEY」と入力する']);
+    expect(JSON.stringify({ steps, notes })).not.toContain('ABCD-1234');
+  });
+});

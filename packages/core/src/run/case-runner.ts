@@ -2,7 +2,7 @@ import type { TargetSession } from '../adapter/types.js';
 import type { TestSpecSheet } from '../tsv/types.js';
 import type { AiResult } from './types.js';
 import type { CaseContext, CaseVerdict } from './execute.js';
-import type { PlannedAction, PlannedSeek, PlannedStep } from './steps.js';
+import type { PlannedAction, PlannedSeek, PlannedStep, ValueSource } from './steps.js';
 import { seekUntilVisible } from './seek.js';
 import { expandDates } from './dates.js';
 import { alreadyThereMessage, wasAlreadyThere } from './already-there.js';
@@ -98,6 +98,11 @@ export interface SheetCaseRunnerOptions {
   readonly dateFormat?: string;
   /** いまの時刻。**検査では差し替える**（日付の展開が実時計に依らないように）。 */
   readonly now?: () => Date;
+  /**
+   * **シートに書けない値の取り口**（C113・§14）。手順の `$NAME` をここで引く。
+   * 渡さなければ `$NAME` の行は保留（人が入力する）。**宿主が環境変数などから作る。**
+   */
+  readonly values?: ValueSource;
 }
 
 const errorMessage = (error: unknown): string =>
@@ -173,7 +178,9 @@ async function actAll(
       }
       const report = await ctx.session.act(step.action);
       // **何をどう押したか**を足跡へ（#42）。言えない相手は何も返さない。
-      if (report !== undefined) ctx.note?.(report.detail);
+      // **外から入れた値は、相手の報告ごと伏せる**（打ったあとの値を言う相手がいる・C113）。
+      if (step.secret === true) ctx.note?.('値は外から入れた（証跡には書かない）');
+      else if (report !== undefined) ctx.note?.(report.detail);
     } catch (error: unknown) {
       return `「${step.text}」で止まった: ${errorMessage(error)}`;
     }
@@ -223,6 +230,8 @@ export function createSheetCaseRunner(
       ...(options.elementKinds === undefined ? {} : { elementKinds: options.elementKinds }),
       ...(options.doubleClick === undefined ? {} : { doubleClick: options.doubleClick }),
       ...(options.appId === undefined ? {} : { appId: options.appId }),
+      // **シートに書けない値の取り口**（C113）。無ければ `$NAME` の行は保留になる。
+      ...(options.values === undefined ? {} : { values: options.values }),
     });
     const held = holdBeforeTouching(planned);
     if (held !== undefined) return withDates(held);

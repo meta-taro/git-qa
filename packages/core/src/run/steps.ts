@@ -14,7 +14,18 @@ export interface PlannedAction {
   /** 番号を剥がした原文。証跡の足跡（`RunStep.label`）にそのまま出す。 */
   readonly text: string;
   readonly action: Action;
+  /**
+   * **値を外から入れた手順**（C113）。`action.text` に本物の値が入っているので、
+   * 走らせる側は相手の報告（打ったあとの値を言う相手がいる）を足跡に書かない。
+   */
+  readonly secret?: true;
 }
+
+/**
+ * **シートに書けない値の取り口**（C113・§14）。`$NAME` の `NAME` を渡すと値を返す。
+ * 無ければ `undefined`。**コアは環境変数を直に読まない**（どこから取るかは宿主が決める）。
+ */
+export type ValueSource = (name: string) => string | undefined;
 
 /** 落とせなかった 1 手順。**AI はここで止まって人へ渡す。** */
 export interface PlannedHold {
@@ -70,6 +81,22 @@ export interface PlanOptions {
    * どのパッケージかが端末と地域で変わるのが理由。**その問題が無い相手にまで押し付けない。**
    */
   readonly appId?: 'package-or-url' | 'name';
+  /**
+   * **シートに書けない値を外から取る**（C113・§14）。手順の値が `$NAME` のとき、ここに聞く。
+   * **無ければ `$NAME` は使えない**（保留になる）。値は足跡に出ない（原文の `$NAME` が残る）。
+   */
+  readonly values?: ValueSource;
+}
+
+/**
+ * **外から入れる値の書き方**（C113）。`$LICENSE_KEY` のように、`$` と大文字の名前。
+ * **小文字・数字始まりは取らない**（`$5` のような、ただの文字と区別するため）。
+ */
+const PLACEHOLDER = /^\$(?<name>[A-Z][A-Z0-9_]*)$/;
+
+/** `$NAME` なら `NAME`。そうでなければ `undefined`。 */
+export function placeholderName(text: string): string | undefined {
+  return PLACEHOLDER.exec(text)?.groups?.['name'];
 }
 
 /** 行頭の番号・箇条書き記号。書式は書き手によって揺れるので、まとめて剥がす。 */
@@ -171,32 +198,61 @@ function planType(
   text: string,
   target: string | undefined,
   textInput: 'none' | 'ascii-only' | 'any',
+  values: ValueSource | undefined,
 ): PlannedStep {
+  // **足跡に出る文。**`$NAME` のときも、ここには `$NAME` のまま残る（値は書かない）。
+  const label = target === undefined ? `「${text}」と入力する` : `${target}に「${text}」と入力する`;
+  const typeAction = (value: string): Action =>
+    target === undefined
+      ? { kind: 'type', text: value }
+      : { kind: 'type', text: value, target: { at: 'element', ref: target } };
+
   // **送る口を持たない相手。**送ろうとして実行時に落ちるより、人へ回すほうがよい。
   if (textInput === 'none') {
     return {
       kind: 'hold',
-      text: target === undefined ? `「${text}」と入力する` : `${target}に「${text}」と入力する`,
+      text: label,
       reason: `この相手には文字を送れない。人が入力する必要がある`,
     };
   }
+
+  // **シートに書けない値を外から入れる**（C113）。理由にも足跡にも、値は書かない。
+  const name = placeholderName(text);
+  if (name !== undefined) {
+    if (values === undefined) {
+      return {
+        kind: 'hold',
+        text: label,
+        reason: `値 $${name} を外から渡す口が、この入口には無い。人が入力する必要がある`,
+      };
+    }
+    const value = values(name);
+    if (value === undefined || value === '') {
+      return {
+        kind: 'hold',
+        text: label,
+        reason: `値 $${name} が渡されていない（git-qa を起こす環境に ${name} を置く）。人が入力する必要がある`,
+      };
+    }
+    if (textInput === 'ascii-only' && !ASCII_ONLY.test(value)) {
+      return {
+        kind: 'hold',
+        text: label,
+        reason: `端末の入力は IME を通らないので $${name} の値を送れない（値は書かない）。人が入力する必要がある`,
+      };
+    }
+    return { kind: 'action', text: label, action: typeAction(value), secret: true };
+  }
+
   if (textInput === 'ascii-only' && !ASCII_ONLY.test(text)) {
     // 黙って化けた文字を打つより、送れないと言うほうがよい（adapter-android と同じ判断）。
     return {
       kind: 'hold',
-      text: target === undefined ? `「${text}」と入力する` : `${target}に「${text}」と入力する`,
+      text: label,
       reason: `端末の入力は IME を通らないので「${text}」を送れない。人が入力する必要がある`,
     };
   }
-  const action: Action =
-    target === undefined
-      ? { kind: 'type', text }
-      : { kind: 'type', text, target: { at: 'element', ref: target } };
-  return {
-    kind: 'action',
-    text: target === undefined ? `「${text}」と入力する` : `${target}に「${text}」と入力する`,
-    action,
-  };
+  return { kind: 'action', text: label, action: typeAction(text) };
 }
 
 /**
@@ -272,6 +328,7 @@ function planOneStep(
   appId: 'package-or-url' | 'name',
   keyInput: boolean,
   can: Can,
+  values: ValueSource | undefined,
 ): PlannedStep {
   const double = DOUBLE_TAP.exec(text);
   if (double?.groups) return planDoubleTap(text, double.groups, can);
@@ -298,12 +355,12 @@ function planOneStep(
   const into = TYPE_INTO.exec(text);
   if (into?.groups) {
     const target = into.groups['target'] ?? into.groups['bare'];
-    return { ...planType(into.groups['text'] ?? '', target, textInput), text };
+    return { ...planType(into.groups['text'] ?? '', target, textInput, values), text };
   }
 
   const only = TYPE_ONLY.exec(text);
   if (only?.groups) {
-    return { ...planType(only.groups['text'] ?? '', undefined, textInput), text };
+    return { ...planType(only.groups['text'] ?? '', undefined, textInput, values), text };
   }
 
   const launch = LAUNCH.exec(text);
@@ -398,7 +455,9 @@ export function planSteps(stepsText: string, options: PlanOptions = {}): Planned
     elementKinds: options.elementKinds ?? false,
     doubleClick: options.doubleClick ?? false,
   };
-  return lines.map((line) => planOneStep(line, options.app, textInput, appId, keyInput, can));
+  return lines.map((line) =>
+    planOneStep(line, options.app, textInput, appId, keyInput, can, options.values),
+  );
 }
 
 /** 画面に在るかどうかで決まる期待結果。 */

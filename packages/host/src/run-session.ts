@@ -1,4 +1,5 @@
 import { runnerOf } from './release.js';
+import { valuesFromEnv } from './sheet-values.js';
 import { execFile } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -601,6 +602,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
   const expectation = expectationOf(options.sheet.meta, options.expectation);
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
+    // **シートに書けない値は、起こした環境から**（C113）。配布版を Finder から起こすと渡らない（文書に書いた）。
+    values: valuesFromEnv(process.env),
     /**
      * **手順が終わったら、押した所の案内を消す**（2026-09-25・人の指摘）。
      * 見る所は、見つかった時点で出し直す（`session.locate`）。

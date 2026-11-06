@@ -735,3 +735,77 @@ describe('planSteps — 見えるまで送る', () => {
     expect(step?.kind === 'hold' ? step.reason : '').toMatch(/「末尾」が見えるまで送る/);
   });
 });
+
+/**
+ * **シートに書けない値を外から入れる**（C113・2026-11-06・iPhone の席の報告）。
+ *
+ * ライセンスキーは検証シートに書けない（§14・commit されるため）。それだと、その欄を打つ行は
+ * 自動では流せず（16 行中 8 行が BLOCKED）、**秘密を扱う画面がすべて人の手に残る。**
+ * 手順には `$NAME` と書き、値は宿主が渡す取り口から引く。**足跡・理由に値は出さない。**
+ */
+describe('planType — 値を外から入れる（C113）', () => {
+  const values = (name: string): string | undefined =>
+    name === 'LICENSE_KEY' ? 'ABCD-1234' : undefined;
+
+  it('$NAME は外の値で打ち、足跡には $NAME のまま残す', () => {
+    const [step] = planSteps('1. 「ライセンスキー」に「$LICENSE_KEY」と入力する', { values });
+
+    expect(step).toEqual({
+      kind: 'action',
+      text: '「ライセンスキー」に「$LICENSE_KEY」と入力する',
+      action: {
+        kind: 'type',
+        text: 'ABCD-1234',
+        target: { at: 'element', ref: 'ライセンスキー' },
+      },
+      secret: true,
+    });
+  });
+
+  it('焦点の欄へ打つ形でも同じ', () => {
+    const [step] = planSteps('「$LICENSE_KEY」と入力する', { values });
+
+    expect(step?.kind).toBe('action');
+    expect(step?.kind === 'action' ? step.action : undefined).toEqual({
+      kind: 'type',
+      text: 'ABCD-1234',
+    });
+    expect(step?.text).toBe('「$LICENSE_KEY」と入力する');
+  });
+
+  it('渡されていなければ保留。理由には名前だけが出る', () => {
+    const [step] = planSteps('「ライセンスキー」に「$OTHER_KEY」と入力する', { values });
+
+    expect(step?.kind).toBe('hold');
+    expect(step?.kind === 'hold' ? step.reason : '').toMatch(/\$OTHER_KEY/);
+    expect(step?.kind === 'hold' ? step.reason : '').toMatch(/人が入力/);
+  });
+
+  it('外から渡す口の無い入口では保留（黙って $NAME を打たない）', () => {
+    const [step] = planSteps('「ライセンスキー」に「$LICENSE_KEY」と入力する');
+
+    expect(step?.kind).toBe('hold');
+    expect(step?.kind === 'hold' ? step.reason : '').toMatch(/口/);
+  });
+
+  it('ASCII しか送れない相手に送れない値なら保留。値は書かない', () => {
+    const [step] = planSteps('「お名前」に「$NAME_JA」と入力する', {
+      values: () => 'テスト太郎',
+    });
+
+    expect(step?.kind).toBe('hold');
+    const reason = step?.kind === 'hold' ? step.reason : '';
+    expect(reason).toMatch(/\$NAME_JA/);
+    expect(reason).not.toContain('テスト太郎');
+  });
+
+  it('大文字で始まらないものは、ただの文字', () => {
+    const [step] = planSteps('「金額」に「$5」と入力する', { values, textInput: 'any' });
+
+    expect(step).toEqual({
+      kind: 'action',
+      text: '「金額」に「$5」と入力する',
+      action: { kind: 'type', text: '$5', target: { at: 'element', ref: '金額' } },
+    });
+  });
+});

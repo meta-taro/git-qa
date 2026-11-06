@@ -1,4 +1,5 @@
 import { runnerOf } from './release.js';
+import { valuesFromEnv } from './sheet-values.js';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
@@ -103,6 +104,8 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<Run> {
   assertRunnableSheet(options.sheet);
   const runner = createSheetCaseRunner({
     readScreenText: options.readScreenText,
+    // **シートに書けない値は、起こした環境から**（C113）。
+    values: valuesFromEnv(process.env),
     ...(sheetDestination(options.sheet.meta) === undefined
       ? {}
       : { app: sheetDestination(options.sheet.meta) as string }),

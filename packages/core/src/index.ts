@@ -52,6 +52,7 @@ export type {
   PlannedHold,
   PlannedSeek,
   PlannedStep,
+  ValueSource,
 } from './run/steps.js';
 export { RUN_SCHEMA, validateRun } from './run/validate.js';
 export { writeRunJson } from './run/write.js';
