@@ -39,5 +39,12 @@
       "debugApplicationIdSuffix": ".debug"
     },
     "resources": ["resources/host-bundle.mjs"]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["git-qa"]
+      }
+    }
   }
 }

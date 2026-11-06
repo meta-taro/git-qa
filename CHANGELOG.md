@@ -8,6 +8,9 @@
 
 ## 未リリース
 
+- 足した: **外から、シートとケースを指して起動できる**（`git-qa://run?sheet=…&case=…&target=…`）。検証の漏れを並べる側の道具のアイコンから、
+  そのケースだけを始められる。相手とハンドルが揃っていれば押さずに始まり、走り切ると `run.json` に `finishedAt` が付く。
+  既に起きていればその窓で受ける（走っている最中は断る）。配布物だけ（開発中の起動は OS にスキームを登録しない）。実機では未確認（C112）
 - 直した: **Windows では MCP（`pnpm mcp`）からデスクトップアプリを見られなかった。**窓を見る道具（`git-qa-win`）を MCP の道では探しておらず、
   `app_screenshot` も macOS の口（`osascript` / `screencapture`）を呼んでいた。探し方を adapter-desktop に 1 つにして MCP でも使い、
   Windows の `app_screenshot` は `git-qa-win` で窓を撮る（画面全体は撮れない、と言う）。実機の Windows では未確認

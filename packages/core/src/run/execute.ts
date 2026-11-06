@@ -139,6 +139,18 @@ export interface ExecuteRunOptions {
    * **始めた時刻も前のもの。**続きだからといって、今日始めたことにしない。
    */
   previous?: Run;
+  /**
+   * **頼まれたケースだけを走らせる**（2026-11-06・外から起動する口のため・C112）。
+   *
+   * 漏れを並べる側の道具が「このケースを確かめてくれ」と git-qa を呼ぶ。
+   * シート全部を走らせると、人はそのケースに着くまで他のケースに判定を置き続けることになる。
+   *
+   * シートの `No.`。**順はシートの順**（頼まれた順ではない）。
+   * **走らせなかったケースは証跡に書かない**（`previous` と同じ約束）。
+   * **走り切れば終わりの時刻が付く** —— 頼まれた分を走り切ったので、その実行は終わっている。
+   * シートに無い No. や空は、**繋ぐ前に落とす**（相手を触った跡だけ残さない）。
+   */
+  only?: readonly number[];
   /** 途中経過を書けなかったときの理由。**黙らない**ためだけに使う。 */
   onProgressError?: (reason: string) => void;
   /** 時刻の出どころ。既定は実時計。 */
@@ -306,11 +318,32 @@ function assertOneTarget(options: ExecuteRunOptions): void {
   }
 }
 
+/**
+ * **頼まれたケースだけに絞る**（C112）。**繋ぐ前に確かめる** —— 無い No. を頼まれて、
+ * 相手を触った跡だけ残さない。順はシートの順。
+ */
+export function keepOnly(
+  subjects: readonly CaseSubject[],
+  only: readonly number[] | undefined,
+): CaseSubject[] {
+  if (only === undefined) return [...subjects];
+  if (only.length === 0) {
+    throw new Error('走らせるケースの No. が 1 つも指定されていない（全部なら指定しない）');
+  }
+  const known = new Set(subjects.map((subject) => subject.no));
+  const missing = only.filter((no) => !known.has(no));
+  if (missing.length > 0) {
+    throw new Error(`No. ${missing.map(String).join(', ')} は検証シートに無い`);
+  }
+  const wanted = new Set(only);
+  return subjects.filter((subject) => wanted.has(subject.no));
+}
+
 export async function executeRun(options: ExecuteRunOptions): Promise<Run> {
   const now = options.now ?? ((): Date => new Date());
   assertOneTarget(options);
   assertModeMatchesAskHuman(options.mode, options.askHuman !== undefined);
-  const subjects = toCaseSubjects(options.sheet);
+  const subjects = keepOnly(toCaseSubjects(options.sheet), options.only);
 
   // **続きなら、始まりは前のまま。**今日始めたことにしない。
   const startedAt = options.previous?.startedAt ?? now().toISOString();

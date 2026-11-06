@@ -156,6 +156,10 @@ const ja = {
     '見る相手が決まっていないので始められない（1 の欄。端末を選ぶか、URL を入れる）',
   'setup.blocked.sheet': '検証シートが選べていないので始められない（2 の欄）',
   'setup.failed': '始められなかった: {message}',
+  // **外から呼ばれた起動**（C112）。黙って何も起きない、を作らない。
+  'setup.launch.bad': '外から頼まれた起動を受け取れなかった: {message}',
+  'setup.launch.busy':
+    '外から起動を頼まれたが、いま検証が走っている。終わるか止めてから、もう一度呼ぶ',
 
   'onboarding.title': 'はじめかた',
   'onboarding.lead': 'この 3 つが済むと、検証中の端末の画面がここに出る',
@@ -321,6 +325,9 @@ const en: Record<keyof typeof ja, string> = {
     'Nothing is selected to look at, so this cannot start (field 1: pick a device or enter a URL)',
   'setup.blocked.sheet': 'No test sheet is selected, so this cannot start (field 2)',
   'setup.failed': 'Could not start: {message}',
+  'setup.launch.bad': 'Could not accept the launch request from outside: {message}',
+  'setup.launch.busy':
+    'A launch was requested from outside, but a run is in progress. Finish or stop it, then call again',
 
   'onboarding.title': 'Getting started',
   'onboarding.lead': 'Once these three are done, the device screen appears here',

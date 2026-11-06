@@ -95,3 +95,29 @@ describe('Info.plist（macOS の使用目的）', () => {
     expect(values.every((v) => v.trim().length >= 10)).toBe(true);
   });
 });
+
+/**
+ * **外から呼ばれる口**（C112）。`git-qa://run?…` を OS に登録するのは Tauri の設定で、
+ * ここが消えると**配布物だけが黙って呼べなくなる**（手元の検査は全部通ったまま）。
+ */
+describe('外から呼ばれる口（git-qa://）', () => {
+  const plugins = (
+    JSON.parse(readFileSync(CONF, 'utf8')) as {
+      plugins?: { 'deep-link'?: { desktop?: { schemes?: string[] } } };
+    }
+  ).plugins;
+
+  it('git-qa スキームを登録している', () => {
+    expect(plugins?.['deep-link']?.desktop?.schemes).toEqual(['git-qa']);
+  });
+
+  it('Rust 側に、受け取って画面へ渡す口がある', () => {
+    const cargo = readFileSync(
+      fileURLToPath(new URL('../src-tauri/Cargo.toml', import.meta.url)),
+      'utf8',
+    );
+    expect(cargo).toMatch(/tauri-plugin-deep-link/);
+    // 2 つ目の起動は 1 つ目へ URL を渡して終わる。**無いと、呼ぶたびに窓が増える。**
+    expect(cargo).toMatch(/tauri-plugin-single-instance[^\n]*deep-link/);
+  });
+});

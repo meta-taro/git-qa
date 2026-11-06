@@ -124,6 +124,13 @@ export interface StartRequest {
    * 渡すと、**その実行に足す。**新しい実行にすると証跡が 2 本に割れる。
    */
   readonly resume?: string;
+  /**
+   * **頼まれたケースだけを走らせる**（C112・外から起動する口のため）。シートの `No.`。
+   *
+   * 漏れを並べる側の道具が「このケースを確かめてくれ」と git-qa を呼ぶ。
+   * 渡すと、そのケースだけ走って終わる（終わりの時刻が付く）。
+   */
+  readonly caseNo?: number;
 }
 
 export interface StartSetupServerOptions {
@@ -144,6 +151,20 @@ export interface SetupServer {
 
 /** 選ぶ画面から来る本文はごく小さい。これより大きいものは、この口へ来るものではない。 */
 const MAX_BODY_BYTES = 16 * 1024;
+
+/**
+ * ケースの `No.` を読む。**1 以上の整数だけ**（シートの `No.` 列の規則と同じ）。
+ * 数でも、数字だけの文字でもよい（URL から来る）。それ以外は `undefined`。
+ */
+export function parseCaseNo(value: unknown): number | undefined {
+  const no =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^[0-9]+$/.test(value)
+        ? Number(value)
+        : undefined;
+  return no !== undefined && Number.isInteger(no) && no >= 1 ? no : undefined;
+}
 
 function readJson(
   req: IncomingMessage,
@@ -384,6 +405,21 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
             ? wantedResume
             : undefined;
 
+        /**
+         * **頼まれたケースだけ**（C112）。URL から来るので文字でも受け取る。
+         *
+         * **形のおかしいものは断って、理由を返す。**黙って全部走らせると、
+         * 人は頼んだケースに着くまで他のケースに判定を置き続けることになる。
+         */
+        const wantedCase = (body as { caseNo?: unknown }).caseNo;
+        const caseNo = parseCaseNo(wantedCase);
+        if (wantedCase !== undefined && caseNo === undefined) {
+          res
+            .writeHead(400, { ...cors, 'content-type': 'text/plain; charset=utf-8' })
+            .end(`ケースの No. は 1 以上の整数（受け取ったもの: ${JSON.stringify(wantedCase)}）`);
+          return;
+        }
+
         begin({
           serial,
           sheetPath,
@@ -392,6 +428,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
           ...(browserPath === undefined ? {} : { browserPath }),
           ...(watch ? { watch: true } : {}),
           ...(resume === undefined ? {} : { resume }),
+          ...(caseNo === undefined ? {} : { caseNo }),
         });
         res.writeHead(202, cors).end();
       });

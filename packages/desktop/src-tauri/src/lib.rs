@@ -1,4 +1,5 @@
 mod host;
+mod launch;
 mod menu;
 mod open;
 mod state;
@@ -72,6 +73,13 @@ fn set_locale(app: tauri::AppHandle, choice: String, effective: String) -> Resul
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    // **2 つ目の起動は、1 つ目へ引数（`git-qa://…`）を渡して終わる**（C112）。
+    // Windows では URL を開くたびに新しい起動になるので、これが無いと呼ぶたびに窓が増える。
+    // **いちばん先に置く**（後ろに置くと、2 つ目が窓を作ってから気づく）。
+    .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+      launch::received(app, &argv);
+    }))
+    .plugin(tauri_plugin_deep_link::init())
     // 検証シートを人が選べるようにする。**配布物では作業ディレクトリが `/` になる**ので、
     // 探して並べるだけでは足りない（実機で「検証シートが無い」と出た）。
     .plugin(tauri_plugin_dialog::init())
@@ -81,6 +89,35 @@ pub fn run() {
       let effective = menu::locale_from_env();
       app.manage(state::SettingsState::new(&effective));
       app.set_menu(menu::build(app.handle(), &effective, "system", "system")?)?;
+
+      // **外から呼ばれる口**（`git-qa://run?…`・C112）。
+      app.manage(launch::LaunchState::default());
+      {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        // 起きている間に来た分（macOS は Apple event。Windows は single-instance が運ぶ）。
+        let handle = app.handle().clone();
+        app.deep_link().on_open_url(move |event| {
+          let urls: Vec<String> = event.urls().iter().map(|url| url.to_string()).collect();
+          launch::received(&handle, &urls);
+        });
+        // 起動と同時に来た分。画面がまだ無いので置いておく（画面が起きたら取りに来る）。
+        match app.deep_link().get_current() {
+          Ok(Some(urls)) => {
+            let urls: Vec<String> = urls.iter().map(|url| url.to_string()).collect();
+            launch::received(app.handle(), &urls);
+          }
+          Ok(None) => {}
+          // 読めなくても起動は止めない。**理由は残す**（呼んだのに何も起きない、の切り分けに要る）。
+          Err(error) => log::warn!("起動時の URL を読めない: {error}"),
+        }
+        // 手元で建てたものにも OS の登録を付ける（配布物は installer / .app の包みが登録する）。
+        #[cfg(any(windows, target_os = "linux"))]
+        if cfg!(debug_assertions) {
+          if let Err(error) = app.deep_link().register_all() {
+            log::warn!("git-qa:// を OS に登録できない: {error}");
+          }
+        }
+      }
 
       // **配布物では Node 側をここで起こす。**開発中（`pnpm app`）は既に起きているので、
       // その場合は起こさない（二重に立てると端末を掴み合う）。
@@ -131,7 +168,8 @@ pub fn run() {
       open_sheet,
       setup_url,
       app_release,
-      open_downloads
+      open_downloads,
+      launch::take_launch_url
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")

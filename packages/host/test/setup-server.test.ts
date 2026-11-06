@@ -601,3 +601,56 @@ describe('担当者ハンドル', () => {
     expect(await phaseOf(server)).toBe('running');
   });
 });
+
+/**
+ * **頼まれたケースだけを走らせる指定**（C112・外から起動する口のため）。
+ *
+ * 漏れを並べる側の道具が「このケースを確かめてくれ」と git-qa を呼ぶ。
+ * **形のおかしいものは捨てて、理由を返す** —— 黙って全部走らせると、人は頼んだケースに
+ * 着くまで他のケースに判定を置き続けることになる。
+ */
+describe('頼まれたケースだけ', () => {
+  const started = async (body: Record<string, unknown>) => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+    const res = await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv', ...body }),
+    });
+    return { start, res };
+  };
+
+  it('No. を受け取って実行へ渡す', async () => {
+    const { start, res } = await started({ caseNo: 7 });
+    expect(res.status).toBe(202);
+    await waitFor(() => Promise.resolve(start.mock.calls.length > 0));
+    expect(start.mock.calls[0]?.[0]).toMatchObject({ caseNo: 7 });
+  });
+
+  it('文字で来た No. も受け取る（URL から来るので）', async () => {
+    const { start } = await started({ caseNo: '12' });
+    await waitFor(() => Promise.resolve(start.mock.calls.length > 0));
+    expect(start.mock.calls[0]?.[0]).toMatchObject({ caseNo: 12 });
+  });
+
+  it('指定が無ければ渡さない（全部走らせる）', async () => {
+    const { start } = await started({});
+    await waitFor(() => Promise.resolve(start.mock.calls.length > 0));
+    expect(start.mock.calls[0]?.[0]).not.toHaveProperty('caseNo');
+  });
+
+  it.each([0, -1, 1.5, 'abc', '', '../x'])(
+    '1 以上の整数でない %j は断り、理由を返す',
+    async (bad) => {
+      const { start, res } = await started({ caseNo: bad });
+      expect(res.status).toBe(400);
+      expect(await res.text()).toMatch(/No\./);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(start).not.toHaveBeenCalled();
+    },
+  );
+});

@@ -9,11 +9,14 @@ import { connectionStatus, renderOnboarding } from './onboarding/index.js';
 import {
   appRelease,
   fetchSetupState,
+  keepLaunchAndReload,
   openDownloads,
   pickSheet,
   requestStart,
   resolveSetupUrl,
+  watchLaunchUrls,
 } from './setup/client.js';
+import { launchParams, parseLaunchUrl, whyCannotLaunch } from './setup/launch.js';
 import { readRecentSheets, rememberSheet, writeRecentSheets } from './setup/recent.js';
 import { isTypingHandle, nextDrawing } from './setup/redraw.js';
 import { renderSetup } from './setup/view.js';
@@ -419,6 +422,23 @@ if (liveUrl !== undefined) {
     // **版は 1 度だけ聞く。**毎回聞いても答えは変わらない。
     const release = await appRelease();
 
+    /** 「これで始めてくれ」。**押しても、外から呼ばれても、同じ道を通す。** */
+    const begin = (params: Parameters<typeof requestStart>[1] & { operator: string }): void => {
+      // **帯へ出すために覚える。**実行の状態は、選んだ相手と人を運ばない。
+      chosen = { target: params.serial.replace(/^app:/, ''), operator: params.operator };
+      // **開いたものを覚える。**次からは探索に頼らずここへ出す。
+      recentSheets = rememberSheet(recentSheets, params.sheetPath);
+      writeRecentSheets(defaultStore(), recentSheets);
+      // もう一度押したなら、前の理由は消す。**古い理由が残ると、直ったのか分からない。**
+      startError = undefined;
+      requestStart(setupUrl, params).catch((error: unknown) => {
+        // **押した所へ返す。**「判定」の欄に出しても、押した人は見ていない。
+        startError = error instanceof Error ? error.message : String(error);
+        lastDrawn = '';
+        void tick();
+      });
+    };
+
     const tick = async (): Promise<void> => {
       const state = await fetchSetupState(setupUrl);
       if (state === undefined) return;
@@ -475,21 +495,7 @@ if (liveUrl !== undefined) {
           appName = name;
           writeSetting('git-qa.appName', name, defaultStore());
         },
-        onStart: (params) => {
-          // **帯へ出すために覚える。**実行の状態は、選んだ相手と人を運ばない。
-          chosen = { target: params.serial.replace(/^app:/, ''), operator: params.operator };
-          // **開いたものを覚える。**次からは探索に頼らずここへ出す。
-          recentSheets = rememberSheet(recentSheets, params.sheetPath);
-          writeRecentSheets(defaultStore(), recentSheets);
-          // もう一度押したなら、前の理由は消す。**古い理由が残ると、直ったのか分からない。**
-          startError = undefined;
-          requestStart(setupUrl, params).catch((error: unknown) => {
-            // **押した所へ返す。**「判定」の欄に出しても、押した人は見ていない。
-            startError = error instanceof Error ? error.message : String(error);
-            lastDrawn = '';
-            void tick();
-          });
-        },
+        onStart: begin,
         onPickSheet: () => {
           void pickSheet()
             .then((chosen) => {
@@ -520,6 +526,53 @@ if (liveUrl !== undefined) {
 
     // 最初の 1 回は待たずに出す。**開いた直後に空の画面を見せない。**
     await tick();
+
+    /**
+     * **外から呼ばれた起動**（C112）。`git-qa://run?sheet=…&case=…&target=…` で、
+     * 漏れを並べる側の道具がシートとケースを指して呼ぶ。
+     *
+     * **相手とハンドルが揃っていれば、押さずに始める** —— 呼んだ側でアイコンを押したのが、
+     * その人の「始める」。揃っていなければ、シートだけ選んだ状態で止めて理由を出す。
+     * **判断（読み方・始められるか）は `setup/launch.ts`**にあり、そちらは検査してある。ここは配線。
+     */
+    const launch = (raw: string): void => {
+      if (started) {
+        // 走っている最中は断る（入口が 409 を返す）。**走り終えて映像を出したままなら、開き直して受ける。**
+        if (latest?.phase !== 'finished') {
+          showSessionError(app, t('setup.launch.busy'));
+          return;
+        }
+        if (!keepLaunchAndReload(raw))
+          showSessionError(app, t('setup.launch.bad', { message: raw }));
+        return;
+      }
+      const parsed = parseLaunchUrl(raw);
+      if (!parsed.ok) {
+        startError = t('setup.launch.bad', { message: parsed.reason });
+        lastDrawn = '';
+        void tick();
+        return;
+      }
+      const { request } = parsed;
+      pickedSheet = request.sheetPath;
+      // 相手は欄にも写す。**自動で始められなかったとき、人が押すだけで済むように。**
+      if (request.target !== undefined && /^https?:\/\//.test(request.target)) {
+        webUrl = request.target;
+        writeSetting('git-qa.webUrl', webUrl, defaultStore());
+      } else if (request.target?.startsWith('app:') === true) {
+        appName = request.target.slice(4);
+        writeSetting('git-qa.appName', appName, defaultStore());
+      }
+      const why = whyCannotLaunch(request, operator);
+      startError = why === undefined ? undefined : t(why);
+      lastDrawn = '';
+      const params = launchParams(request, { operator, browser, browserPath });
+      if (params !== undefined) begin(params);
+      void tick();
+    };
+    void watchLaunchUrls(launch).catch((error: unknown) => {
+      console.error('[launch] 外からの起動を受けられない', error);
+    });
   })();
 }
 

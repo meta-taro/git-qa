@@ -104,6 +104,11 @@ export interface StartRunSessionOptions {
    */
   readonly previous?: Run;
   /**
+   * **頼まれたケースだけを走らせる**（C112・外から起動する口のため）。シートの `No.`。
+   * 走らせなかったケースは証跡に書かず、走り切れば終わりの時刻が付く（`executeRun` の約束）。
+   */
+  readonly only?: readonly number[];
+  /**
    * **期待結果が出るまで待つ長さ**（外部レビュー meta-taro/git-qa#12）。
    *
    * 既定は 2 秒。**検査では小さくする** —— 落ちる判定のたびに本当に 2 秒待つと、
@@ -747,6 +752,8 @@ export async function startRunSession(options: StartRunSessionOptions): Promise<
      */
     stopped: () => aborted !== undefined,
     ...(options.previous === undefined ? {} : { previous: options.previous }),
+    // **頼まれたケースだけ**（C112）。渡されなければ全部。
+    ...(options.only === undefined ? {} : { only: options.only }),
     /**
      * **鑑賞モードは `watched`。**`assisted`（押すまで待つ）でも `auto`（誰も見ていない）
      * でもない。**人は見ているが、押さなくても進む形**だったことを、そのまま残す。

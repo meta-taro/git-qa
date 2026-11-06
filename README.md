@@ -48,6 +48,18 @@ A run, case by case — the AI runs each step (press the button, reopen the page
 A test sheet is a TSV you can write in any spreadsheet — samples are in [`sheets/`](./sheets/).
 From source instead: `git clone … && pnpm install && pnpm app` (see [Install](#install)).
 
+### Launch from another tool
+
+Another tool (a traceability ledger, for instance) can open git-qa on a given sheet and case:
+
+```text
+git-qa://run?sheet=<absolute path to the TSV>&case=<No.>&target=<what to look at>
+```
+
+`case` runs that one case only and sets `finishedAt` in `run.json` when it is done. `target` is a URL,
+`app:<name>` for a desktop app, or an adb serial. With both present and a handle already entered, the run
+starts without a click; if git-qa is already open, that window takes it. Installed app only (not `pnpm app`).
+
 ## Why it is built this way
 
 This is *not* a tool for handing verification to an AI and letting it say

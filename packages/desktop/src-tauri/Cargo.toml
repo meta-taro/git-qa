@@ -23,3 +23,7 @@ log = "0.4"
 tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.3"
+# 外から「このシートのこのケースを確かめてくれ」と呼ばれる口（`git-qa://run?…`・C112）。
+# 2 つ目の起動は 1 つ目へ URL を渡して終わる（single-instance の `deep-link` 機能）。
+tauri-plugin-deep-link = "2.6.3"
+tauri-plugin-single-instance = { version = "2.5.5", features = ["deep-link"] }

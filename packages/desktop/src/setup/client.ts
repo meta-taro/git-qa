@@ -166,6 +166,8 @@ export async function requestStart(
     watch?: true;
     /** **続きから**（2026-09-12）。止まった実行の ID。 */
     resume?: string;
+    /** **頼まれたケースだけ**（C112・外から起動する口）。シートの `No.`。 */
+    caseNo?: number;
   },
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
@@ -270,4 +272,84 @@ export async function openDownloads(): Promise<void> {
     // **黙って何も起きないよりは、理由を残す。**
     console.error('[git-qa] 配布ページを開けなかった', error);
   }
+}
+
+/** 走っている最中に来た頼みを、画面を開き直すあいだ置いておく所。 */
+const KEPT_LAUNCH = 'git-qa.launch';
+
+/**
+ * **外から来た「このシートのこのケースを確かめてくれ」を受ける**（C112）。
+ *
+ * 来る道は 3 つ。**どれも同じ 1 本の受け口へ流す。**
+ *
+ * 1. 画面を開き直す前に置いておいたもの（走っている最中に来たので、開き直して受ける）
+ * 2. 起動と同時に来たもの（アプリが起きるより先に URL が届いている。聞きに行かないと取れない）
+ * 3. 起きている間に来たもの（アプリが合図だけを送る。**本文は聞きに行く** —— 合図に本文を乗せると、
+ *    2 と二重に始まる）
+ *
+ * ブラウザだけで開いているときは 1 だけ（アプリが無いので 2・3 は来ない）。
+ */
+export async function watchLaunchUrls(
+  onUrl: (url: string) => void,
+  deps: {
+    readonly storage?: Pick<Storage, 'getItem' | 'removeItem'>;
+    readonly take?: () => Promise<string | null>;
+    readonly listen?: (handler: () => void) => Promise<void>;
+  } = {},
+): Promise<void> {
+  const storage = deps.storage ?? sessionStorage;
+  let kept: string | null = null;
+  try {
+    kept = storage.getItem(KEPT_LAUNCH);
+    if (kept !== null) storage.removeItem(KEPT_LAUNCH);
+  } catch {
+    // 置き場が使えない（非公開モード等）。**置いていないのと同じ。**
+  }
+  if (kept !== null && kept !== '') onUrl(kept);
+
+  // **アプリの中かどうかは呼ばれたときに見る**（検査では window が無い）。
+  const tauri = (): boolean => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  const take =
+    deps.take ??
+    (async (): Promise<string | null> => {
+      if (!tauri()) return null;
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke<string | null>('take_launch_url');
+    });
+  const listen =
+    deps.listen ??
+    (async (handler: () => void): Promise<void> => {
+      if (!tauri()) return;
+      const { listen: on } = await import('@tauri-apps/api/event');
+      await on('launch-url', handler);
+    });
+
+  // **先に合図を聞いてから、溜まっている分を取る。**逆だと、その間に来た 1 本が落ちる。
+  await listen(() => {
+    void take().then((url) => {
+      if (url !== null && url !== '') onUrl(url);
+    });
+  });
+  const pending = await take();
+  if (pending !== null && pending !== '') onUrl(pending);
+}
+
+/**
+ * 走っている最中に来た頼みを置いて、画面を開き直す。
+ *
+ * 開き直すと、走っている実行には繋ぎ直し（入口の状態が `running` なら映像へ戻る）、
+ * 終わっていれば選ぶ画面へ戻って、置いたものを受ける。**置けなければ開き直さない**（頼みが消える）。
+ */
+export function keepLaunchAndReload(
+  url: string,
+  storage: Pick<Storage, 'setItem'> = sessionStorage,
+  reload: () => void = () => window.location.reload(),
+): boolean {
+  try {
+    storage.setItem(KEPT_LAUNCH, url);
+  } catch {
+    return false;
+  }
+  reload();
+  return true;
 }

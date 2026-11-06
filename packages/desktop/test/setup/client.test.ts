@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   fetchSetupState,
+  keepLaunchAndReload,
   requestStart,
   resolveSetupUrl,
   setupUrlFromLocation,
+  watchLaunchUrls,
 } from '../../src/setup/client.js';
 
 /**
@@ -268,5 +270,75 @@ describe('fetchSetupState — 映像の種類', () => {
     );
 
     expect(state?.liveKind).toBeUndefined();
+  });
+});
+
+describe('watchLaunchUrls', () => {
+  it('置いておいたもの → 溜まっていたもの → 合図の順に、同じ受け口へ流す', async () => {
+    const got: string[] = [];
+    const store = new Map<string, string>([['git-qa.launch', 'git-qa://run?sheet=%2Fa.tsv']]);
+    let fire: (() => void) | undefined;
+    const queue = ['git-qa://run?sheet=%2Fb.tsv', 'git-qa://run?sheet=%2Fc.tsv'];
+
+    await watchLaunchUrls((url) => got.push(url), {
+      storage: {
+        getItem: (key) => store.get(key) ?? null,
+        removeItem: (key) => void store.delete(key),
+      },
+      take: () => Promise.resolve(queue.shift() ?? null),
+      listen: (handler) => {
+        fire = handler;
+        return Promise.resolve();
+      },
+    });
+    expect(got).toEqual(['git-qa://run?sheet=%2Fa.tsv', 'git-qa://run?sheet=%2Fb.tsv']);
+    // 置いておいたものは 1 度しか受けない。
+    expect(store.has('git-qa.launch')).toBe(false);
+
+    fire?.();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(got.at(-1)).toBe('git-qa://run?sheet=%2Fc.tsv');
+  });
+
+  it('何も無ければ何も流さない', async () => {
+    const got: string[] = [];
+    await watchLaunchUrls((url) => got.push(url), {
+      storage: { getItem: () => null, removeItem: () => undefined },
+      take: () => Promise.resolve(null),
+      listen: () => Promise.resolve(),
+    });
+    expect(got).toEqual([]);
+  });
+});
+
+describe('keepLaunchAndReload', () => {
+  it('置いてから開き直す', () => {
+    const store = new Map<string, string>();
+    const reload = vi.fn();
+    expect(
+      keepLaunchAndReload(
+        'git-qa://run?sheet=%2Fa.tsv',
+        { setItem: (k, v) => void store.set(k, v) },
+        reload,
+      ),
+    ).toBe(true);
+    expect(store.get('git-qa.launch')).toBe('git-qa://run?sheet=%2Fa.tsv');
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('置けなければ開き直さない（頼みが消える）', () => {
+    const reload = vi.fn();
+    expect(
+      keepLaunchAndReload(
+        'git-qa://run?sheet=%2Fa.tsv',
+        {
+          setItem: () => {
+            throw new Error('使えない');
+          },
+        },
+        reload,
+      ),
+    ).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
   });
 });

@@ -174,7 +174,7 @@ const setup = await startSetupServer({
    * **持っていない OS では、持っていないと言う** —— 「映らない」と
    * 「そもそも見られない」は、人にとってまるで別のこと。
    */
-  start: async ({ serial, sheetPath, operator, browser, browserPath, watch, resume }) => {
+  start: async ({ serial, sheetPath, operator, browser, browserPath, watch, resume, caseNo }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -341,6 +341,8 @@ const setup = await startSetupServer({
       runsRoot,
       sheetPath,
       ...(previous === undefined ? {} : { previous }),
+      // **頼まれたケースだけ**（C112・外から起動する口）。走り切ればその実行は終わる。
+      ...(caseNo === undefined ? {} : { only: [caseNo] }),
       // **鑑賞モード。**押さなくても 1 件ごとに間をおいて進む（止める口はある）。
       ...(watch === true ? { watch: {} } : {}),
       ...(recording === undefined ? {} : { recording }),
