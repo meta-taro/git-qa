@@ -37,7 +37,11 @@ import { flashVerdict } from './session/flash.js';
 import { commandForKey, shouldIgnoreKeyPress } from './session/keys.js';
 import type { KeyCommand } from './session/keys.js';
 import { reportDiagnostics, type DiagnosticsReport } from './session/diagnostics.js';
-import { startMenuActions } from './session/menu-actions.js';
+import {
+  installEvidenceOpener,
+  startMenuActions,
+  tauriOpenSheetBridge,
+} from './session/menu-actions.js';
 import { installTextSender } from './session/typing.js';
 import { installDeviceTouch } from './session/touch.js';
 import { installDeviceWheel } from './session/wheel.js';
@@ -819,6 +823,13 @@ function startControl(controlUrl: string): void {
     if (command !== undefined) place(command);
   };
   installVerdictButtons(app, onButton);
+  // 証跡を書いた場所を、アプリの中から開ける（2026-11-07）。
+  installEvidenceOpener(app, {
+    bridge: tauriOpenSheetBridge(),
+    onError: (message) => {
+      showSessionError(app, message);
+    },
+  });
   // 帯の「止める」も同じ道を通す。
   if (topbar !== null) installVerdictButtons(topbar, onButton);
   installCaseFilter(app, (filter) => {

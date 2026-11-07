@@ -174,7 +174,17 @@ const setup = await startSetupServer({
    * **持っていない OS では、持っていないと言う** —— 「映らない」と
    * 「そもそも見られない」は、人にとってまるで別のこと。
    */
-  start: async ({ serial, sheetPath, operator, browser, browserPath, watch, resume, caseNo }) => {
+  start: async ({
+    serial,
+    sheetPath,
+    operator,
+    browser,
+    browserPath,
+    watch,
+    record,
+    resume,
+    caseNo,
+  }) => {
     const text = await readFile(sheetPath, 'utf8');
     const sheet = parseTestSpecTsv(text);
 
@@ -346,6 +356,9 @@ const setup = await startSetupServer({
       // **鑑賞モード。**押さなくても 1 件ごとに間をおいて進む（止める口はある）。
       ...(watch === true ? { watch: {} } : {}),
       ...(recording === undefined ? {} : { recording }),
+      // **録画する**（2026-11-07・人の指摘）。起動画面で頼まれたときだけ。ライブ映像の絵を溜めて
+      // `screen.webm` にする（鑑賞モードは上の `recording` が先で、git-qa の窓を録る）。
+      ...(record === true ? { record: true } : {}),
       // **置いた人。**画面から受け取る。無ければ環境変数、それも無ければ unknown
       // （unknown のまま残ると「誰が保証したか」が読めないので、画面側で入力を促す）。
       operator: { handle: operator ?? process.env['GIT_QA_OPERATOR'] ?? 'unknown' },

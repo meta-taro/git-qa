@@ -164,6 +164,8 @@ export async function requestStart(
     browserPath?: string;
     /** **鑑賞モードで始める**（2026-09-11）。選ばれたときだけ持つ。 */
     watch?: true;
+    /** **録画する**（2026-11-07）。選ばれたときだけ持つ。 */
+    record?: true;
     /** **続きから**（2026-09-12）。止まった実行の ID。 */
     resume?: string;
     /** **頼まれたケースだけ**（C112・外から起動する口）。シートの `No.`。 */

@@ -29,6 +29,14 @@ export interface RenderSetupOptions {
      */
     watch?: true;
     /**
+     * **録画する**（2026-11-07・人の指摘）。
+     *
+     * 動画の仕組みは在った（CLI の `--record`）のに、**アプリの起動画面に頼む口が無く**、
+     * アプリから走らせた検証には動画が残っていなかった。
+     * **選ばれたときだけ持つ**（既定は録らない。黙って場所を食わない）。
+     */
+    record?: true;
+    /**
      * **続きから**（2026-09-12・人の指示）。止まった実行の ID。
      *
      * 渡すと、**その実行に足す。**新しい実行にすると証跡が 2 本に割れ、
@@ -471,6 +479,21 @@ export function renderSetup(
   watchLabel.append(watch, watchText);
 
   /**
+   * **録画する**（2026-11-07・人の指摘）。
+   *
+   * 1 件ごとに `screen.webm` が証跡に残る。**ffmpeg が無ければ絵だけ残り**、
+   * 証跡には「持っていない」と書かれる（入口では確かめない。実行側が言う）。
+   */
+  const recordLabel = doc.createElement('label');
+  recordLabel.className = 'setup-watch-label';
+  const record = doc.createElement('input');
+  record.type = 'checkbox';
+  record.className = 'setup-record';
+  const recordText = doc.createElement('span');
+  recordText.textContent = t('setup.record');
+  recordLabel.append(record, recordText);
+
+  /**
    * **途中で止まった検証**（2026-09-12・人の指示）。
    *
    * 選ぶと、**その実行に足す。**シートは実行が覚えているので、人は選び直さない。
@@ -547,6 +570,7 @@ export function renderSetup(
         ? { browserPath: browserPath.value.trim() }
         : {}),
       ...(watch.checked ? { watch: true as const } : {}),
+      ...(record.checked ? { record: true as const } : {}),
       ...(resume === undefined ? {} : { resume }),
     });
   });
@@ -649,7 +673,7 @@ export function renderSetup(
     section.append(heading, note, resumeList, ...foldOlder(doc, resumeList));
   }
 
-  section.append(watchLabel, start);
+  section.append(watchLabel, recordLabel, start);
 
   // **保存済みの値を戻したときも印を立てる。**打ち始めるまで黙っていては遅い。
   // 組み上がってから当てるので、理由の行はボタンの下に入る。

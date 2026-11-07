@@ -119,6 +119,12 @@ export interface StartRequest {
    */
   readonly watch?: true;
   /**
+   * **録画する**（2026-11-07・人の指摘）。1 件ごとに `screen.webm` を証跡へ残す。
+   *
+   * CLI の `--record` と同じ。**真のときだけ持つ。**
+   */
+  readonly record?: true;
+  /**
    * **続きから**（2026-09-12・人の指示）。止まった実行の ID。
    *
    * 渡すと、**その実行に足す。**新しい実行にすると証跡が 2 本に割れる。
@@ -392,6 +398,8 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
          * 「何も言われていない」が同じ形になる。
          */
         const watch = (body as { watch?: unknown }).watch === true;
+        /** **録画する**（2026-11-07）。`watch` と同じく真のときだけ渡す。 */
+        const record = (body as { record?: unknown }).record === true;
 
         /**
          * **続きから**（2026-09-12）。止まった実行の ID。
@@ -427,6 +435,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
           ...(browser === undefined ? {} : { browser }),
           ...(browserPath === undefined ? {} : { browserPath }),
           ...(watch ? { watch: true } : {}),
+          ...(record ? { record: true } : {}),
           ...(resume === undefined ? {} : { resume }),
           ...(caseNo === undefined ? {} : { caseNo }),
         });

@@ -1,6 +1,12 @@
+// @vitest-environment happy-dom
+
 import { describe, expect, it, vi } from 'vitest';
 
-import { startMenuActions, type OpenSheetBridge } from '../../src/session/menu-actions.js';
+import {
+  installEvidenceOpener,
+  startMenuActions,
+  type OpenSheetBridge,
+} from '../../src/session/menu-actions.js';
 
 /**
  * メニューから検証シートを開く（Issue 011）。
@@ -82,5 +88,54 @@ describe('startMenuActions', () => {
 
     expect(bridge.opened).toEqual([]);
     expect(onError).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **証跡を開く**（2026-11-07・人の指摘）。画面の「開く」を押すと、証跡を書いた場所を
+ * ファイル管理ソフトで選んだ状態にする（`reveal`）。**場所は押す所が持っている。**
+ */
+describe('installEvidenceOpener', () => {
+  const button = (path: string): HTMLElement => {
+    const root = document.createElement('div');
+    const open = document.createElement('button');
+    open.className = 'evidence-open';
+    open.dataset['path'] = path;
+    root.append(open);
+    document.body.replaceChildren(root);
+    return root;
+  };
+
+  it('押した所の場所を、ファイル管理ソフトで見せる', async () => {
+    const bridge = fakeBridge();
+    const root = button('/Users/me/runs/x/run.json');
+    installEvidenceOpener(root, { bridge, onError: vi.fn() });
+
+    root.querySelector<HTMLElement>('.evidence-open')?.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(bridge.opened).toEqual([{ path: '/Users/me/runs/x/run.json', mode: 'reveal' }]);
+  });
+
+  it('開けなかったら理由を出す', async () => {
+    const bridge = fakeBridge('ファイルが見つからない');
+    const onError = vi.fn();
+    const root = button('/Users/me/runs/x/run.json');
+    installEvidenceOpener(root, { bridge, onError });
+
+    root.querySelector<HTMLElement>('.evidence-open')?.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('ファイルが見つからない'));
+  });
+
+  it('アプリの外（ブラウザで開いている）では、押しても黙らず理由を出す', () => {
+    const onError = vi.fn();
+    const root = button('/Users/me/runs/x/run.json');
+    installEvidenceOpener(root, { bridge: undefined, onError });
+
+    root.querySelector<HTMLElement>('.evidence-open')?.click();
+
+    expect(onError).toHaveBeenCalledOnce();
   });
 });

@@ -752,3 +752,44 @@ describe('見る相手の札', () => {
     expect(active()).toBe('app');
   });
 });
+
+/**
+ * **録画する**（2026-11-07・人の指摘）。
+ *
+ * 動画の仕組みは在った（`--record`）のに、**アプリの起動画面に頼む口が無く**、
+ * アプリから普通に走らせた検証には動画が 1 本も残っていなかった。
+ * 既定はこれまでどおり録らない（黙って場所を食わない）。
+ */
+describe('renderSetup — 録画', () => {
+  const choose = (): void => {
+    live().querySelector<HTMLElement>('.setup-device[data-serial="R5CT1234"]')?.click();
+    live().querySelector<HTMLElement>('.setup-sheet[data-path="/repo/docs/b.tsv"]')?.click();
+  };
+
+  it('録画するかを選べる', () => {
+    renderSetup(root, idle, { onStart: vi.fn(), operator: 'octocat' });
+
+    expect(live().querySelector('input.setup-record')).not.toBeNull();
+  });
+
+  it('選ばなければ、録らない', () => {
+    const onStart = vi.fn();
+    renderSetup(root, idle, { onStart, operator: 'octocat' });
+
+    choose();
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart.mock.calls[0]?.[0]).not.toHaveProperty('record');
+  });
+
+  it('選べば、録画を頼んで始める', () => {
+    const onStart = vi.fn();
+    renderSetup(root, idle, { onStart, operator: 'octocat' });
+
+    choose();
+    live().querySelector<HTMLInputElement>('input.setup-record')!.checked = true;
+    live().querySelector<HTMLButtonElement>('.setup-start')?.click();
+
+    expect(onStart.mock.calls[0]?.[0]).toMatchObject({ record: true });
+  });
+});

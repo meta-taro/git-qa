@@ -461,6 +461,15 @@ function renderEvidence(doc: Document, state: SessionState): HTMLElement[] {
     saved.className = 'verdict-evidence';
     saved.textContent = `${t('verdict.saved')} ${state.runJsonPath}`;
     out.push(saved);
+    // **場所を出すだけで終わらせない**（2026-11-07・人の指摘）。判定時の画面（`screen.webp`）と
+    // 動画（`screen.webm`）はこの場所の下に在るのに、アプリの中からは辿れなかった。
+    // **場所は押す所が持つ**（画面が別の場所を推測して開かない）。
+    const open = doc.createElement('button');
+    open.type = 'button';
+    open.className = 'evidence-open';
+    open.dataset['path'] = state.runJsonPath;
+    open.textContent = t('verdict.open');
+    out.push(open);
   }
   if (state.saveError !== undefined) {
     const failed = doc.createElement('p');

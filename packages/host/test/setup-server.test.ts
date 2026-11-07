@@ -654,3 +654,36 @@ describe('頼まれたケースだけ', () => {
     },
   );
 });
+
+/**
+ * **録画する**（2026-11-07・人の指摘）。アプリの起動画面から頼まれた録画を実行へ渡す。
+ * `watch` と同じく**真のときだけ持つ**。
+ */
+describe('録画を頼んで始める', () => {
+  const started = async (body: Record<string, unknown>) => {
+    const start = vi.fn().mockResolvedValue({
+      liveUrl: 'http://127.0.0.1:9/live/x.h264',
+      controlUrl: 'http://127.0.0.1:9/live/x/control',
+    });
+    server = await startSetupServer(options({ start }));
+    const res = await fetch(`${server.url}/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serial: 'emulator-5554', sheetPath: '/repo/a.tsv', ...body }),
+    });
+    return { start, res };
+  };
+
+  it('record: true を実行へ渡す', async () => {
+    const { start, res } = await started({ record: true });
+    expect(res.status).toBe(202);
+    await waitFor(() => Promise.resolve(start.mock.calls.length > 0));
+    expect(start.mock.calls[0]?.[0]).toMatchObject({ record: true });
+  });
+
+  it('指定が無い・真でないなら持たない', async () => {
+    const { start } = await started({ record: 'yes' });
+    await waitFor(() => Promise.resolve(start.mock.calls.length > 0));
+    expect(start.mock.calls[0]?.[0]).not.toHaveProperty('record');
+  });
+});

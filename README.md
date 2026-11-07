@@ -119,8 +119,12 @@ under version control.
       run.json       verdicts, steps, who placed them and when
       case-001/
         screen.webp  the screen at the moment the verdict was placed
-        screen.webm  video of the run — **only when asked for** (`--record`)
+        screen.webm  video of the run — **only when asked for** (`--record`,
+                     or "Record video" on the app's start screen)
 ```
+
+After a verdict is placed, the app shows "Open the evidence folder" under the
+path it wrote to, so the screenshot and video of each case are one click away.
 
 Nothing about your machine goes into the evidence: paths are relative to the
 workspace, so the same run reads the same way on anyone's machine.

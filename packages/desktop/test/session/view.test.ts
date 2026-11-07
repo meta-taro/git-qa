@@ -251,6 +251,26 @@ describe('証跡の行方', () => {
 
     expect(column('verdict').textContent).toContain('EROFS');
   });
+
+  /**
+   * **証跡を開く口**（2026-11-07・人の指摘）。
+   *
+   * 場所を 1 行出すだけで、判定時の画面（`screen.webp`）も動画（`screen.webm`）も
+   * アプリの中からは辿れなかった。**書いた場所をそのまま開ける**ようにする。
+   */
+  it('書けた場所を、そのまま開ける（押す所に場所を持つ）', () => {
+    renderSession(root, finished({ runJsonPath: '/Users/me/runs/x/run.json' }));
+
+    const open = column('verdict').querySelector<HTMLElement>('.evidence-open');
+    expect(open).not.toBeNull();
+    expect(open?.dataset['path']).toBe('/Users/me/runs/x/run.json');
+  });
+
+  it('書けていなければ、開く口を出さない（押しても何も起きないを作らない）', () => {
+    renderSession(root, finished({ saveError: 'EROFS' }));
+
+    expect(column('verdict').querySelector('.evidence-open')).toBeNull();
+  });
 });
 
 /**

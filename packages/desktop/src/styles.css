@@ -1655,6 +1655,23 @@ body {
   border-radius: 8px;
 }
 
+/* 証跡の場所を開く。**書いた場所の直下に置く**（場所を読んだ人が、そのまま押せる）。 */
+.evidence-open {
+  margin: 0 0.875rem 0.875rem;
+  padding: 0.375rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.evidence-open:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
 /* シートと続きからは、パスを読ませる所なので等幅。 */
 .setup-sheet,
 .setup-resume {

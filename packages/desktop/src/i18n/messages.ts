@@ -50,6 +50,8 @@ const ja = {
   'verdict.running': 'AI が操作している。判定はまだ置けない',
   // **鑑賞モード**（2026-09-11）。押さなくても進むことを、出し続ける。
   'setup.watch': '鑑賞で走らせる（押さなくても進む。Esc で止められる）',
+  // **録画する**（2026-11-07）。ffmpeg が無ければ絵だけ残る（証跡に「持っていない」と書かれる）。
+  'setup.record': '録画する（1 件ごとに screen.webm が証跡に残る。ffmpeg が無ければ絵だけ）',
   // **続きから**（2026-09-12）。どこまで人が見て置いたかを添える。
   'setup.device.failed':
     '端末の一覧を取れなかった（{reason}）。Android を見ないなら、上の URL かアプリ名で進めます',
@@ -75,6 +77,11 @@ const ja = {
   'flash.autoPass': 'AI の判定のまま（人は見ていない）',
 
   'verdict.saved': '証跡を書いた:',
+  // **証跡を開く**（2026-11-07）。判定時の画面と動画は、この場所の case-NNN/ に在る。
+  'verdict.open': '証跡の場所を開く（判定時の画面・動画は case-NNN/ に）',
+  'verdict.openFailed': '証跡の場所を開けない: {message}',
+  'verdict.openOutside':
+    'ブラウザで開いているので、ここからは開けない。場所をそのまま辿ってください',
   'verdict.saveFailed': '証跡を書けなかった:',
   // 上の帯・一覧の 2 行目・判定の欄の見出し・終わったときのまとめ（2026-10-21・DESIGN.md）
   'topbar.progress': '{total} 件のうち {placed} 件に結果',
@@ -222,6 +229,8 @@ const en: Record<keyof typeof ja, string> = {
   'key.move.note': 'Moves what you are looking at; you can re-place on cases that ran',
   'verdict.running': 'The AI is operating the device. No verdict can be placed yet',
   'setup.watch': 'Run in watch mode (moves on without you; Esc stops it)',
+  'setup.record':
+    'Record video (one screen.webm per case in the evidence; stills only without ffmpeg)',
   'setup.device.failed':
     'Could not list devices ({reason}). If you are not testing Android, use the URL or app name above',
   'setup.finished':
@@ -246,6 +255,9 @@ const en: Record<keyof typeof ja, string> = {
   'flash.autoPass': "The AI's own result (no one watched)",
 
   'verdict.saved': 'Evidence written to:',
+  'verdict.open': 'Open the evidence folder (screenshot and video per case under case-NNN/)',
+  'verdict.openFailed': 'Cannot open the evidence folder: {message}',
+  'verdict.openOutside': 'Opened in a browser, so this cannot open it here. Follow the path above',
   'verdict.saveFailed': 'Could not write evidence:',
   'topbar.progress': '{placed} of {total} cases have a result',
   'topbar.phase.setup': 'Setting up',
