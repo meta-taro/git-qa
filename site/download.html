@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ダウンロード — git-qa（macOS・Windows のインストーラー）</title>
+    <meta
+      name="description"
+      content="git-qa のデスクトップアプリのインストーラー。macOS（Apple シリコン・Intel の両方で動く 1 本）と Windows（x64・ARM64）向け。無料・MIT ライセンス。Node.js 22 以上が要ります。"
+    />
+    <link rel="canonical" href="https://meta-taro.github.io/git-qa/download.html" />
+    <link rel="icon" href="icon.png" type="image/png" />
+    <meta name="theme-color" content="#059669" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="git-qa をダウンロード" />
+    <meta
+      property="og:description"
+      content="macOS（Apple シリコン・Intel）と Windows（x64・ARM64）向けのインストーラー。"
+    />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/download.html" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="assets/site.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": "git-qa を入れて使い始める",
+        "inLanguage": "ja",
+        "supply": [{ "@type": "HowToSupply", "name": "Node.js 22 以上" }],
+        "step": [
+          {
+            "@type": "HowToStep",
+            "name": "インストーラーを選ぶ",
+            "text": "macOS は 1 本（Apple シリコン・Intel の両方で動く）。Windows は x64（Intel / AMD）か ARM64 を選んでダウンロードする。"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "入れる",
+            "text": "macOS は .dmg を開いて git-qa をアプリケーションへ移す。Windows は .msi を実行する。"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "始める",
+            "text": "git-qa を開き、ハンドルを入れ、見る相手と検証シート（TSV）を選んで「検証を開始する」を押す。"
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="./"><img src="icon.png" alt="" width="28" height="28" />git-qa</a>
+        <nav class="site-nav" aria-label="サイト">
+          <a href="./#features">できること</a>
+          <a href="cases/">事例</a>
+          <a href="download.html" aria-current="page">ダウンロード</a>
+          <a href="roadmap.html">ロードマップ</a>
+          <a href="en/" hreflang="en" lang="en">English</a>
+          <a class="gh" href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <span class="eyebrow">無料・MIT ライセンス・ベータ版</span>
+          <h1>git-qa をダウンロード</h1>
+          <p class="lede">
+            お使いの PC に合うものを選んでください。見ている PC が分かれば「この
+            PC」と印を付けています。版と落とす先は GitHub のリリースから読んでいます。
+          </p>
+          <p data-release-status class="muted">最新の版を GitHub から読んでいます…</p>
+        </div>
+      </section>
+
+      <section style="padding-top: 0">
+        <div class="wrap" data-downloads>
+          <div class="dl-grid">
+            <article class="dl" data-kind="mac">
+              <h3>macOS</h3>
+              <p class="cpu">
+                Apple シリコン・Intel の両方で動く 1
+                本（.dmg）。署名と公証をしてあるので、そのまま開けます。端末・ウェブ・デスクトップアプリ・iPhone
+                を見られます。
+              </p>
+              <div class="files">
+                <a class="btn btn-ghost" href="https://github.com/meta-taro/git-qa/releases"
+                  >リリースのページから選ぶ</a
+                >
+              </div>
+            </article>
+            <article class="dl" data-kind="win-x64">
+              <h3>Windows</h3>
+              <p class="cpu">
+                x64（Intel・AMD の CPU。ふつうの Windows はこちら）。ウェブ・Android
+                端末・デスクトップアプリを見られます。
+              </p>
+              <div class="files">
+                <a class="btn btn-ghost" href="https://github.com/meta-taro/git-qa/releases"
+                  >リリースのページから選ぶ</a
+                >
+              </div>
+            </article>
+            <article class="dl" data-kind="win-arm">
+              <h3>Windows</h3>
+              <p class="cpu">
+                ARM64（Snapdragon などの CPU）。入れ方とできることは x64 と同じです。
+              </p>
+              <div class="files">
+                <a class="btn btn-ghost" href="https://github.com/meta-taro/git-qa/releases"
+                  >リリースのページから選ぶ</a
+                >
+              </div>
+            </article>
+          </div>
+          <p style="margin-top: 20px"><a href="releases.html">過去の版はこちら →</a></p>
+        </div>
+      </section>
+
+      <section class="soft">
+        <div class="wrap">
+          <div class="section-head"><h2>入れる前に</h2></div>
+          <div class="note">
+            <b>Node.js 22 以上が要ります。</b>
+            アプリの中から実行器を動かすので、入っていないと画面に理由を出して止まります。<a
+              href="https://nodejs.org/ja"
+              >Node.js の公式サイト</a
+            >から LTS 版を入れてください。
+          </div>
+          <h3 style="margin-top: 28px">相手によって要るもの</h3>
+          <div class="table-wrap">
+            <table>
+              <tr>
+                <th>adb（Android SDK Platform Tools）</th>
+                <td>Android 端末を見るときだけ</td>
+              </tr>
+              <tr>
+                <th>Chrome / Edge / Firefox / Safari</th>
+                <td>ウェブを見るときだけ。入っているものを選べます（証跡に版が残ります）</td>
+              </tr>
+              <tr>
+                <th>ffmpeg / cwebp</th>
+                <td>
+                  任意。無くても止まりませんが、証跡の絵と動画が変換されずに撮れた形のまま残ります。録画には
+                  ffmpeg が要ります
+                </td>
+              </tr>
+              <tr>
+                <th>WebDriverAgent（iPhone / iPad で押すとき）</th>
+                <td>
+                  見る・読む・録るだけなら不要。押す・打つには端末に入れる必要があり、署名は人の作業です
+                </td>
+              </tr>
+            </table>
+          </div>
+          <h3 style="margin-top: 28px">Windows で、どちらの CPU か分からないとき</h3>
+          <p>
+            設定 › システム ›「バージョン情報」の「システムの種類」が「x64 ベース」なら x64、「ARM
+            ベース」なら ARM64 です。macOS は 1 本で両方に入るので、選ぶ必要がありません。
+          </p>
+          <h3 style="margin-top: 28px">初めて開くときの確認</h3>
+          <div class="note warn">
+            <b>Windows のインストーラーは署名していません</b>（証明書に物理トークンか HSM
+            が要るため）。「Windows によって PC
+            が保護されました」と出ます。出どころを確かめてから［詳細情報］›［実行］を押してください。<b
+              >心当たりが無いときは入れないでください。</b
+            >
+          </div>
+          <p style="margin-top: 16px">
+            <b>macOS は署名と公証をしています</b
+            >ので、そのまま開けます。デスクトップアプリを見るときは、初回に画面収録とアクセシビリティの許可を
+            macOS が聞きます。
+          </p>
+          <p>
+            中身は <a href="https://github.com/meta-taro/git-qa">GitHub のソース</a>から GitHub
+            Actions で作っています。気になるときは、クローンして <code>pnpm install</code> と
+            <code>pnpm app</code> で手元から動かすこともできます。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="./"><img src="icon.png" alt="" width="22" height="22" />git-qa</a>
+          <p>人が判定する QA ランナー。合格は、人が見て押したときにだけ付く。MIT ライセンス。</p>
+        </div>
+        <nav aria-label="フッター">
+          <a href="cases/">事例</a><a href="download.html">ダウンロード</a
+          ><a href="releases.html">過去の版</a><a href="roadmap.html">ロードマップ</a
+          ><a href="en/" hreflang="en" lang="en">English</a
+          ><a href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="assets/site.js"></script>
+  </body>
+</html>

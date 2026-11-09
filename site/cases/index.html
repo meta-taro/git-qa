@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>事例 — git-qa の使いどころ</title>
+    <meta
+      name="description"
+      content="同梱の見本で見る git-qa の使いどころ。出す前の回帰シートを手で通すのをやめる、「誰が確かめたの？」に証跡で答える、AI エージェントが作った機能を実機で確かめさせる。"
+    />
+    <link rel="canonical" href="https://meta-taro.github.io/git-qa/cases/" />
+    <link rel="icon" href="../icon.png" type="image/png" />
+    <meta name="theme-color" content="#059669" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="git-qa の事例" />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/cases/" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <link rel="stylesheet" href="../assets/site.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "git-qa の事例",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "url": "https://meta-taro.github.io/git-qa/cases/regression-sheet.html",
+            "name": "出す前の回帰シートを、手で通すのをやめる"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "url": "https://meta-taro.github.io/git-qa/cases/who-verified.html",
+            "name": "「で、誰が確かめたの？」に証跡で答える"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "url": "https://meta-taro.github.io/git-qa/cases/agent-mcp.html",
+            "name": "AI エージェントが作った機能を、実機で確かめさせる"
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="../"
+          ><img src="../icon.png" alt="" width="28" height="28" />git-qa</a
+        >
+        <nav class="site-nav" aria-label="サイト">
+          <a href="../#features">できること</a>
+          <a href="./" aria-current="page">事例</a>
+          <a href="../download.html">ダウンロード</a>
+          <a href="../roadmap.html">ロードマップ</a>
+          <a href="../en/" hreflang="en" lang="en">English</a>
+          <a class="gh" href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <span class="eyebrow">事例</span>
+          <h1>git-qa の使いどころ</h1>
+          <p class="lede">
+            どれも、リポジトリに同梱している見本のシート（<a
+              href="https://github.com/meta-taro/git-qa/tree/develop/sheets"
+              >sheets/</a
+            >）と、ローカルで動く見本のページで再現しています。実在の案件のデータは使っていません。手元で同じ画面を開けます。
+          </p>
+        </div>
+      </section>
+      <section style="padding-top: 0">
+        <div class="wrap cards">
+          <a class="card" href="regression-sheet.html">
+            <img src="../img/run.png" width="1280" height="800" loading="lazy" alt="" />
+            <div class="card-body">
+              <h3>出す前の回帰シートを、手で通すのをやめる</h3>
+              <p>
+                Android・ウェブ・デスクトップにまたがる回帰シートを AI
+                が流し、人は変わった所と落ちた所だけを見る。
+              </p>
+              <span class="more">事例を読む →</span>
+            </div>
+          </a>
+          <a class="card" href="who-verified.html">
+            <img src="../img/run.png" width="1280" height="800" loading="lazy" alt="" />
+            <div class="card-body">
+              <h3>「で、誰が確かめたの？」に証跡で答える</h3>
+              <p>ケースごとに VERIFIED か AUTO_PASS か、ハンドル・時刻・その時の画面が残る。</p>
+              <span class="more">事例を読む →</span>
+            </div>
+          </a>
+          <a class="card" href="agent-mcp.html">
+            <img src="../img/setup-target.png" width="972" height="282" loading="lazy" alt="" />
+            <div class="card-body">
+              <h3>AI エージェントが作った機能を、実機で確かめさせる</h3>
+              <p>MCP で画面を撮る・読む・押す。夜に無人で流し、朝は落ちた所だけ人が見る。</p>
+              <span class="more">事例を読む →</span>
+            </div>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="../"
+            ><img src="../icon.png" alt="" width="22" height="22" />git-qa</a
+          >
+          <p>人が判定する QA ランナー。合格は、人が見て押したときにだけ付く。MIT ライセンス。</p>
+        </div>
+        <nav aria-label="フッター">
+          <a href="./">事例</a><a href="../download.html">ダウンロード</a
+          ><a href="../releases.html">過去の版</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ロードマップ — git-qa のこれまでとこれから</title>
+    <meta
+      name="description"
+      content="git-qa の開発の段と、いま取り組んでいること・次にやること・作らないもの。「同じ 20 ケースを手で通すより明確に短いか」を、続けるかどうかの判断にしています。"
+    />
+    <link rel="canonical" href="https://meta-taro.github.io/git-qa/roadmap.html" />
+    <link rel="icon" href="icon.png" type="image/png" />
+    <meta name="theme-color" content="#059669" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="git-qa のロードマップ" />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/roadmap.html" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/og.png" />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="./"><img src="icon.png" alt="" width="28" height="28" />git-qa</a>
+        <nav class="site-nav" aria-label="サイト">
+          <a href="./#features">できること</a>
+          <a href="cases/">事例</a>
+          <a href="download.html">ダウンロード</a>
+          <a href="roadmap.html" aria-current="page">ロードマップ</a>
+          <a href="en/" hreflang="en" lang="en">English</a>
+          <a class="gh" href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <span class="eyebrow">2026 年 11 月 9 日 更新</span>
+          <h1>ロードマップ</h1>
+          <p class="lede">
+            段ごとに「次へ進んでよい条件」を置いて進めています。作る順と測る順を分け、作る順は
+            Android から、測る順は唯一の未知だった iPhone から。 git-qa
+            が役に立つかどうかは、<strong
+              >同じ 20 ケースを手で通した時間より、この道具で通した時間が明確に短いか</strong
+            >で決めます。短くなければ、先へ進まずに画面を作り直します。
+          </p>
+        </div>
+      </section>
+
+      <section style="padding-top: 0">
+        <div class="wrap road">
+          <article class="stage">
+            <span class="state chip ok">済み</span>
+            <h3>1. Android で一本道を通す</h3>
+            <ul>
+              <li class="done">検証シート（TSV）を読む。書き戻さない</li>
+              <li class="done">Android 実機・エミュレータに繋ぎ、ライブビューを画面の中央に出す</li>
+              <li class="done">
+                AI がケースを流し、人の番で止まり、1 打鍵で <code>VERIFIED</code> を置いて次へ進む
+              </li>
+              <li class="done">
+                <code>run.json</code> に <code>VERIFIED</code> と
+                <code>AUTO_PASS</code> が混ざった形で残る
+              </li>
+            </ul>
+            <p class="gate">
+              <b>次へ進んでよい条件：</b>5
+              ケース以上をこの流れで通し、ライブビューの遅延が許せる範囲に入っている → 達成
+            </p>
+          </article>
+
+          <article class="stage">
+            <span class="state chip ok">済み</span>
+            <h3>2. 証跡を残し、相手を広げる</h3>
+            <ul>
+              <li class="done">
+                1 件ごとの画面と動画を
+                <code>runs/&lt;日時&gt;/case-NNN/</code>
+                へ。録画は開始時の設定で、録らなかったことも証跡に残る
+              </li>
+              <li class="done">
+                ウェブ（Chrome 系・Firefox・Safari。CDP
+                を直に叩く）とデスクトップアプリ（macOS・Windows）の Adapter
+              </li>
+              <li class="done">
+                iPhone / iPad を USB で映す・文字を読む・録る。押す・打つは端末に WebDriverAgent
+                を入れたとき
+              </li>
+              <li class="done">
+                鑑賞モード（押さなくても進む）と、画面なしの無人実行（<code>--no-ui</code>）
+              </li>
+              <li class="done">
+                途中で止めて、次の日に続きから。シートが書き換わっていれば続けない
+              </li>
+              <li class="done">
+                試験 1 本を 1 つのフォルダにまとめ、証跡をフォルダごと git で管理できる
+              </li>
+              <li class="done">
+                配布物：macOS（署名・公証。Apple シリコン・Intel の 1 本）、Windows（x64・ARM64）
+              </li>
+            </ul>
+            <p class="gate">
+              <b>答え合わせ：</b>ウェブとデスクトップの Adapter
+              を足すのに、核の変更が要らなかったこと → 要らなかった
+            </p>
+          </article>
+
+          <article class="stage now">
+            <span class="state chip wait">いま</span>
+            <h3>3. AI エージェントと一緒に進める</h3>
+            <ul>
+              <li class="done">
+                MCP：画面を撮る・文字を読む・押せる名前を並べる・押す・なぞる・打つ・アプリを起こす。判定を置く道具は作らない
+              </li>
+              <li class="done">公式の MCP 一覧（registry.modelcontextprotocol.io）に載せる</li>
+              <li class="done">
+                外の道具から、シートとケースを指して起動する（<code>git-qa://run?…</code>）
+              </li>
+              <li class="done">
+                シートに書けない値（ライセンスキーなど）を、手順に名前だけ書いて環境変数から打つ。足跡には名前のまま残る
+              </li>
+              <li class="done">
+                アプリの起動画面から録画を選び、判定を置き終わった欄から証跡の場所を開く
+              </li>
+              <li>
+                iPhone / iPad で押す・打つを、実機で通す（WebDriverAgent の署名と導入は人の作業）
+              </li>
+              <li>Windows のデスクトップで、まだ読めない入力欄を減らす</li>
+              <li>テスト中に見つけた別の問題を、ケースの合否とは別に記録する（Finding）</li>
+              <li>人が途中で操作を引き取り、AI へ返す（Human Takeover）</li>
+            </ul>
+          </article>
+
+          <article class="stage">
+            <span class="state chip fail">次</span>
+            <h3>4. 楽になったことを数字で示す</h3>
+            <ul>
+              <li>
+                同じ 20 ケースを、手で通した所要時間と、この道具で通した所要時間を測る（まだ 1
+                度も測っていません）
+              </li>
+              <li>1 ケースあたりの打鍵数とマウス操作の回数を数える</li>
+            </ul>
+            <p class="gate">
+              <b>止めどころ：</b
+              >手作業より明確に短くなければ、先へ進まずに画面を作り直します。他が全部できていても、この数字が出なければ製品ではありません。
+            </p>
+          </article>
+
+          <article class="stage">
+            <span class="state chip">その後</span>
+            <h3>5. 広げる</h3>
+            <ul>
+              <li>前回の証跡との差分（変わった所だけを人に見せる）</li>
+              <li>Windows のインストーラーの署名（証明書に物理トークンか HSM が要る）</li>
+              <li>新しい版の知らせ（いまは自動更新が無く、このサイトから落とし直す）</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="soft">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>作らないもの</h2>
+            <p>役に立ちそうでも、git-qa は次のものを作りません。</p>
+          </div>
+          <ul class="facts">
+            <li>
+              <b>AI が合格を出す口</b><span>MCP にも判定を置く道具は作らない。合否は人だけ。</span>
+            </li>
+            <li>
+              <b>不正防止機構</b
+              ><span
+                >中身を見ずに
+                <code>VERIFIED</code>
+                を置くこともできる。置いた瞬間にその人のハンドルが残る、ロックではなく署名。</span
+              >
+            </li>
+            <li>
+              <b>全ケースの人間確認を強制する仕組み</b
+              ><span>全部を人が確認する道具は使われなくなる。人が見るのは 3 つだけ。</span>
+            </li>
+            <li>
+              <b>Appium / Maestro / scrcpy / Playwright の再実装</b
+              ><span>既にあるものは使う。無いものだけ作る。</span>
+            </li>
+            <li>
+              <b>クラウドの端末ファーム・SaaS 化</b
+              ><span>手元で完結する。相手の画面も証跡も外へ送らない。</span>
+            </li>
+            <li>
+              <b>CI/CD の置き換え・独自 AI モデルの開発</b
+              ><span>git-qa は人が見る場面の道具。自動テストの代わりではない。</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="./"><img src="icon.png" alt="" width="22" height="22" />git-qa</a>
+          <p>人が判定する QA ランナー。合格は、人が見て押したときにだけ付く。MIT ライセンス。</p>
+        </div>
+        <nav aria-label="フッター">
+          <a href="cases/">事例</a><a href="download.html">ダウンロード</a
+          ><a href="releases.html">過去の版</a><a href="roadmap.html">ロードマップ</a
+          ><a href="en/" hreflang="en" lang="en">English</a
+          ><a href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

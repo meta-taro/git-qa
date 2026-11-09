@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI エージェントが作った機能を、実機で確かめさせる — git-qa の事例</title>
+    <meta
+      name="description"
+      content="Claude Code などの AI エージェントが MCP で git-qa を使い、作った機能を Android・ウェブ・デスクトップ・iPhone の実物で確かめる。画面を撮る・文字を読む・押せる名前を並べる・押す。夜に無人で流し、朝は落ちた所だけ人が見る。合格を出すのは人。"
+    />
+    <link rel="canonical" href="https://meta-taro.github.io/git-qa/cases/agent-mcp.html" />
+    <link rel="icon" href="../icon.png" type="image/png" />
+    <meta name="theme-color" content="#059669" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="AI エージェントが作った機能を、実機で確かめさせる" />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/cases/agent-mcp.html" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/img/setup-target.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="../assets/site.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "AI エージェントが作った機能を、実機で確かめさせる",
+            "inLanguage": "ja",
+            "dateModified": "2026-11-09",
+            "about": { "@id": "https://meta-taro.github.io/git-qa/#app" },
+            "image": "https://meta-taro.github.io/git-qa/img/setup-target.png",
+            "description": "Claude Code などの AI エージェントが MCP で git-qa を使い、作った機能を Android・ウェブ・デスクトップ・iPhone の実物で確かめる。画面を撮る・文字を読む・押せる名前を並べる・押す。夜に無人で流し、朝は落ちた所だけ人が見る。合格を出すのは人。"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "git-qa",
+                "item": "https://meta-taro.github.io/git-qa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "事例",
+                "item": "https://meta-taro.github.io/git-qa/cases/"
+              },
+              { "@type": "ListItem", "position": 3, "name": "AI エージェントが実機で確かめる" }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="../"
+          ><img src="../icon.png" alt="" width="28" height="28" />git-qa</a
+        >
+        <nav class="site-nav" aria-label="サイト">
+          <a href="../#features">できること</a><a href="./" aria-current="page">事例</a
+          ><a href="../download.html">ダウンロード</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a class="gh" href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap article">
+          <p class="crumbs"><a href="../">git-qa</a> / <a href="./">事例</a></p>
+          <h1>AI エージェントが作った機能を、実機で確かめさせる</h1>
+          <p class="lede">
+            コードを書いたエージェントに、動いた画面まで見せたい。<strong
+              >MCP で、Claude Code
+              などのエージェントが画面を撮る・文字を読む・押せる名前を並べる・押す</strong
+            >を、Android・ウェブ・デスクトップ・iPhone でできます。
+            夜のうちに無人で流しておき、朝は落ちた所だけ人が見る。合格を出すのは、それでも人です。
+          </p>
+          <dl class="summary-box">
+            <dt>エージェントができること</dt>
+            <dd>操作と取得。撮る・読む・押す・なぞる・打つ・アプリを起こす</dd>
+            <dt>エージェントができないこと</dt>
+            <dd>判定を置くこと。<code>VERIFIED</code> を置く道具は MCP にありません</dd>
+            <dt>相手</dt>
+            <dd>Android（既定）・ウェブ・デスクトップアプリ。既に起きているブラウザにも繋げる</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section style="padding-top: 0">
+        <div class="wrap article">
+          <h2>1. 相手を選んで、MCP を起こす</h2>
+          <p>
+            git-qa のクローンから <code>pnpm mcp</code> で起きます（Claude Code なら
+            <code>.mcp.json</code> に登録済み）。相手は環境変数で選びます。
+          </p>
+          <pre><code>$ pnpm mcp                                                        # Android（既定）
+$ GIT_QA_MCP_TARGET=web GIT_QA_MCP_URL=http://localhost:3000/ pnpm mcp   # ウェブ
+$ GIT_QA_MCP_TARGET=desktop GIT_QA_MCP_APP=メモ pnpm mcp                 # デスクトップ</code></pre>
+          <figure class="shot">
+            <img
+              src="../img/setup-target.png"
+              width="972"
+              height="282"
+              loading="lazy"
+              alt="見る相手を選ぶ札。端末・ウェブページ・デスクトップアプリ"
+            />
+          </figure>
+
+          <h2>2. 押す前に、押せる名前を並べる</h2>
+          <p>
+            <code>element_list</code>
+            が、いま画面にある押せる名前を返します。ここに出た文字をそのまま
+            <code>element_tap</code>
+            に渡せば、座標を当てにいかなくて済みます。名前を推し量ると、外れたときにしか気づけません。
+          </p>
+          <div class="table-wrap">
+            <table>
+              <tr>
+                <th><code>element_list</code></th>
+                <td>押せる名前を並べる</td>
+              </tr>
+              <tr>
+                <th><code>element_tap</code></th>
+                <td>名前で押す（「保存」など）</td>
+              </tr>
+              <tr>
+                <th><code>device_screen_text</code></th>
+                <td>画面の文字を読む（相手ごとの読み方で）</td>
+              </tr>
+              <tr>
+                <th><code>device_screenshot</code></th>
+                <td>
+                  いまの画面を絵で取る。場所を渡すとそこにも書く（もう在るファイルには書かない）
+                </td>
+              </tr>
+              <tr>
+                <th>
+                  <code>device_tap</code> / <code>device_swipe</code> / <code>device_key</code> /
+                  <code>device_type</code> / <code>device_launch</code>
+                </th>
+                <td>1 点を押す・なぞる・HOME などを送る・文字を打つ・アプリを起こす</td>
+              </tr>
+            </table>
+          </div>
+
+          <h2>3. 夜に流して、朝に見る</h2>
+          <p>
+            画面なしで流す（<code>--no-ui</code>）と、人が居なくてもシートを最後まで走らせ、証跡を残します。朝、人は落ちた所と
+            AI が判断できなかった所だけを見て、<kbd>D</kbd> か
+            <kbd>F</kbd> を置きます。夜のうちの結果は全部
+            <code>AUTO_PASS</code> のまま。人が押すまで合格にはなりません。
+          </p>
+
+          <h2>4. 外の道具から、そのケースだけを起こす</h2>
+          <p>
+            検証の漏れを並べる側の道具から、シートとケースを指して git-qa
+            を起こせます（<code>git-qa://run?sheet=…&amp;case=…&amp;target=…</code>）。相手とハンドルが揃っていれば押さずに始まり、走り切ると証跡に終わりの時刻が付きます。
+          </p>
+
+          <div class="next-cases">
+            <h2>ほかの事例</h2>
+            <div class="cards">
+              <a class="card" href="regression-sheet.html"
+                ><div class="card-body">
+                  <h3>出す前の回帰シートを、手で通すのをやめる</h3>
+                  <p>AI が流し、人は変わった所と落ちた所だけを見る。</p>
+                  <span class="more">読む →</span>
+                </div></a
+              >
+              <a class="card" href="who-verified.html"
+                ><div class="card-body">
+                  <h3>「で、誰が確かめたの？」に証跡で答える</h3>
+                  <p>VERIFIED か AUTO_PASS か、ハンドルと時刻と画面が残る。</p>
+                  <span class="more">読む →</span>
+                </div></a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="../"
+            ><img src="../icon.png" alt="" width="22" height="22" />git-qa</a
+          >
+          <p>人が判定する QA ランナー。合格は、人が見て押したときにだけ付く。MIT ライセンス。</p>
+        </div>
+        <nav aria-label="フッター">
+          <a href="./">事例</a><a href="../download.html">ダウンロード</a
+          ><a href="../releases.html">過去の版</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

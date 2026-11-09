@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>出す前の回帰シートを、手で通すのをやめる — git-qa の事例</title>
+    <meta
+      name="description"
+      content="Android アプリ・ウェブ・デスクトップアプリにまたがる回帰シートを、手で通す代わりに AI が流し、人は映像を見ながら 1 ケースずつキーを押す。じっくり見るのは変わった所と落ちた所だけ、という git-qa の使い方。"
+    />
+    <link rel="canonical" href="https://meta-taro.github.io/git-qa/cases/regression-sheet.html" />
+    <link rel="icon" href="../icon.png" type="image/png" />
+    <meta name="theme-color" content="#059669" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="出す前の回帰シートを、手で通すのをやめる" />
+    <meta
+      property="og:url"
+      content="https://meta-taro.github.io/git-qa/cases/regression-sheet.html"
+    />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/img/run.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="../assets/site.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "出す前の回帰シートを、手で通すのをやめる",
+            "inLanguage": "ja",
+            "dateModified": "2026-11-09",
+            "about": { "@id": "https://meta-taro.github.io/git-qa/#app" },
+            "image": "https://meta-taro.github.io/git-qa/img/run.png",
+            "description": "Android アプリ・ウェブ・デスクトップアプリにまたがる回帰シートを、手で通す代わりに AI が流し、人は映像を見ながら 1 ケースずつキーを押す。じっくり見るのは変わった所と落ちた所だけ、という git-qa の使い方。"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "git-qa",
+                "item": "https://meta-taro.github.io/git-qa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "事例",
+                "item": "https://meta-taro.github.io/git-qa/cases/"
+              },
+              { "@type": "ListItem", "position": 3, "name": "回帰シートを AI に流す" }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="../"
+          ><img src="../icon.png" alt="" width="28" height="28" />git-qa</a
+        >
+        <nav class="site-nav" aria-label="サイト">
+          <a href="../#features">できること</a><a href="./" aria-current="page">事例</a
+          ><a href="../download.html">ダウンロード</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a class="gh" href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap article">
+          <p class="crumbs"><a href="../">git-qa</a> / <a href="./">事例</a></p>
+          <h1>出す前の回帰シートを、手で通すのをやめる</h1>
+          <p class="lede">
+            出す前の確認を、また手でぽちぽち通すのがつらい。Android
+            アプリ・ウェブ・デスクトップアプリにまたがる 30 行の回帰シートがある。 手で通す代わりに
+            <strong>AI がシートどおりに操作し、人は映像を見ながら 1 ケースずつキーを押す。</strong
+            >じっくり見るのは、変わった所と落ちた所だけです。
+          </p>
+          <dl class="summary-box">
+            <dt>状態</dt>
+            <dd>
+              手順と期待結果が書かれた回帰シート（TSV）がある。相手は Android
+              端末・ウェブページ・デスクトップアプリのどれか
+            </dd>
+            <dt>git-qa がやること</dt>
+            <dd>手順を流し、期待結果の文字を画面に見つけたら赤い印で指して止まる</dd>
+            <dt>人がやること</dt>
+            <dd>映像を見て <kbd>D</kbd> か <kbd>F</kbd>。判断できなければ <kbd>A</kbd></dd>
+          </dl>
+        </div>
+      </section>
+
+      <section style="padding-top: 0">
+        <div class="wrap article">
+          <h2>1. シートは表計算で書ける TSV</h2>
+          <p>
+            1 行が 1
+            ケース。手順（「押す」をクリックする）と期待結果（「押された」と表示される）を書きます。手順には「押す・打つ・開き直す・『X』が見えるまで送る」のような読める言い方が決まっていて、見本は同梱の
+            <code>sheets/web-sample-ja.tsv</code> にあります。
+          </p>
+          <pre><code>No.	手順	期待結果
+1	「押す」をクリックする	「押された」と表示される
+2	ページを開き直す	「押された」が消えている
+3	「押す」をクリックする	「押された」と表示される（1 回目だけ動く不具合を見つける）</code></pre>
+
+          <h2>2. AI が流し、人の番で止まる</h2>
+          <p>
+            「検証を開始する」を押すと、AI が 1
+            件ずつ操作します。期待結果の文字を見つけると、ライブビューの上に赤い印を出して止まり、右の欄に
+            AI の見立て（<code>AUTO_PASS</code>）と、人が押すキーが並びます。
+          </p>
+          <figure class="shot">
+            <img
+              src="../img/run.png"
+              width="1280"
+              height="800"
+              loading="lazy"
+              alt="検証中の画面。中央のライブビューに「押された」の文字と赤い印、右に AI の見立て AUTO_PASS と、合格 D・不合格 F・判断できない A の札"
+            />
+          </figure>
+
+          <h2>3. 見るのは 3 つだけ</h2>
+          <p>
+            全ケースを人が見る道具にすると、使われなくなります。人が見るのは、AI
+            が判断できないと言った所・前回と差分が出た所・落ちた所。残りは
+            <kbd>スペース</kbd> で送って
+            <code>AUTO_PASS</code> のまま置きます。合格へは繰り上がりません。
+          </p>
+          <p>
+            押さなくても進む鑑賞モードもあります。人は見ているだけで AI
+            が最後まで走り、押さなかったケースは <code>AUTO_PASS</code> のまま残ります。
+          </p>
+
+          <h2>4. 途中で止めて、次の日に続きから</h2>
+          <p>
+            30 行を 1
+            日で見切れなくても構いません。止めた実行は最初の画面に並び、選ぶとその実行に足します。昨日置いた判定は置き直しません。シートが書き換わっていれば続きからは走らせません。昨日の判定は、いまの文面に対して置かれたものではないからです。
+          </p>
+
+          <div class="next-cases">
+            <h2>ほかの事例</h2>
+            <div class="cards">
+              <a class="card" href="who-verified.html"
+                ><div class="card-body">
+                  <h3>「で、誰が確かめたの？」に証跡で答える</h3>
+                  <p>VERIFIED か AUTO_PASS か、ハンドルと時刻と画面が残る。</p>
+                  <span class="more">読む →</span>
+                </div></a
+              >
+              <a class="card" href="agent-mcp.html"
+                ><div class="card-body">
+                  <h3>AI エージェントが作った機能を、実機で確かめさせる</h3>
+                  <p>MCP で撮る・読む・押す。</p>
+                  <span class="more">読む →</span>
+                </div></a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="../"
+            ><img src="../icon.png" alt="" width="22" height="22" />git-qa</a
+          >
+          <p>人が判定する QA ランナー。合格は、人が見て押したときにだけ付く。MIT ライセンス。</p>
+        </div>
+        <nav aria-label="フッター">
+          <a href="./">事例</a><a href="../download.html">ダウンロード</a
+          ><a href="../releases.html">過去の版</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

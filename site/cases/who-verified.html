@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>「で、誰が確かめたの？」に証跡で答える — git-qa の事例</title>
+    <meta
+      name="description"
+      content="事故のあと、発注元・監査・自分のチームから「誰が確かめたのか」と聞かれたとき、git-qa の証跡（run.json）が答える。ケースごとに VERIFIED（人が見てハンドルを置いた）か AUTO_PASS（AI が通した・誰も見ていない）かが、時刻とその時の画面と一緒に残る。"
+    />
+    <link rel="canonical" href="https://meta-taro.github.io/git-qa/cases/who-verified.html" />
+    <link rel="icon" href="../icon.png" type="image/png" />
+    <meta name="theme-color" content="#059669" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="「で、誰が確かめたの？」に証跡で答える" />
+    <meta property="og:url" content="https://meta-taro.github.io/git-qa/cases/who-verified.html" />
+    <meta property="og:image" content="https://meta-taro.github.io/git-qa/img/run.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="../assets/site.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "TechArticle",
+            "headline": "「で、誰が確かめたの？」に証跡で答える",
+            "inLanguage": "ja",
+            "dateModified": "2026-11-09",
+            "about": { "@id": "https://meta-taro.github.io/git-qa/#app" },
+            "image": "https://meta-taro.github.io/git-qa/img/run.png",
+            "description": "事故のあと、発注元・監査・自分のチームから「誰が確かめたのか」と聞かれたとき、git-qa の証跡（run.json）が答える。ケースごとに VERIFIED（人が見てハンドルを置いた）か AUTO_PASS（AI が通した・誰も見ていない）かが、時刻とその時の画面と一緒に残る。"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "git-qa",
+                "item": "https://meta-taro.github.io/git-qa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "事例",
+                "item": "https://meta-taro.github.io/git-qa/cases/"
+              },
+              { "@type": "ListItem", "position": 3, "name": "誰が確かめたかを証跡で" }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="../"
+          ><img src="../icon.png" alt="" width="28" height="28" />git-qa</a
+        >
+        <nav class="site-nav" aria-label="サイト">
+          <a href="../#features">できること</a><a href="./" aria-current="page">事例</a
+          ><a href="../download.html">ダウンロード</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a class="gh" href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap article">
+          <p class="crumbs"><a href="../">git-qa</a> / <a href="./">事例</a></p>
+          <h1>「で、誰が確かめたの？」に証跡で答える</h1>
+          <p class="lede">
+            事故のあと、発注元・監査・自分のチームから聞かれます。<strong>証跡が答えます。</strong>
+            ケースごとに <code>VERIFIED</code>（人が見てハンドルを置いた）か
+            <code>AUTO_PASS</code>（AI
+            が通した・誰も見ていない）かが、ハンドル・時刻・その時の画面と一緒に残っています。
+          </p>
+          <dl class="summary-box">
+            <dt>残るもの</dt>
+            <dd><code>run.json</code>（判定・手順・誰がいつ置いたか）と、1 件ごとの画面・動画</dd>
+            <dt>混ぜないもの</dt>
+            <dd>
+              人が見た <code>VERIFIED</code> と、誰も見ていない <code>AUTO_PASS</code>。素の PASS
+              に潰さない
+            </dd>
+            <dt>書かないもの</dt>
+            <dd>
+              その機械の事情（絶対パス・個人名）。誰の機械でも同じ形になり、公開リポジトリに入れられる
+            </dd>
+          </dl>
+        </div>
+      </section>
+
+      <section style="padding-top: 0">
+        <div class="wrap article">
+          <h2>1. 合格は、人が押したときにだけ付く</h2>
+          <p>
+            AI が置けるのは <code>AUTO_PASS</code> までです。右の欄の
+            <kbd>D</kbd> を人が押すと、そのケースは
+            <span class="chip ok">VERIFIED</span>
+            になり、起動時に入れたハンドル（証跡に「誰が見たか」として残る名乗り）が付きます。中身を見ずに押すこともできますが、それは欠陥ではなく仕様です。押した瞬間にその人のハンドルが残る、ロックではなく署名です。
+          </p>
+          <figure class="shot">
+            <img
+              src="../img/run.png"
+              width="1280"
+              height="800"
+              loading="lazy"
+              alt="右上に、見ている人のハンドル「qa」。右の欄に「合格にする（自分の目で見て確かめた）証跡には VERIFIED として残る」の札"
+            />
+          </figure>
+
+          <h2>2. 1 件終わるたびに書く</h2>
+          <p>
+            途中で落ちても、そこまでに置いた判定は残ります。終わりの時刻が無ければ途中、というのが目印です。
+          </p>
+          <pre><code>runs/&lt;日時&gt;/
+  run.json        … 判定・手順・誰がいつ置いたか（1 件終わるたびに書く）
+  case-001/
+    screen.webp   … 判定を置く時点の画面
+    screen.webm   … AI が操作している間の動画（録画を選んだとき）</code></pre>
+
+          <h2>3. 結果の語彙は 5 つ</h2>
+          <div class="table-wrap">
+            <table>
+              <tr>
+                <th><code>VERIFIED</code></th>
+                <td>人がハンドルを置いた</td>
+              </tr>
+              <tr>
+                <th><code>AUTO_PASS</code></th>
+                <td>AI が通した。誰も見ていない</td>
+              </tr>
+              <tr>
+                <th><code>FAIL</code></th>
+                <td>落ちた（人が見て置いた）</td>
+              </tr>
+              <tr>
+                <th><code>BLOCKED</code></th>
+                <td>前提が整わず実行できなかった・人が見ても決められなかった</td>
+              </tr>
+              <tr>
+                <th><code>SKIP</code></th>
+                <td>実行しなかった</td>
+              </tr>
+            </table>
+          </div>
+          <p>素の PASS だと、上の 2 つが同じ値に潰れます。潰すと、この道具の意味がなくなります。</p>
+
+          <h2>4. 後から、何に対する判定かを確かめる</h2>
+          <p>
+            置かれた判定がどのシートの、どの文面に対するものかは、後から確かめられます。シートが書き換わっていれば落ちます。ウェブなら判定した時点の
+            URL も残り、同じ見た目の別ページを絵だけで見分けなくて済みます（クエリの値は伏せます）。
+          </p>
+          <pre><code>$ pnpm check:run runs/&lt;日時&gt;/run.json
+証跡: 20260911-190000
+シート: サンプル 検証シート（docs/test-specs/001.tsv）
+人が見て置いた判定: 4 件 / 全 5 件
+検証対象は、走っている間ずっと同じ</code></pre>
+
+          <div class="next-cases">
+            <h2>ほかの事例</h2>
+            <div class="cards">
+              <a class="card" href="regression-sheet.html"
+                ><div class="card-body">
+                  <h3>出す前の回帰シートを、手で通すのをやめる</h3>
+                  <p>AI が流し、人は変わった所と落ちた所だけを見る。</p>
+                  <span class="more">読む →</span>
+                </div></a
+              >
+              <a class="card" href="agent-mcp.html"
+                ><div class="card-body">
+                  <h3>AI エージェントが作った機能を、実機で確かめさせる</h3>
+                  <p>MCP で撮る・読む・押す。</p>
+                  <span class="more">読む →</span>
+                </div></a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="../"
+            ><img src="../icon.png" alt="" width="22" height="22" />git-qa</a
+          >
+          <p>人が判定する QA ランナー。合格は、人が見て押したときにだけ付く。MIT ライセンス。</p>
+        </div>
+        <nav aria-label="フッター">
+          <a href="./">事例</a><a href="../download.html">ダウンロード</a
+          ><a href="../releases.html">過去の版</a><a href="../roadmap.html">ロードマップ</a
+          ><a href="../en/" hreflang="en" lang="en">English</a
+          ><a href="https://github.com/meta-taro/git-qa">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
