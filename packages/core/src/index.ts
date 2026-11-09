@@ -93,6 +93,8 @@ export type { Pointing } from './session/protocol.js';
 // 証跡が何に対して置かれたのかを確かめる（外部レビュー #1）。
 export { compareSheet, renderSheetCheck, sheetDigest } from './run/sheet-check.js';
 export type { CheckedRun, SheetCheck } from './run/sheet-check.js';
+export { compareToManual, formatMs, measureRun, renderBench } from './run/bench.js';
+export type { BenchCase, BenchRun, CaseBench, ManualVerdict, RunBench } from './run/bench.js';
 
 // 判定を置く時点の画面（2026-09-11）。
 export { captureCaseShot } from './run/case-shot.js';
