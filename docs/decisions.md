@@ -3857,3 +3857,38 @@ macOS は使用目的が書かれていないと**許可を聞く画面すら出
 - 2026-11-07：起動画面（`setup-record`）・入口サーバ（`record`）・実行の入口（`app-cli` → `startRunSession({ record })`）・
   判定の欄（`evidence-open` → `open_sheet(path, 'reveal')`）を入れた。検査は手元のみ（起動画面・入口サーバ・判定の欄・開く口）。
   **実機のアプリでは未確認。**
+
+### C115: mac の配布物は universal 1 本（2026-11-09）
+
+## 決めたこと
+
+1. **`.dmg` は `tauri build --target universal-apple-darwin` で建て、1 本で Apple シリコンと Intel の両方に入れる。**
+   建てる機械は Apple シリコン 1 台のまま、署名・公証も 1 本のまま。
+2. **同梱の道具も全部 universal。**Swift の道具（ocr・record・ios）は元からそう建てている（`build-swift-tool.sh`）。
+   Rust の `git-qa-input` も同じ形にする（`build-rust-tool.sh`：的ごとに建てて `lipo` で束ね、建てた直後に署名）。
+3. **配る前に検める。**`.dmg` の中の本体（`Contents/MacOS`）が両方の CPU を持たなければ、その場で落とす。同梱の道具の CPU も出す。
+4. 配布ページは「macOS（Apple シリコン・Intel）」。`release.js` は `.dmg` を名前の末尾で探しているので変えない。
+
+## 根拠
+
+- 紹介ページの決まり（oss-notes `shared/lp-structure.md` の 1）は「mac は Apple シリコン・Intel」。
+  別々に 2 本出すと、建てる機械か CI の job が増え、署名も 2 回になる。universal なら増えない（dbboard・md-business と同じ作り）。
+- 本体だけ universal にして道具を忘れると、Intel Mac で**エラーではなく「触れない」「読めない」として静かに出る**
+  （2026-09-12 に Swift の道具で踏んだ形）。だから道具も揃え、検める。
+
+## 採らなかった案とその理由
+
+- **Intel 用の `.dmg` を別に出す**：job・署名・配布ページの欄が増える。利点は universal より小さい配布物だけ。
+- **手元の `pnpm app`・`tauri build` も universal にする**：開発中はいまの CPU だけで十分で、建てる時間が倍になる。配るものだけ。
+
+## これを止めるべき条件
+
+- Intel Mac の実機で `.dmg` を開いて動かなかったとき（universal の前提のどこかが崩れている。まず `lipo -info` で本体と道具を見る）。
+- 使う部品に Intel 向けに建たないものが出たとき（そのときは別の手を PdM と相談）。
+
+## 実行状況
+
+- 2026-11-09：`release.yml`（的を入れる・`--target universal-apple-darwin`・置き場所・本体の CPU を検める）、`build-rust-tool.sh`、配布ページの表記、
+  `docs/alpha-guide.md`。手元（Apple シリコンの Mac）で `tauri build --target universal-apple-darwin` を通し、`.dmg` の中を検めた。
+- **実測**：`git-qa_0.2.0_universal.dmg`（6.6 MB）。本体 `x86_64 arm64`。同梱の道具 4 つ（input・ios・ocr・record）すべて `x86_64 arm64`。
+  Rust は的ごとに 1m58s / 1m20s。**Intel の実機では未確認。**CI では次のタグで通る。

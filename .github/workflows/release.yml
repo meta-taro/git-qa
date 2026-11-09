@@ -53,6 +53,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
+      # **1 本で Apple シリコンと Intel の両方に入る（universal）**（C115）。
+      # 両方の的が無いと `--target universal-apple-darwin` は建たない。
+      - name: 両方の CPU の Rust の的を入れる（universal）
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: packages/desktop/src-tauri
@@ -126,11 +130,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm --filter @git-qa/desktop exec tauri build
+        run: pnpm --filter @git-qa/desktop exec tauri build --target universal-apple-darwin
 
       - name: 配布物を作る（署名なし）
         if: steps.creds.outputs.ready != 'true'
-        run: pnpm --filter @git-qa/desktop exec tauri build
+        run: pnpm --filter @git-qa/desktop exec tauri build --target universal-apple-darwin
 
       # **署名されたかを実物で確かめる。**「署名したつもり」で配らない。
       #
@@ -142,7 +146,7 @@ jobs:
       - name: 署名を検める
         run: |
           set -euo pipefail
-          dmg=$(find packages/desktop/src-tauri/target/release/bundle/dmg -name '*.dmg' | head -1)
+          dmg=$(find packages/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg -name '*.dmg' | head -1)
           test -n "$dmg"
           echo "── 配布物 ── $dmg"
 
@@ -152,6 +156,14 @@ jobs:
 
           echo "── 中の .app ──"
           codesign -dv "$app" 2>&1 | grep -E 'Identifier|Signature|TeamIdentifier|Authority' || true
+          # **本体が両方の CPU を持つか**（C115）。片方だけなら Intel Mac で「壊れているため開けません」になる。
+          main=$(find "$app/Contents/MacOS" -type f | head -1)
+          archs=$(lipo -info "$main" | sed 's/.*are: //;s/.*is architecture: //')
+          echo "本体: $archs"
+          case "$archs" in
+            *x86_64*arm64*|*arm64*x86_64*) ;;
+            *) echo "::error::本体が universal ではありません（$archs）"; hdiutil detach /tmp/verify -quiet; exit 1 ;;
+          esac
           echo "── 同梱の道具 ──"
           for tool in "$app"/Contents/Resources/resources/git-qa-*; do
             [ -f "$tool" ] || continue
@@ -179,7 +191,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: git-qa-macos
-          path: packages/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          path: packages/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
   windows:

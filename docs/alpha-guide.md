@@ -34,7 +34,7 @@
 ## 配る側へ — 別の Mac に入れるとき
 
 **渡すもの**: 配布ページ（ https://meta-taro.github.io/git-qa/ ）の
-`git-qa_0.2.0_aarch64.dmg`（macOS・署名と公証つき）または `.msi`（Windows・署名なし）。
+`git-qa_<版>_universal.dmg`（macOS・Apple シリコンと Intel の両方に入る・署名と公証つき）または `.msi`（Windows・署名なし）。
 
 **版の名前をここに固定しない。**古い版を指したまま残ると、**どれを配ったのか分からなくなる**
 （実際に `0.0.0` のまま数版ぶん残っていた・外部レビュー meta-taro/git-qa#23）。
@@ -43,7 +43,7 @@
 
 | | 要る理由 | 無いとどうなるか |
 |---|---|---|
-| **Apple Silicon の Mac** | dmg が `aarch64` 版 | Intel Mac では動きません |
+| **macOS 13 以降の Mac** | dmg は universal（Apple シリコン・Intel の両方） | それより古い macOS では開けません |
 | **Node** | アプリの中身が Node で動いている | `Node を起こせない（node が要る）` で止まります |
 | **Chrome** | ウェブページを見るのに使う | ウェブ検証ができません |
 | adb | Android を見るときだけ | Android 検証ができません |
