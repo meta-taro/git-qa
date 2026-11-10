@@ -17,6 +17,9 @@ manifest="${1:?使い方: build-rust-tool.sh <Cargo.toml> <crate 名> <出力先
 crate="${2:?使い方: build-rust-tool.sh <Cargo.toml> <crate 名> <出力先>}"
 out="${3:?使い方: build-rust-tool.sh <Cargo.toml> <crate 名> <出力先>}"
 target_dir="$(dirname "$manifest")/target"
+# **取ってきたばかりの clone に `target/` は無い。**cargo の言い分を書く先が無いとリダイレクトが先に落ち、
+# cargo は 1 度も走らないまま「No such file or directory」だけが出る（v0.2.0-beta.22 の CI 初回で踏んだ）。
+mkdir -p "$target_dir"
 
 built=()
 for target in aarch64-apple-darwin x86_64-apple-darwin; do

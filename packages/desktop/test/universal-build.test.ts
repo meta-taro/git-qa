@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -58,5 +61,40 @@ describe('mac の配布物は universal', () => {
       expect(html).not.toMatch(/macOS（Apple Silicon）|macOS \(Apple Silicon\)/);
       expect(html).toMatch(/Intel/);
     }
+  });
+});
+
+/**
+ * **CI の初回で `git-qa-input` が建たず、配布物に入らないまま検査で止まった**（v0.2.0-beta.22・2026-11-10）。
+ *
+ * `cargo` の言い分を `target/<的>.err` へ書こうとしたが、**取ってきたばかりの clone に `target/` は無い。**
+ * リダイレクトが先に失敗して cargo は 1 度も走らず、出たのは「No such file or directory」だけだった。
+ * 手元では `target/` が既にあったので気づかなかった。**置き場所は自分で作る。**
+ */
+describe('build-rust-tool.sh — 取ってきたばかりの場所でも動く', () => {
+  const script = fileURLToPath(new URL('../scripts/build-rust-tool.sh', import.meta.url));
+
+  it('target/ が無くても cargo を呼び、建たなかった理由（cargo の言い分）を出す', () => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'git-qa-rust-tool-'));
+    writeFileSync(join(dir, 'Cargo.toml'), '[package]\nname = "fake"\n');
+    // cargo の代役。**的が無いときの cargo と同じく、stderr へ理由を書いて 1 で返す。**
+    const bin = join(dir, 'bin');
+    spawnSync('mkdir', ['-p', bin]);
+    writeFileSync(
+      join(bin, 'cargo'),
+      '#!/bin/sh\necho "error: the target may not be installed" >&2\nexit 1\n',
+    );
+    chmodSync(join(bin, 'cargo'), 0o755);
+
+    const ran = spawnSync('bash', [script, join(dir, 'Cargo.toml'), 'fake', join(dir, 'out')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}` },
+    });
+
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toContain('the target may not be installed');
+    expect(ran.stdout + ran.stderr).not.toContain('No such file or directory');
+    expect(existsSync(join(dir, 'target'))).toBe(true);
   });
 });

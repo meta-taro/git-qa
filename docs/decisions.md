@@ -3993,3 +3993,7 @@ macOS は使用目的が書かれていないと**許可を聞く画面すら出
   `docs/alpha-guide.md`。手元（Apple シリコンの Mac）で `tauri build --target universal-apple-darwin` を通し、`.dmg` の中を検めた。
 - **実測**：`git-qa_0.2.0_universal.dmg`（6.6 MB）。本体 `x86_64 arm64`。同梱の道具 4 つ（input・ios・ocr・record）すべて `x86_64 arm64`。
   Rust は的ごとに 1m58s / 1m20s。**Intel の実機では未確認。**CI では次のタグで通る。
+
+**追記（2026-11-10）：CI の初回で `git-qa-input` が建たなかった。**`build-rust-tool.sh` が cargo の言い分を `target/<的>.err` に書こうとしたが、
+取ってきたばかりの clone に `target/` は無く、リダイレクトが先に落ちて cargo は走らなかった（出たのは「No such file or directory」だけ）。
+手元では `target/` が既にあったので通っていた。**置き場所は自分で作る**（`mkdir -p`）。cargo の代役で `target/` 無しから走らせる検査を足した。
