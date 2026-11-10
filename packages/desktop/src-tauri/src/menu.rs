@@ -30,6 +30,7 @@ fn locale_id(value: &str) -> String {
 pub struct MenuText {
     pub app: &'static str,
     pub about: &'static str,
+    pub check_update: &'static str,
     pub quit: &'static str,
     pub edit: &'static str,
     pub undo: &'static str,
@@ -58,6 +59,7 @@ pub struct MenuText {
 const JA: MenuText = MenuText {
     app: "git-qa",
     about: "git-qa について",
+    check_update: "新しい版を確かめる…",
     quit: "git-qa を終了",
     edit: "編集",
     undo: "取り消す",
@@ -86,6 +88,7 @@ const JA: MenuText = MenuText {
 const EN: MenuText = MenuText {
     app: "git-qa",
     about: "About git-qa",
+    check_update: "Check for a Newer Version…",
     quit: "Quit git-qa",
     edit: "Edit",
     undo: "Undo",
@@ -166,6 +169,9 @@ pub fn build<R: Runtime>(
         true,
         &[
             &PredefinedMenuItem::about(app, Some(t.about), Some(about))?,
+            // **「について」は版しか言わない。**新しい版が出ているかは配布ページが知っている。
+            // 入れ替えは人の工程なので（C71）、ここでは配布ページを OS のブラウザで開くだけ。
+            &MenuItem::with_id(app, "app:downloads", t.check_update, true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::quit(app, Some(t.quit))?,
         ],

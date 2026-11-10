@@ -48,6 +48,8 @@ export interface SetupState {
    * **勝手に入れ替えない。**出ていることを言うだけ。
    */
   readonly update?: { readonly version: string; readonly url: string };
+  /** **確かめた上で**新しい版は無い。無いときは「分からない」（2026-11-10）。 */
+  readonly upToDate?: true;
 }
 
 const PHASES: readonly SetupPhase[] = ['idle', 'starting', 'running', 'done', 'failed'];
@@ -129,6 +131,7 @@ function parseSetupState(raw: unknown): SetupState | undefined {
     ...(text('deviceError') === undefined ? {} : { deviceError: text('deviceError') as string }),
     ...(resumable === undefined ? {} : { resumable }),
     ...(update === undefined ? {} : { update }),
+    ...(raw['upToDate'] === true ? { upToDate: true as const } : {}),
   };
 }
 

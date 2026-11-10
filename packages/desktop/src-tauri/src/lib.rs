@@ -135,11 +135,17 @@ pub fn run() {
       Ok(())
     })
     .on_menu_event(|app, event| {
-      // 外観のメニューだけを見る。ほかは Tauri の既定の項目なので、ここへは来ない。
+      // 自分で付けた項目だけがここへ来る（外観・言語・ファイル・配布ページ）。既定の項目は来ない。
       if let Some(value) = event.id().0.strip_prefix("appearance:") {
         if let Err(error) = menu::apply_appearance(app, value) {
           // 握り潰さない。切り替わらなかったことが分からないと、人は何度も押す。
           log::error!("外観を切り替えられない: {error}");
+        }
+      }
+      if event.id().0 == "app:downloads" {
+        // **開く先はこちらが決める**（open.rs）。画面を経由しないので、URL を受け取る口も無い。
+        if let Err(error) = open::open_downloads() {
+          log::error!("配布ページを開けない: {error}");
         }
       }
       if let Some(action) = event.id().0.strip_prefix("file:") {

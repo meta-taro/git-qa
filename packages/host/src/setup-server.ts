@@ -1,5 +1,5 @@
 import { runnerOf } from './release.js';
-import { newerRelease } from './update.js';
+import { checkRelease } from './update.js';
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -74,6 +74,13 @@ export interface SetupState {
    * **勝手に入れ替えない。**出ていることを言うだけで、入れるかは人が決める。
    */
   readonly update?: { readonly version: string; readonly url: string };
+  /**
+   * **確かめた上で、新しい版は無い**（2026-11-10）。
+   *
+   * `update` が無いだけでは「最新」か「聞きに行けなかった」か分からず、
+   * 使う側に「更新があるか分からない」と言われた。確かめられたときだけ立つ。
+   */
+  readonly upToDate?: true;
 }
 
 export interface StartedRun {
@@ -222,7 +229,10 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
    * **新しい版は 1 度だけ聞く。**状態は毎秒取りに来るので、
    * そのたびに外へ出ると **GitHub に断られる**（それ以前に、外へ出る回数を増やさない）。
    */
-  const update = await newerRelease(runnerOf().version);
+  const checked = await checkRelease(runnerOf().version);
+  const update =
+    checked.kind === 'newer' ? { version: checked.version, url: checked.url } : undefined;
+  const upToDate = checked.kind === 'latest' ? (true as const) : undefined;
 
   /**
    * **1 つ数え損ねたくらいで、画面ごと出さないのはやりすぎ**（2026-09-12）。
@@ -276,6 +286,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
       ...(resumable === undefined ? {} : { resumable }),
       ...(deviceError === undefined ? {} : { deviceError }),
       ...(update === undefined ? {} : { update }),
+      ...(upToDate === undefined ? {} : { upToDate }),
       ...(started === undefined ? {} : started),
       ...(failure === undefined ? {} : { error: failure }),
     };

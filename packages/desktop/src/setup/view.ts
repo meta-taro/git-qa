@@ -702,6 +702,13 @@ export function renderSetup(
     // ふつうのリンクにすると押しても何も起きないので、OS のブラウザへ渡す。
     said.addEventListener('click', () => options.onDownloads?.());
     section.append(said);
+  } else if (state.upToDate === true) {
+    // **確かめた上で最新なら、そう言う**（2026-11-10）。
+    // 黙っていると「聞きに行けなかった」と見分けがつかず、「更新があるか分からない」になる。
+    const said = doc.createElement('p');
+    said.className = 'setup-uptodate';
+    said.textContent = t('setup.upToDate');
+    section.append(said);
   }
 
   // **版は、人が報告へ書き写せる所に置く**（2026-09-18）。

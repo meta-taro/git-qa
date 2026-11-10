@@ -71,27 +71,46 @@ export interface NewerReleaseOptions {
 }
 
 /**
- * **新しい版が出ているか聞く。**出ていなければ・聞けなければ `undefined`。
+ * 版を確かめた結果。
+ *
+ * - `newer` … 自分より新しい版が配られている
+ * - `latest` … **確かめた上で**新しいものは無い（いまが最新）
+ * - `unknown` … 聞きに行けなかった・答えが読めなかった・手元で建てたもの
+ *
+ * **`latest` と `unknown` を分ける**（2026-11-10）。前は両方「何も出さない」だったので、
+ * 使う側は「最新」なのか「確かめられていない」のか分からず、
+ * **「更新があるか分からない」**と言われた。確かめられたときは最新だと言う。
+ */
+export type ReleaseCheck =
+  | { readonly kind: 'newer'; readonly version: string; readonly url: string }
+  | { readonly kind: 'latest' }
+  | { readonly kind: 'unknown' };
+
+const UNKNOWN: ReleaseCheck = { kind: 'unknown' };
+
+/**
+ * **新しい版が出ているか聞く。**
  *
  * **落とさない。**繋がらない機械でも検証は続けられなければならない
  * （`product-baseline.md` §4「外部サービスに繋がるテストは、繋がらない環境でも走る形にする」）。
  */
-export async function newerRelease(
+export async function checkRelease(
   current: string,
   options: NewerReleaseOptions = {},
-): Promise<NewerRelease | undefined> {
+): Promise<ReleaseCheck> {
   // **手元で建てたものは、そもそも聞きに行かない。**外へ出す必要が無い。
-  if (parse(current) === undefined) return undefined;
+  // 最新だとも言わない —— 比べる相手が無い。
+  if (parse(current) === undefined) return UNKNOWN;
 
   const ask = options.fetch ?? fetch;
   try {
     const answer = await ask(RELEASES_API, {
       headers: { accept: 'application/vnd.github+json' },
     });
-    if (!answer.ok) return undefined;
+    if (!answer.ok) return UNKNOWN;
 
     const body: unknown = await answer.json();
-    if (!Array.isArray(body)) return undefined;
+    if (!Array.isArray(body)) return UNKNOWN;
 
     // **並び順は当てにしない。**いちばん新しいものを自分で選ぶ。
     // **下書きは数えない**（まだ配っていない）。
@@ -104,9 +123,23 @@ export async function newerRelease(
       if (newest === undefined || isNewer(newest, said.tag_name)) newest = said.tag_name;
     }
 
-    return newest === undefined ? undefined : { version: newest, url: REPO_RELEASES_URL };
+    return newest === undefined
+      ? { kind: 'latest' }
+      : { kind: 'newer', version: newest, url: REPO_RELEASES_URL };
   } catch {
-    // 繋がらない・答えが読めない。**黙って何も返さない**（検証は続けられる）。
-    return undefined;
+    // 繋がらない・答えが読めない。**黙る**（検証は続けられる）。最新だとは言わない。
+    return UNKNOWN;
   }
+}
+
+/**
+ * **新しい版が出ていれば、その版と配布ページ。**出ていなければ・聞けなければ `undefined`。
+ * 「最新」と「分からない」を分けて知りたいなら `checkRelease` を使う。
+ */
+export async function newerRelease(
+  current: string,
+  options: NewerReleaseOptions = {},
+): Promise<NewerRelease | undefined> {
+  const checked = await checkRelease(current, options);
+  return checked.kind === 'newer' ? { version: checked.version, url: checked.url } : undefined;
 }

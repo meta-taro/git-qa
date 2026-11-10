@@ -1128,6 +1128,13 @@ body {
   cursor: pointer;
 }
 
+/* **確かめた上で最新。**急かす話ではないので、版の名乗りと同じ弱さで置く。 */
+.setup-uptodate {
+  margin: 1.25rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.55;
+}
+
 /* **版の名乗り。**報告へ書き写す所なので、選ばせる欄より弱く、しかし読める濃さで置く。 */
 .setup-release {
   margin: 1.5rem 0 0;

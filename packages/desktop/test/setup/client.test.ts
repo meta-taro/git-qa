@@ -62,6 +62,32 @@ describe('fetchSetupState', () => {
       fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl),
     ).resolves.toBeUndefined();
   });
+
+  /** **確かめた上で最新**を、確かめられなかったのと区別して受け取る（2026-11-10）。 */
+  it('最新だと確かめた印（upToDate）を写す', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ phase: 'idle', devices: [], sheets: [], upToDate: true }), {
+        status: 200,
+      }),
+    );
+
+    const state = await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl);
+
+    expect(state?.upToDate).toBe(true);
+    expect(state?.update).toBeUndefined();
+  });
+
+  it('印が無ければ upToDate を立てない', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ phase: 'idle', devices: [], sheets: [] }), { status: 200 }),
+      );
+
+    const state = await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl);
+
+    expect(state?.upToDate).toBeUndefined();
+  });
 });
 
 describe('requestStart', () => {

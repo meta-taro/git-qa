@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { REPO_RELEASES_URL, isNewer, newerRelease } from '../src/update.js';
+import { REPO_RELEASES_URL, checkRelease, isNewer, newerRelease } from '../src/update.js';
 
 /**
  * **「入れ直してください」を毎回お願いしていた**（2026-09-18）。
@@ -120,6 +120,81 @@ describe('newerRelease', () => {
     }) as unknown as typeof fetch;
 
     expect(await newerRelease('dev', { fetch: watch })).toBeUndefined();
+    expect(asked).toBe(false);
+  });
+});
+
+/**
+ * **「最新かどうか分からない」が「最新」と同じ見え方だった**（2026-11-10）。
+ *
+ * 新しい版が無いときは何も出さなかったので、使う側は「確かめた上で最新」なのか
+ * 「聞きに行けなかった」のかを区別できず、「更新があるか分からない」と言われた。
+ * **確かめられたときは、最新だと言う。**確かめられなかったときだけ黙る。
+ */
+describe('checkRelease', () => {
+  const answer =
+    (...tags: string[]): typeof fetch =>
+    () =>
+      Promise.resolve(
+        new Response(JSON.stringify(tags.map((tag) => ({ tag_name: tag, draft: false }))), {
+          status: 200,
+        }),
+      );
+
+  it('新しいのが出ていたら newer と、その版と配布ページ', async () => {
+    expect(await checkRelease('v0.2.0-beta.9', { fetch: answer('v0.2.0-beta.12') })).toEqual({
+      kind: 'newer',
+      version: 'v0.2.0-beta.12',
+      url: REPO_RELEASES_URL,
+    });
+  });
+
+  it('確かめて新しいのが無ければ latest（最新だと言える）', async () => {
+    expect(await checkRelease('v0.2.0-beta.12', { fetch: answer('v0.2.0-beta.12') })).toEqual({
+      kind: 'latest',
+    });
+    expect(await checkRelease('v0.2.0-beta.12', { fetch: answer('v0.2.0-beta.11') })).toEqual({
+      kind: 'latest',
+    });
+  });
+
+  it('一覧に dev と下書きしか無くても latest（配れる版が無いなら、いまが最新）', async () => {
+    const mixed = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify([
+            { tag_name: 'dev', draft: false },
+            { tag_name: 'v0.2.0-beta.13', draft: true },
+          ]),
+          { status: 200 },
+        ),
+      )) as unknown as typeof fetch;
+
+    expect(await checkRelease('v0.2.0-beta.12', { fetch: mixed })).toEqual({ kind: 'latest' });
+  });
+
+  it('繋がらなければ unknown（最新だとは言わない）', async () => {
+    const broken = (() =>
+      Promise.reject(new Error('getaddrinfo ENOTFOUND'))) as unknown as typeof fetch;
+
+    expect(await checkRelease('v0.2.0-beta.9', { fetch: broken })).toEqual({ kind: 'unknown' });
+  });
+
+  it('GitHub が断ってきても unknown', async () => {
+    const rate = (() =>
+      Promise.resolve(new Response('', { status: 403 }))) as unknown as typeof fetch;
+
+    expect(await checkRelease('v0.2.0-beta.9', { fetch: rate })).toEqual({ kind: 'unknown' });
+  });
+
+  it('手元で建てたものは聞きに行かず unknown（最新だとも言わない）', async () => {
+    let asked = false;
+    const watch = (() => {
+      asked = true;
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    expect(await checkRelease('0.2.0-dev', { fetch: watch })).toEqual({ kind: 'unknown' });
     expect(asked).toBe(false);
   });
 });

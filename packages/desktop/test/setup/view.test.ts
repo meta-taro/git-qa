@@ -719,6 +719,23 @@ describe('新しい版のお知らせ', () => {
 
     expect(live().querySelector('.setup-update')).toBeNull();
   });
+
+  /**
+   * **「無い」と「分からない」が同じ見え方だった**（2026-11-10）。
+   * 確かめた上で新しいのが無いときは、そう言う。確かめられなかったときだけ黙る。
+   */
+  it('確かめて新しいのが無ければ、最新だと言う', () => {
+    renderSetup(root, { ...idle, upToDate: true }, { onStart: vi.fn() });
+
+    expect(live().querySelector('.setup-update')).toBeNull();
+    expect(live().querySelector('.setup-uptodate')?.textContent).toContain('新しい版');
+  });
+
+  it('確かめられなかったときは、最新だとも言わない', () => {
+    renderSetup(root, idle, { onStart: vi.fn() });
+
+    expect(live().querySelector('.setup-uptodate')).toBeNull();
+  });
 });
 
 /** **見る相手の札**（2026-10-21・DESIGN.md「準備の札」）。いまどれを見るかが光る。 */
