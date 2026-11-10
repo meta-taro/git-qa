@@ -446,9 +446,22 @@ if (liveUrl !== undefined) {
       });
     };
 
+    /** 状態が続けて読めなかった回数と、最後の理由。**3 回続いたら理由を画面に出す**（2026-11-10）。 */
+    let unreadable = 0;
+    let unreadableWhy = '';
     const tick = async (): Promise<void> => {
-      const state = await fetchSetupState(setupUrl);
-      if (state === undefined) return;
+      const state = await fetchSetupState(setupUrl, fetch, (reason) => {
+        unreadableWhy = reason;
+      });
+      if (state === undefined) {
+        unreadable += 1;
+        // 入口は開いたのに状態が読めない。**黙って「はじめかた」に留まらない。**
+        if (unreadable >= 3 && !started) {
+          showLiveViewError(app, t('setup.stateUnreadable', { reason: unreadableWhy }));
+        }
+        return;
+      }
+      unreadable = 0;
 
       if (state.phase === 'running' && state.liveUrl !== undefined) {
         window.clearInterval(poll);

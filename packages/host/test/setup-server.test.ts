@@ -718,3 +718,30 @@ describe('startSetupServer — 新しい版の確認は入口を待たせない'
     await waitFor(async () => (await json(`${server!.url}/state`))['upToDate'] === true);
   });
 });
+
+/**
+ * **端末やシートを数える所が返ってこないと、`/state` ごと返らず、画面は黙って留まる**（2026-11-10・Windows の席）。
+ * 落ちるのは `orEmpty` で拾っていたが、**返ってこない**は拾えていなかった。期限を置いて、理由を返す。
+ */
+describe('startSetupServer — 数える所が返ってこなくても state は返る', () => {
+  it('端末の一覧が返ってこなければ、期限で切って理由を添える', async () => {
+    server = await startSetupServer(
+      options({ listDevices: () => new Promise(() => undefined), listTimeoutMs: 50 }),
+    );
+
+    const state = await json(`${server.url}/state`);
+    expect(state['phase']).toBe('idle');
+    expect(state['devices']).toEqual([]);
+    expect(String(state['deviceError'])).toContain('返らなかった');
+  });
+
+  it('シートの一覧が返ってこなくても、state は返る', async () => {
+    server = await startSetupServer(
+      options({ findSheets: () => new Promise(() => undefined), listTimeoutMs: 50 }),
+    );
+
+    const state = await json(`${server.url}/state`);
+    expect(state['phase']).toBe('idle');
+    expect(state['sheets']).toEqual([]);
+  });
+});

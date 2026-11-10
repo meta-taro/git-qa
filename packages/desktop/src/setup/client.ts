@@ -142,15 +142,36 @@ function parseSetupState(raw: unknown): SetupState | undefined {
 export async function fetchSetupState(
   url: string,
   fetchImpl: typeof fetch = fetch,
+  /**
+   * 読めなかった理由を知らせる口（2026-11-10・Windows の席で踏んだ）。
+   * 読めないと画面は黙って「はじめかた」に留まっていたので、理由を人に見せられる形にする。
+   */
+  onProblem?: (reason: string) => void,
 ): Promise<SetupState | undefined> {
   try {
-    const res = await fetchImpl(`${url}/state`);
-    if (!res.ok) return undefined;
-    return parseSetupState(await res.json());
-  } catch {
+    const res = await fetchImpl(`${url}/state`, { signal: AbortSignal.timeout(STATE_TIMEOUT_MS) });
+    if (!res.ok) {
+      const body = (await res.text().catch(() => '')).trim().slice(0, 200);
+      onProblem?.(`HTTP ${String(res.status)}${body === '' ? '' : `: ${body}`}`);
+      return undefined;
+    }
+    const raw: unknown = await res.json();
+    const state = parseSetupState(raw);
+    if (state === undefined) onProblem?.(`形が違う: ${JSON.stringify(raw).slice(0, 200)}`);
+    return state;
+  } catch (error: unknown) {
+    const said = error instanceof Error ? error.message : String(error);
+    onProblem?.(
+      error instanceof Error && error.name === 'TimeoutError'
+        ? `${String(STATE_TIMEOUT_MS / 1000)} 秒待っても返らない`
+        : `繋がらない: ${said}`,
+    );
     return undefined;
   }
 }
+
+/** 状態を 1 回読むのに待つ上限。**返ってこないのと、読めないのを区別する。** */
+const STATE_TIMEOUT_MS = 8000;
 
 /**
  * 選んだ端末とシートで始めてもらう。

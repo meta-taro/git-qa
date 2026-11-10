@@ -155,7 +155,12 @@ export interface StartSetupServerOptions {
   readonly port?: number;
   /** 新しい版を確かめる口。**試験で差し替える。**省けば GitHub に聞く。 */
   readonly checkRelease?: () => Promise<ReleaseCheck>;
+  /** 端末・シート・止まった実行を数える所に待つ上限（ミリ秒）。**試験で短くする。** */
+  readonly listTimeoutMs?: number;
 }
+
+/** 数える所が返ってこないときに待つ上限。**返ってこないと `/state` ごと返らず、画面は黙って留まる。** */
+const LIST_TIMEOUT_MS = 5000;
 
 export interface SetupServer {
   /** 画面が読む URL（無作為の文字列を含む）。`?setup=` に渡す。 */
@@ -257,15 +262,27 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
    * 画面は「読み込み中」のまま、理由も出ない。
    * **Android を見ないならウェブの URL だけで始められるのに、入口で止まる。**
    */
+  const listTimeoutMs = options.listTimeoutMs ?? LIST_TIMEOUT_MS;
   const orEmpty = async <T>(
     work: () => Promise<readonly T[]>,
     onError?: (reason: string) => void,
   ): Promise<readonly T[]> => {
+    // **落ちるだけでなく、返ってこないのも拾う**（2026-11-10・Windows の席で踏んだ）。
+    // 返ってこないと `/state` ごと返らず、画面は理由も出さずに「はじめかた」に留まる。
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${String(listTimeoutMs / 1000)} 秒たっても返らなかった`)),
+        listTimeoutMs,
+      );
+    });
     try {
-      return await work();
+      return await Promise.race([work(), late]);
     } catch (error: unknown) {
       onError?.(error instanceof Error ? error.message : String(error));
       return [];
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   };
 

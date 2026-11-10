@@ -180,10 +180,19 @@ describe('画面から読めること（CORS）', () => {
     expect(res.headers.get('access-control-allow-headers')).toContain('content-type');
   });
 
+  /**
+   * **Windows の配布版は、ずっと「はじめかた」から進めなかった**（2026-11-10・ドスパラの席で判明）。
+   * Tauri 2 の Windows（と Android）の WebView は `http://tauri.localhost` と名乗る（`https` は設定したときだけ）。
+   * 許可一覧に `https` しか無く、画面からの読み取りがブラウザに弾かれて、理由も出ずに黙っていた。
+   */
   it('Tauri が本番で使うオリジンも許す（開発だけ通る、にしない）', async () => {
     bridge = await startLiveBridge({ source: source() });
 
-    for (const origin of ['tauri://localhost', 'https://tauri.localhost']) {
+    for (const origin of [
+      'tauri://localhost',
+      'https://tauri.localhost',
+      'http://tauri.localhost',
+    ]) {
       const res = await fetch(`${bridge.controlUrl}/events`, { headers: { origin } });
       expect(res.headers.get('access-control-allow-origin'), origin).toBe(origin);
       await res.body?.cancel();

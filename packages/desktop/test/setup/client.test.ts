@@ -41,8 +41,26 @@ describe('fetchSetupState', () => {
 
     const state = await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl);
 
-    expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:5/setup/abc/state');
+    const [calledUrl, init] = fetchImpl.mock.calls[0] as [string, RequestInit | undefined];
+    expect(calledUrl).toBe('http://127.0.0.1:5/setup/abc/state');
+    // **返ってこないのを見分けるために期限を付けて読む**（2026-11-10）。
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(state?.devices[0]?.serial).toBe('emulator-5554');
+  });
+
+  /** Windows の実機（adb 無し）が返した状態をそのまま読めること（2026-11-10・ドスパラの席の実測）。 */
+  it('adb の無い Windows が返す形（deviceError・resumable・upToDate）を読む', async () => {
+    const body =
+      '{"phase":"idle","devices":[],"sheets":[],"resumable":[],"deviceError":"spawn adb ENOENT","upToDate":true}';
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(body, { status: 200 }));
+    const onProblem = vi.fn();
+
+    const state = await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl, onProblem);
+
+    expect(state?.phase).toBe('idle');
+    expect(state?.deviceError).toBe('spawn adb ENOENT');
+    expect(state?.upToDate).toBe(true);
+    expect(onProblem).not.toHaveBeenCalled();
   });
 
   it('形が違えば受け取らない（黙って空の画面を出さない）', async () => {
@@ -61,6 +79,53 @@ describe('fetchSetupState', () => {
     await expect(
       fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl),
     ).resolves.toBeUndefined();
+  });
+
+  /**
+   * **状態が読めないと、画面は黙って「はじめかた」に留まっていた**（2026-11-10・Windows の席で踏んだ）。
+   * 読めなかった理由を外へ出す口（onProblem）を持つ。返りは今までどおり undefined。
+   */
+  it('入口が 500 を返したら、その本文を理由として知らせる', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response('端末の一覧で落ちた', { status: 500 }));
+    const onProblem = vi.fn();
+
+    await expect(
+      fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl, onProblem),
+    ).resolves.toBeUndefined();
+    expect(onProblem).toHaveBeenCalledWith(expect.stringContaining('500'));
+    expect(onProblem).toHaveBeenCalledWith(expect.stringContaining('端末の一覧で落ちた'));
+  });
+
+  it('形が違えば、そう知らせる', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response('{"phase":"ねている"}', { status: 200 }));
+    const onProblem = vi.fn();
+
+    await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl, onProblem);
+    expect(onProblem).toHaveBeenCalledWith(expect.stringContaining('形'));
+  });
+
+  it('繋がらなければ、その理由を知らせる', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const onProblem = vi.fn();
+
+    await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl, onProblem);
+    expect(onProblem).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'));
+  });
+
+  it('読めたときは知らせない', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ phase: 'idle', devices: [], sheets: [] }), { status: 200 }),
+      );
+    const onProblem = vi.fn();
+
+    await fetchSetupState('http://127.0.0.1:5/setup/abc', fetchImpl, onProblem);
+    expect(onProblem).not.toHaveBeenCalled();
   });
 
   /** **確かめた上で最新**を、確かめられなかったのと区別して受け取る（2026-11-10）。 */

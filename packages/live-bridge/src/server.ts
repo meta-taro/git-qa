@@ -78,6 +78,9 @@ const ALLOWED_ORIGINS: readonly string[] = [
   'http://127.0.0.1:1420',
   'tauri://localhost',
   'https://tauri.localhost',
+  // **Windows（と Android）の Tauri 2 はこう名乗る**（`https` は `useHttpsScheme` を立てたときだけ）。
+  // 無かったせいで Windows の配布版は画面から入口を読めず、理由も出さずに「はじめかた」に留まっていた（2026-11-10）。
+  'http://tauri.localhost',
 ];
 
 /**
