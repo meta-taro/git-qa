@@ -491,6 +491,19 @@ describe('担当者ハンドル', () => {
     expect(res.status).toBe(200);
     expect(state.devices).toEqual([]);
     expect(state.deviceError).toContain('adb');
+    // **人に見せる文は人の言葉で**（2026-11-10・Windows の実機で「spawn adb ENOENT」がそのまま出た）。
+    expect(state.deviceError).toBe('adb が PATH に無い');
+    expect(state.deviceError).not.toContain('ENOENT');
+  });
+
+  it('adb 以外の理由は、そのまま出す', async () => {
+    server = await startSetupServer(
+      options({
+        listDevices: () => Promise.reject(new Error('device offline')),
+      }),
+    );
+    const state = (await (await fetch(`${server.url}/state`)).json()) as { deviceError?: string };
+    expect(state.deviceError).toBe('device offline');
   });
 
   /** シートを探せなくても同じ。**画面は出て、理由が出る。** */

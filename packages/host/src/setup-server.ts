@@ -263,6 +263,12 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
    * **Android を見ないならウェブの URL だけで始められるのに、入口で止まる。**
    */
   const listTimeoutMs = options.listTimeoutMs ?? LIST_TIMEOUT_MS;
+  /**
+   * **人に見せる理由は人の言葉で**（2026-11-10・Windows の実機で「spawn adb ENOENT」がそのまま出た）。
+   * adb が入っていない機械がいちばん多い形なので、それだけは言い換える。ほかはそのまま返す。
+   */
+  const describeDeviceFailure = (reason: string): string =>
+    /ENOENT/.test(reason) && /\badb\b/.test(reason) ? 'adb が PATH に無い' : reason;
   const orEmpty = async <T>(
     work: () => Promise<readonly T[]>,
     onError?: (reason: string) => void,
@@ -303,7 +309,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
     // **選ぶたびに取り直す。**繋ぎ替えた端末が出てこないと、人は待たされ続ける。
     const devices = await orEmpty(
       () => options.listDevices(),
-      (reason) => (deviceError = reason),
+      (reason) => (deviceError = describeDeviceFailure(reason)),
     );
     // シートと止まった実行は**毎回は探し直さない。**失敗しても画面は出す。
     sheets ??= await orEmpty(() => options.findSheets());
