@@ -128,3 +128,43 @@ describe('sourceToLines — 欄の中身', () => {
     expect(sourceToLines(field('Switch', '1', 'Wi-Fi'), 1)).toBe('Wi-Fi\t171\t539\t326\t28');
   });
 });
+
+/**
+ * **iOS の `SecureField` / `TextField` は、部品の木に `label` が無く、`placeholderValue` にしか文字が無い**
+ * （2026-11-10・iPhone 17・iOS 27 の席で踏んだ）。案内文は画面に見えているので、画面の文字に入れる。
+ */
+describe('sourceToLines — 欄の案内文（placeholderValue）', () => {
+  const field = (type: string, extra: Record<string, unknown>) => ({
+    type,
+    isVisible: '1',
+    rect: { x: 8, y: 525, width: 326, height: 28 },
+    ...extra,
+  });
+
+  it('名前の無い欄は、案内文を欄の位置で並べる（伏せ字の欄も案内文は読む）', () => {
+    for (const type of ['TextField', 'SecureTextField']) {
+      const lines = sourceToLines(field(type, { placeholderValue: 'パスワード' }), 1).split('\n');
+      expect(lines).toEqual(['パスワード\t171\t539\t326\t28']);
+    }
+  });
+
+  it('打ったあと（値がある）は、案内文はもう見えていないので入れない', () => {
+    const lines = sourceToLines(
+      field('TextField', { placeholderValue: 'ライセンスキー', value: 'ABC-123' }),
+      1,
+    ).split('\n');
+    expect(lines).toEqual(['ABC-123\t171\t539\t326\t28']);
+  });
+
+  it('名前と案内文が同じなら重ねない', () => {
+    expect(
+      sourceToLines(field('TextField', { label: '検索', placeholderValue: '検索' }), 1).split('\n'),
+    ).toHaveLength(1);
+  });
+
+  it('欄でない部品の案内文は入れない', () => {
+    expect(sourceToLines(field('Button', { label: '次へ', placeholderValue: 'x' }), 1)).toBe(
+      '次へ\t171\t539\t326\t28',
+    );
+  });
+});

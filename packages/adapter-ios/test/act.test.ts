@@ -31,6 +31,7 @@ const fake = (scale = 3) => {
       return Promise.resolve();
     },
     texts: () => Promise.resolve(''),
+    windowSize: () => Promise.resolve({ width: 402, height: 874 }),
     navigation: () => Promise.resolve({ width: 402, height: 874 }),
     swipe: (from, to, ms) => {
       done.push(
@@ -42,6 +43,8 @@ const fake = (scale = 3) => {
   const deps = {
     wda,
     look: () => Promise.resolve('設定\t603\t1311\t90\t40\n一般\t300\t600\t60\t30'),
+    // 試験では、画面が落ち着くのを待たない。
+    settle: () => Promise.resolve(),
   };
   return { done, deps };
 };
@@ -67,6 +70,57 @@ describe('iosAct', () => {
     expect(done).toEqual(['tap 201,437']);
     expect(report.detail).toContain('「設定」を WebDriverAgent で押した');
     expect(report.detail).toContain('（201, 437）');
+  });
+
+  /**
+   * **押した座標がずれていたとき、足跡から原因が追えなかった**（2026-11-10・iPhone 17 の席）。
+   * 見つけた部品の大きさ（ポイント）と、同じ文字が何件あったかを足跡に添える。
+   */
+  it('足跡に、見つけた部品の大きさ（ポイント）と同じ文字の件数が付く', async () => {
+    const { deps } = fake();
+
+    const report = await iosAct({ kind: 'tap', target: { at: 'element', ref: '設定' } }, deps);
+
+    expect(report.detail).toContain('幅 30 × 高さ 13 pt');
+    expect(report.detail).toContain('同じ文字 1 件');
+  });
+
+  /**
+   * **キーボードが出て画面が動いている最中に読むと、動く前の位置を押す**（2026-11-10・iPhone 17 の席）。
+   * 画面の文字が 2 回続けて同じになるまで読み直してから押す。
+   */
+  it('画面が動いている間は読み直し、落ち着いた位置を押す', async () => {
+    const { done, deps } = fake();
+    const frames = [
+      '利用を開始する\t585\t1656\t360\t132', // 動く前
+      '利用を開始する\t585\t1275\t360\t132', // 動いた後
+      '利用を開始する\t585\t1275\t360\t132', // 同じ → 落ち着いた
+    ];
+    let reads = 0;
+    const moving = {
+      ...deps,
+      look: () => Promise.resolve(frames[Math.min(reads++, frames.length - 1)] ?? ''),
+      settle: () => Promise.resolve(),
+    };
+
+    await iosAct({ kind: 'tap', target: { at: 'element', ref: '利用を開始する' } }, moving);
+
+    expect(done).toEqual(['tap 195,425']);
+    expect(reads).toBe(3);
+  });
+
+  it('画面が落ち着いていれば、読むのは 2 回で済む', async () => {
+    const { deps } = fake();
+    let reads = 0;
+    const still = {
+      ...deps,
+      look: () => (reads++, deps.look()),
+      settle: () => Promise.resolve(),
+    };
+
+    await iosAct({ kind: 'tap', target: { at: 'element', ref: '設定' } }, still);
+
+    expect(reads).toBe(2);
   });
 
   it('座標で指したら、画素をポイントに直して押す', async () => {

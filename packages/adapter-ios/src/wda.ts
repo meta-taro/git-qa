@@ -44,6 +44,11 @@ export interface WdaClient {
    * 画面の大きさ（左端からなぞるのに要る）。どちらもポイント。
    */
   navigation(): Promise<Navigation>;
+  /**
+   * 画面の大きさ（ポイント）。**読めなければ投げる**（当てずっぽうの大きさでなぞらない）。
+   * `「X」が見えるまで送る` が、なぞる所を決めるのに要る（2026-11-10・iPhone 17 の席で踏んだ）。
+   */
+  windowSize(): Promise<{ width: number; height: number }>;
   /** なぞる（ポイントの座標で・`durationMs` かけて動かす）。 */
   swipe(
     from: { x: number; y: number },
@@ -149,6 +154,18 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
       return said.value?.scale ?? 1;
     },
 
+    async windowSize() {
+      const said = (await inSession('GET', '/window/size')) as {
+        value?: { width?: unknown; height?: unknown };
+      };
+      const width = said.value?.width;
+      const height = said.value?.height;
+      if (typeof width !== 'number' || typeof height !== 'number' || width <= 0 || height <= 0) {
+        throw new Error('WebDriverAgent が画面の大きさを返さなかった（/window/size）');
+      }
+      return { width, height };
+    },
+
     async tap(at) {
       await inSession(
         'POST',
@@ -226,6 +243,8 @@ interface SourceNode {
   readonly type?: string;
   readonly label?: string | null;
   readonly value?: unknown;
+  /** 空の欄に薄く出ている案内文。iOS 27 の `TextField` / `SecureField` は名前が無く、ここにしか文字が無い。 */
+  readonly placeholderValue?: unknown;
   readonly isVisible?: string | boolean;
   readonly rect?: { x: number; y: number; width: number; height: number };
   readonly children?: readonly SourceNode[];
@@ -260,7 +279,17 @@ export function sourceToLines(root: unknown, scale: number): string {
         node.type !== undefined && TYPED_INTO.has(node.type) && typeof node.value === 'string'
           ? node.value.trim()
           : '';
-      for (const said of typed === label ? [label] : [label, typed]) {
+      // **名前の無い空の欄は、案内文（placeholderValue）が画面に見えている文字**（2026-11-10・iOS 27）。
+      // 打ったあとは案内文が消えるので、値があるときは入れない。伏せ字の欄も案内文は読んでよい。
+      const hint =
+        label === '' &&
+        typed === '' &&
+        node.type !== undefined &&
+        FIELDS.has(node.type) &&
+        typeof node.placeholderValue === 'string'
+          ? node.placeholderValue.trim()
+          : '';
+      for (const said of typed === label ? [label, hint] : [label, typed, hint]) {
         if (said === '') continue;
         out.push(
           [
@@ -281,6 +310,8 @@ export function sourceToLines(root: unknown, scale: number): string {
 
 /** 人が文字を打ち込む部品。**伏せ字の欄（SecureTextField）は入れない。** */
 const TYPED_INTO: ReadonlySet<string> = new Set(['TextField', 'SearchField', 'TextView']);
+/** 案内文を読んでよい欄（伏せ字の欄も、案内文は秘密ではない）。 */
+const FIELDS: ReadonlySet<string> = new Set([...TYPED_INTO, 'SecureTextField']);
 
 const isShown = (node: SourceNode): boolean =>
   node.isVisible === undefined || node.isVisible === true || node.isVisible === '1';
@@ -320,6 +351,17 @@ export function findBack(root: unknown): Navigation {
 export function toPoints(at: { x: number; y: number }, scale: number): { x: number; y: number } {
   const by = scale > 0 ? scale : 1;
   return { x: at.x / by, y: at.y / by };
+}
+
+/** 画面の文字の中で、その文字を含む行の数（押した足跡に添える・2026-11-10）。 */
+export function countByText(ocr: string, ref: string): number {
+  const squeeze = (value: string): string => value.replace(/\s+/g, '');
+  const want = squeeze(ref);
+  if (want === '') return 0;
+  return ocr
+    .split('\n')
+    .map((line) => line.split('\t'))
+    .filter((cells) => cells.length >= 5 && squeeze(cells[0] ?? '').includes(want)).length;
 }
 
 /**

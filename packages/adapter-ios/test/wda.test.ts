@@ -28,6 +28,7 @@ const fakeWda = (scale = 3) => {
     if (path === '/session' && method === 'POST')
       return reply({ sessionId: 'S1', value: { sessionId: 'S1' } });
     if (path.endsWith('/wda/screen')) return reply({ value: { scale } });
+    if (path.endsWith('/window/size')) return reply({ value: { width: 402, height: 874 } });
     return reply({ value: null });
   };
   return { sent, fetchImpl };
@@ -79,6 +80,18 @@ describe('createWdaClient', () => {
     expect(JSON.stringify(actions?.body)).toContain('"pointerType":"touch"');
     expect(JSON.stringify(actions?.body)).toContain('"x":201');
     expect(JSON.stringify(actions?.body)).toContain('"y":437');
+  });
+
+  /**
+   * **画面の大きさを聞く**（2026-11-10・iPhone 17 の席で「画面の大きさが分からない」と止まった）。
+   * `「X」が見えるまで送る` は画面の大きさからなぞる所を決めるので、WDA だけの形でも要る。
+   */
+  it('画面の大きさ（ポイント）を聞く', async () => {
+    const { sent, fetchImpl } = fakeWda();
+    const client = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+    const size = await client.windowSize();
+    expect(sent.map((s) => s.path)).toContain('/session/S1/window/size');
+    expect(size).toEqual({ width: 402, height: 874 });
   });
 
   it('倍率を聞く', async () => {

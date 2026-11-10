@@ -18,7 +18,7 @@ import type {
 } from '@git-qa/core';
 
 import { framesFrom, iosArgs, parseIosToolDevices, type IosDevice } from './tool.js';
-import { createWdaClient, pickByText, toPoints, type WdaClient } from './wda.js';
+import { countByText, createWdaClient, pickByText, toPoints, type WdaClient } from './wda.js';
 import { encodeFrames, mjpegFrames } from './frames.js';
 
 /**
@@ -183,6 +183,8 @@ const HOME_SCREEN = 'com.apple.springboard';
 
 /** 戻る動き（画面が横へ流れる）が終わるまでの間。 */
 const SETTLE_MS = 700;
+/** 押す前に画面が落ち着くのを待つ 1 回ぶん（キーボードの出入りは 0.3 秒ほど）。 */
+const AIM_SETTLE_MS = 350;
 
 /**
  * **iPhone で戻る**（2026-10-15）。物の戻るキーが無いので、
@@ -244,24 +246,50 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     );
   }
 
+  const settle =
+    deps.settle ?? (() => new Promise<void>((resolve) => setTimeout(resolve, AIM_SETTLE_MS)));
+
+  /**
+   * **画面が落ち着いてから読む**（2026-11-10・iPhone 17 の席で踏んだ）。
+   *
+   * 欄に打つとキーボードが出て、画面が上へ動く。動いている最中に読むと**動く前の位置**を押し、
+   * キーボードのすぐ上の空いた所を叩いていた。画面の文字が 2 回続けて同じになるまで読み直す
+   * （上限 3 回。動き続けていても、最後に読んだものを使う）。
+   */
+  const stableLook = async (): Promise<string> => {
+    let text = await deps.look();
+    for (let again = 0; again < 2; again += 1) {
+      await settle();
+      const next = await deps.look();
+      if (next === text) return next;
+      text = next;
+    }
+    return text;
+  };
+
   /** 押す点を、画素からポイントへ。文字なら絵から探す。 */
   const aim = async (
     target: Extract<Action, { kind: 'tap' }>['target'],
-  ): Promise<{ pt: { x: number; y: number }; label: string }> => {
+  ): Promise<{ pt: { x: number; y: number }; label: string; note: string }> => {
     const scale = await wda.scale();
     if (target.at === 'point') {
-      return { pt: toPoints(target, scale), label: '座標' };
+      return { pt: toPoints(target, scale), label: '座標', note: '' };
     }
-    const found = pickByText(await deps.look(), target.ref);
+    const text = await stableLook();
+    const found = pickByText(text, target.ref);
     if (found === undefined) {
       throw new AdapterError(KIND, `画面に「${target.ref}」が見つからない（画面の文字で探した）`);
     }
-    return { pt: toPoints(found, scale), label: `「${target.ref}」` };
+    // **足跡から原因を追える形で残す**：見つけた部品の大きさ（ポイント）と、同じ文字が何件あったか。
+    const by = scale > 0 ? scale : 1;
+    const size = `幅 ${String(Math.round(found.width / by))} × 高さ ${String(Math.round(found.height / by))} pt`;
+    const note = `（画面の文字から・${size}・同じ文字 ${String(countByText(text, target.ref))} 件）`;
+    return { pt: toPoints(found, scale), label: `「${target.ref}」`, note };
   };
   if (action.kind === 'tap') {
-    const { pt, label } = await aim(action.target);
+    const { pt, label, note } = await aim(action.target);
     await wda.tap(pt);
-    return { detail: `${label}を WebDriverAgent で押した${at(pt)}` };
+    return { detail: `${label}を WebDriverAgent で押した${at(pt)}${note}` };
   }
 
   if (action.kind === 'type') {
@@ -431,6 +459,7 @@ function createIosSession(deps: SessionDeps): TargetSession {
   /** 映像の口を切るため（WDA だけで動くとき）。 */
   let streamStop: AbortController | undefined;
   let closed = false;
+  let cachedScreen: { width: number; height: number } | undefined;
   let liveOpen = false;
   let streaming: ChildProcess | undefined;
 
@@ -600,6 +629,29 @@ function createIosSession(deps: SessionDeps): TargetSession {
     },
 
     screenshot: shoot,
+
+    /**
+     * **画面の大きさ（画素）**（2026-11-10・iPhone 17 の席で踏んだ）。
+     *
+     * `「X」が見えるまで送る` は、ここからなぞる所を決める。無いと「この相手は画面の大きさが
+     * 分からない」で止まっていた。口（WDA）はポイントで返すので、画面の文字・押す座標と同じく
+     * 倍率を掛けて画素にする。**口が無ければ持たない**（勝手な大きさでなぞらない）。
+     */
+    ...(wda === undefined
+      ? {}
+      : {
+          async screenSize(): Promise<{ width: number; height: number }> {
+            ensureOpen();
+            if (cachedScreen !== undefined) return cachedScreen;
+            const [size, scale] = await Promise.all([wda.windowSize(), wda.scale()]);
+            const by = scale > 0 ? scale : 1;
+            cachedScreen = {
+              width: Math.round(size.width * by),
+              height: Math.round(size.height * by),
+            };
+            return cachedScreen;
+          },
+        }),
 
     /**
      * **相手が入れ替わっていないかを測る**（#3）。

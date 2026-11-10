@@ -23,6 +23,7 @@ const wda = (ready = true): WdaClient => ({
   swipe: () => Promise.resolve(),
   texts: () => Promise.resolve('一般\t300\t600\t120\t60'),
   navigation: () => Promise.resolve({ width: 402, height: 874 }),
+  windowSize: () => Promise.resolve({ width: 402, height: 874 }),
   info: () => Promise.resolve({ model: 'iPhone', osVersion: '17.5.1', id: 'ABCDEF' }),
 });
 
@@ -82,6 +83,22 @@ describe('createIosAdapter — WebDriverAgent だけで', () => {
 
     await session.act({ kind: 'tap', target: { at: 'element', ref: '一般' } });
     expect(tapped).toEqual([{ x: 100, y: 200 }]);
+    await session.close();
+  });
+
+  /**
+   * **画面の大きさは、口から取って画素で返す**（2026-11-10・iPhone 17 の席で踏んだ）。
+   * `「X」が見えるまで送る` が「この相手は画面の大きさが分からない」で止まっていた。
+   * 画面の文字も押す座標も画素（ポイント × 倍率）なので、大きさも画素で揃える。
+   */
+  it('画面の大きさを口から取り、画素（ポイント × 倍率）で返す', async () => {
+    const session = await createIosAdapter({
+      wdaUrl: 'http://192.0.2.10:8100',
+      wda: wda(),
+      build: { source: 'ios', label: 'test' },
+    }).connect();
+
+    expect(await session.screenSize?.()).toEqual({ width: 1206, height: 2622 });
     await session.close();
   });
 
