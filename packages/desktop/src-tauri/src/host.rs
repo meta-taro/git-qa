@@ -51,8 +51,39 @@ fn parse_url(line: &str) -> Option<String> {
   line.find(marker).map(|at| line[at + marker.len()..].trim().to_string())
 }
 
+/// `node --version` の返り（`v20.14.0`）から大きい数を読む。読めなければ None。
+fn node_major(said: &str) -> Option<u32> {
+  let first = said.trim().trim_start_matches('v').split('.').next()?;
+  first.parse::<u32>().ok()
+}
+
+/// 実行器が要る Node の版（`package.json` の `engines` と同じ）。
+const NODE_MAJOR_REQUIRED: u32 = 22;
+
 /// Node 側を起こし、入口サーバの URL を拾う。
 pub fn spawn<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+  let state = app.state::<HostState>();
+
+  /*
+   * **アプリが拾う node は、ターミナルの node と違うことがある**（2026-11-10・Windows の席で実測）。
+   *
+   * fnm の v25 はターミナルの PATH にだけ効き、スタートメニューから起動したアプリは
+   * Program Files の v20 を拾った。古い node で実行器を起こしても入口は開かず、
+   * 画面は「はじめかた」のまま理由を出さなかった。**版を先に読んで、古ければそう言う。**
+   * 読めないときはここでは止めない（下の spawn が、入っていないことを言う）。
+   */
+  if let Ok(out) = Command::new("node").arg("--version").output() {
+    let said = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if let Some(major) = node_major(&said) {
+      if major < NODE_MAJOR_REQUIRED {
+        *state.error.lock().unwrap() = Some(format!(
+          "Node が古い（{said}・{NODE_MAJOR_REQUIRED} 以上が要る）。アプリが見つけた node はターミナルのものと違うことがある（fnm / nvm はターミナルだけに効く）。Node {NODE_MAJOR_REQUIRED} 以上を PC 全体に入れてから、アプリを起動し直してください"
+        ));
+        return Ok(());
+      }
+    }
+  }
+
   let script = plain(
     app
       .path()
@@ -60,8 +91,6 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
       .join("resources")
       .join("host-bundle.mjs"),
   );
-
-  let state = app.state::<HostState>();
 
   let mut child = match Command::new("node")
     .arg(&script)
@@ -154,7 +183,19 @@ pub fn stop<R: Runtime>(app: &AppHandle<R>) {
 
 #[cfg(test)]
 mod tests {
-  use super::{parse_url, plain};
+  use super::{node_major, parse_url, plain};
+
+  /// **アプリが拾った node が、ターミナルの node と違っていた**（2026-11-10・Windows の席で実測）。
+  /// fnm の v25 はターミナルだけに効き、スタートメニューからの起動は Program Files の v20 を拾った。
+  /// 版を先に読んで、古ければそう言う。
+  #[test]
+  fn nodeの版の大きい数を読む() {
+    assert_eq!(node_major("v20.14.0\n"), Some(20));
+    assert_eq!(node_major("v22.1.0"), Some(22));
+    assert_eq!(node_major("25.9.0"), Some(25));
+    assert_eq!(node_major("node: command not found"), None);
+    assert_eq!(node_major(""), None);
+  }
 
   /// **Windows でだけ付く前置きを外す**（2026-09-16・実測）。
   /// 付いたまま渡すと node が解決できず、**実行器が 368 ms で死ぬ。**

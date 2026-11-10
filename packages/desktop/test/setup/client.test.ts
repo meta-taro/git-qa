@@ -133,6 +133,33 @@ describe('requestStart', () => {
   });
 });
 
+/**
+ * **聞き終えても起きていなければ、黙って「はじめかた」に留まっていた**（2026-11-10・Windows の席）。
+ * 理由を出す口（onWait）を呼んで、聞き続ける。起きたら進む。
+ */
+describe('resolveSetupUrl — 起きないときに黙らない', () => {
+  it('聞き終えても起きていなければ onWait を呼び、聞き続けて、起きたら返す', async () => {
+    const ask = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('http://127.0.0.1:9/setup/xyz');
+    const onWait = vi.fn();
+
+    await expect(resolveSetupUrl('', { ask, waitMs: 0, tries: 2, onWait })).resolves.toBe(
+      'http://127.0.0.1:9/setup/xyz',
+    );
+    expect(onWait).toHaveBeenCalledTimes(1);
+  });
+
+  it('onWait が無ければ、今までどおり聞き終えたら undefined', async () => {
+    const ask = vi.fn().mockResolvedValue(null);
+
+    await expect(resolveSetupUrl('', { ask, waitMs: 0, tries: 2 })).resolves.toBeUndefined();
+  });
+});
+
 describe('resolveSetupUrl — 配布物では URL をアプリに聞く', () => {
   /**
    * **配布物ではクエリで渡せない。**開発中（`pnpm app`）は `?setup=` が付くが、

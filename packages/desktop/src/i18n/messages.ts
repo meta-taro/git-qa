@@ -127,6 +127,8 @@ const ja = {
   'setup.release': 'この git-qa は {version} です',
   'setup.update': '新しい版が出ています（{version}）— 配布ページを開く',
   'setup.upToDate': '新しい版はありません（配布ページで確かめました）',
+  'setup.hostLate':
+    '実行器がまだ起きていません（10 秒待ちました）。Node 22 以上が入っているか確かめてください。アイコンやスタートメニューから起動すると、ターミナルとは別の PATH で node を探します（fnm / nvm の Node は拾えません）。起きたら自動で進みます',
   'setup.operator': '0. あなたのハンドル（証跡に「誰が見たか」として残る）',
   'setup.operator.placeholder': '個人名ではなく、名乗る名前（例: しけんがかり / octocat）',
   'setup.device': '1. 見る相手を選ぶ',
@@ -303,6 +305,8 @@ const en: Record<keyof typeof ja, string> = {
   'setup.release': 'This git-qa is {version}',
   'setup.update': 'A newer version is out ({version}) — open the download page',
   'setup.upToDate': 'No newer version is out (checked the download page)',
+  'setup.hostLate':
+    'The runner has not started yet (waited 10 s). Check that Node 22 or newer is installed. When launched from an icon or the Start menu, the app looks up node on a PATH different from your terminal (fnm / nvm Node is not found). It continues automatically once the runner is up',
   'setup.operator': '0. Your handle (recorded as who verified)',
   'setup.operator.placeholder': 'A handle, not a personal name (e.g. octocat)',
   'setup.device': '1. Pick what to look at',

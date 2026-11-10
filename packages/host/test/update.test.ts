@@ -198,3 +198,20 @@ describe('checkRelease', () => {
     expect(asked).toBe(false);
   });
 });
+
+/**
+ * **GitHub が答えないと、入口ごと開かなかった**（2026-11-10・Windows の席で踏んだ）。
+ * 聞きに行く所に期限を置く。期限が来たら unknown（最新だとは言わない）。
+ */
+describe('checkRelease — 期限', () => {
+  it('答えが来なければ期限で諦めて unknown', async () => {
+    const hanging = ((_url: string, init?: { signal?: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      })) as unknown as typeof fetch;
+
+    expect(await checkRelease('v0.2.0-beta.9', { fetch: hanging, timeoutMs: 20 })).toEqual({
+      kind: 'unknown',
+    });
+  });
+});

@@ -1,5 +1,5 @@
 import { runnerOf } from './release.js';
-import { checkRelease } from './update.js';
+import { checkRelease, type ReleaseCheck } from './update.js';
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -153,6 +153,8 @@ export interface StartSetupServerOptions {
   readonly findResumable?: () => Promise<readonly SetupResumable[]>;
   readonly start: (params: StartRequest) => Promise<StartedRun>;
   readonly port?: number;
+  /** 新しい版を確かめる口。**試験で差し替える。**省けば GitHub に聞く。 */
+  readonly checkRelease?: () => Promise<ReleaseCheck>;
 }
 
 export interface SetupServer {
@@ -228,11 +230,24 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
   /**
    * **新しい版は 1 度だけ聞く。**状態は毎秒取りに来るので、
    * そのたびに外へ出ると **GitHub に断られる**（それ以前に、外へ出る回数を増やさない）。
+   *
+   * **入口を開くのを待たせない**（2026-11-10・Windows の席で踏んだ）。前はここで答えを待っていたので、
+   * GitHub が答えない機械では入口が開かず、画面は「はじめかた」のまま理由も出なかった。
+   * 答えが来たら、その後の状態に乗せる。
    */
-  const checked = await checkRelease(runnerOf().version);
-  const update =
-    checked.kind === 'newer' ? { version: checked.version, url: checked.url } : undefined;
-  const upToDate = checked.kind === 'latest' ? (true as const) : undefined;
+  let checked: ReleaseCheck | undefined;
+  void (options.checkRelease ?? (() => checkRelease(runnerOf().version)))().then(
+    (said) => {
+      checked = said;
+    },
+    () => undefined, // 聞けなかった＝分からない。黙る（検証は続けられる）
+  );
+  const releaseState = (): Pick<SetupState, 'update' | 'upToDate'> => {
+    if (checked === undefined) return {};
+    if (checked.kind === 'newer') return { update: { version: checked.version, url: checked.url } };
+    if (checked.kind === 'latest') return { upToDate: true };
+    return {};
+  };
 
   /**
    * **1 つ数え損ねたくらいで、画面ごと出さないのはやりすぎ**（2026-09-12）。
@@ -285,8 +300,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
       sheets,
       ...(resumable === undefined ? {} : { resumable }),
       ...(deviceError === undefined ? {} : { deviceError }),
-      ...(update === undefined ? {} : { update }),
-      ...(upToDate === undefined ? {} : { upToDate }),
+      ...releaseState(),
       ...(started === undefined ? {} : started),
       ...(failure === undefined ? {} : { error: failure }),
     };

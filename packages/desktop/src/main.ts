@@ -378,7 +378,10 @@ if (liveUrl !== undefined) {
   void (async () => {
     let url: string | undefined;
     try {
-      url = await resolveSetupUrl(window.location.search);
+      url = await resolveSetupUrl(window.location.search, {
+        // **10 秒待っても起きなければ、理由の候補を出して待ち続ける**（2026-11-10・Windows の席で踏んだ）。
+        onWait: () => showLiveViewError(app, t('setup.hostLate')),
+      });
     } catch (error: unknown) {
       // **起こせなかった理由を画面に出す。**黙って空の画面を出さない。
       showLiveViewError(app, error instanceof Error ? error.message : String(error));

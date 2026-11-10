@@ -197,6 +197,11 @@ export interface ResolveSetupUrlOptions {
   readonly ask?: () => Promise<string | null>;
   readonly waitMs?: number;
   readonly tries?: number;
+  /**
+   * 聞き終えても起きていないときに呼ぶ（理由を画面に出す口・2026-11-10）。
+   * **渡すと、呼んだあとも聞き続ける**（起きたら返す）。渡さなければ聞き終えたら `undefined`。
+   */
+  readonly onWait?: () => void;
 }
 
 /**
@@ -224,12 +229,17 @@ export async function resolveSetupUrl(
   const tries = options.tries ?? 40;
   const waitMs = options.waitMs ?? 250;
 
-  for (let i = 0; i < tries; i += 1) {
-    const url = await ask();
-    if (url !== null && url !== '') return url;
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  for (;;) {
+    for (let i = 0; i < tries; i += 1) {
+      const url = await ask();
+      if (url !== null && url !== '') return url;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+    // **黙って「はじめかた」に留まらない**（2026-11-10・Windows の席で踏んだ）。
+    // 起きていない理由（Node が古い・入っていない）は人にしか直せないので、言って待つ。
+    if (options.onWait === undefined) return undefined;
+    options.onWait();
   }
-  return undefined;
 }
 
 /**

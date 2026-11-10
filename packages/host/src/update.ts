@@ -68,7 +68,12 @@ export interface NewerRelease {
 
 export interface NewerReleaseOptions {
   readonly fetch?: typeof fetch;
+  /** 聞きに行く期限（ミリ秒）。**過ぎたら unknown**（2026-11-10・答えが来ない機械で入口を塞いだ）。 */
+  readonly timeoutMs?: number;
 }
+
+/** GitHub に答えを待つ長さ。繋がらない機械では、これより長く入口を待たせない。 */
+const CHECK_TIMEOUT_MS = 5000;
 
 /**
  * 版を確かめた結果。
@@ -106,6 +111,7 @@ export async function checkRelease(
   try {
     const answer = await ask(RELEASES_API, {
       headers: { accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(options.timeoutMs ?? CHECK_TIMEOUT_MS),
     });
     if (!answer.ok) return UNKNOWN;
 

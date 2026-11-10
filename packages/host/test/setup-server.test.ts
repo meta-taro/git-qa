@@ -687,3 +687,34 @@ describe('録画を頼んで始める', () => {
     expect(start.mock.calls[0]?.[0]).not.toHaveProperty('record');
   });
 });
+
+/**
+ * **GitHub が答えないと、入口が開かず「はじめかた」のまま止まっていた**（2026-11-10・Windows の席）。
+ * 新しい版の確認は入口を開くのを待たせない。答えが来たら、その後の状態に乗る。
+ */
+describe('startSetupServer — 新しい版の確認は入口を待たせない', () => {
+  it('確認が返ってこなくても、入口は開いて state を返す', async () => {
+    server = await startSetupServer(options({ checkRelease: () => new Promise(() => undefined) }));
+
+    const state = await json(`${server.url}/state`);
+    expect(state['phase']).toBe('idle');
+    expect(state['upToDate']).toBeUndefined();
+    expect(state['update']).toBeUndefined();
+  });
+
+  it('確認の答えが来たら、その後の state に乗る', async () => {
+    let answer: ((value: { kind: 'latest' }) => void) | undefined;
+    server = await startSetupServer(
+      options({
+        checkRelease: () =>
+          new Promise<{ kind: 'latest' }>((resolve) => {
+            answer = resolve;
+          }),
+      }),
+    );
+
+    expect((await json(`${server.url}/state`))['upToDate']).toBeUndefined();
+    answer?.({ kind: 'latest' });
+    await waitFor(async () => (await json(`${server!.url}/state`))['upToDate'] === true);
+  });
+});

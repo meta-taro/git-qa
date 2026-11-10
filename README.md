@@ -131,7 +131,8 @@ workspace, so the same run reads the same way on anyone's machine.
 
 ## Requirements
 
-- **Node 22 or newer** — required. The app starts a runner process
+- **Node 22 or newer** — required. The app starts a runner process **Node managed by fnm / nvm is only on your terminal's PATH** — an app launched from an icon or the Start menu does not see it, so install Node 22+ system-wide (the app tells you when the node it found is too old)
+
 - `adb` for Android, a browser for web — only if you use them
 - `ffmpeg` / `cwebp` — optional. Without them, evidence is kept in the format it
   was captured in, uncompressed
