@@ -98,7 +98,7 @@ tool that exists to save effort expensive to use.
 | **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare |
 | **Desktop apps** | macOS (Accessibility + Vision OCR) and Windows (UI Automation) |
 | **iPhone / iPad** | Watch, read and record over USB. **Tap, type, swipe and launch apps** through WebDriverAgent, which you sign and install on the device yourself ([guide](./docs/ios-press.md)). Tried on a real iPhone (iOS 17.5.1) |
-| **Mobile browsers** | Android Chrome over `adb forward` + CDP. iOS Safari through the iPhone path above. **Not yet tried** |
+| **Mobile browsers** | Android Chrome over `adb forward` + CDP — tried on a real phone (Android 15, Chrome 156): open, type, tap, screenshot and read all work; text inside input fields is not part of what it reads. iOS Safari through the iPhone path above (**not yet tried**) |
 | **From an AI agent** | Over MCP — screenshot, read the screen, **list the names you can press**, tap by name. Android, web, desktop, or iPhone / iPad |
 
 ![git-qa driving a real iPhone: the Clock app opened and the Stopwatch tab tapped through WebDriverAgent, with the AI verdict AUTO_PASS](./docs/images/iphone.png)
