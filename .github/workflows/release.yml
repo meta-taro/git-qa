@@ -254,13 +254,16 @@ jobs:
       - name: 何を配るのかを出す
         run: find dist -type f -exec ls -lh {} \;
 
-      # **アルファのうちは prerelease。**受け取る人が、出来上がったものだと思わないように。
+      # **`-`（`v0.2.0-beta.3` など）の付くタグだけ prerelease。**付かないタグ（`v0.2.0`）は正式版として載せる
+      # （2026-11-11・ベータを終えた）。prerelease は `releases/latest` に出ないので、ここを間違えると更新の通知が止まる。
       - name: Release に載せる
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          PRE=""
+          case "${GITHUB_REF_NAME}" in *-*) PRE="--prerelease" ;; esac
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
-            --prerelease \
+            ${PRE} \
             --notes-file .github/release-notes.md \
             $(find dist -type f)

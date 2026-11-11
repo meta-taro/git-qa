@@ -159,14 +159,15 @@ pnpm doctor
 ```
 
 The app also states its own version on the start screen ("This git-qa is
-v0.2.0-beta.20"). **Paste that line into bug reports** — it decides which build
+v0.2.0"). **Paste that line into bug reports** — it decides which build
 you are talking about. When a newer build exists, the same place says so; git-qa
 never replaces itself.
 
 ## Status
 
-**Beta.** Three products are using it. Rough edges are listed in each release's
-notes, and **nothing fails silently** — where a step cannot run, it is recorded
+**Stable since v0.2.0 (2026-11-11).** Three products use it in real verification
+work on Windows and macOS, against web, desktop, Android and iPhone targets.
+Rough edges are listed in each release's notes, and **nothing fails silently** — where a step cannot run, it is recorded
 as "a person needs to do this," not as a pass.
 
 Bug reports and requests: [Issues](https://github.com/meta-taro/git-qa/issues).
