@@ -237,7 +237,12 @@ describe('findBack', () => {
 
   it('ナビゲーションバーの左寄りのボタンを返し、画面の大きさも返す', () => {
     const found = findBack(app([navBar([button('編集', 330), button('設定', 8)])]));
-    expect(found).toEqual({ back: { x: 38, y: 90 }, width: 402, height: 874 });
+    expect(found).toEqual({
+      back: { x: 38, y: 90 },
+      width: 402,
+      height: 874,
+      bars: [{ x: 0, y: 62, width: 402, height: 54 }],
+    });
   });
 
   it('右寄りのボタンしか無ければ、戻るボタンは無いとする', () => {
@@ -250,5 +255,32 @@ describe('findBack', () => {
 
   it('ナビゲーションバーが無ければ、戻るボタンは無いとする', () => {
     expect(findBack(app([button('設定', 8)])).back).toBeUndefined();
+  });
+
+  /**
+   * **画面に浮いている棒（タブバー・ツールバー・ナビゲーションバー）の位置も返す**
+   * （2026-11-11・iPhone 17 の席で、タブバーの裏に半分隠れた行の真ん中を押してタブバーに当たった）。
+   * 押す前に、見つけた部品がこれらに隠れていないかを見るのに要る。見えていない棒は数えない。
+   */
+  it('見えている棒（タブバー・ツールバー・ナビゲーションバー）の矩形を返す', () => {
+    const tabBar = {
+      type: 'TabBar',
+      isVisible: '1',
+      rect: { x: 0, y: 790, width: 402, height: 60 },
+    };
+    const hidden = {
+      type: 'Toolbar',
+      isVisible: '0',
+      rect: { x: 0, y: 700, width: 402, height: 44 },
+    };
+    const found = findBack(app([navBar([]), tabBar, hidden]));
+    expect(found.bars).toEqual([
+      { x: 0, y: 62, width: 402, height: 54 },
+      { x: 0, y: 790, width: 402, height: 60 },
+    ]);
+  });
+
+  it('棒が無ければ、bars は空', () => {
+    expect(findBack(app([button('設定', 8)])).bars).toEqual([]);
   });
 });

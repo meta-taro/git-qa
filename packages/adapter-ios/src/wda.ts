@@ -57,6 +57,14 @@ export interface WdaClient {
   ): Promise<void>;
 }
 
+/** 矩形（左上と大きさ）。 */
+export interface Rect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 /** 戻るための手がかり。座標はポイント。 */
 export interface Navigation {
   readonly back?: { x: number; y: number };
@@ -64,6 +72,11 @@ export interface Navigation {
   readonly app?: string;
   readonly width: number;
   readonly height: number;
+  /**
+   * 画面に浮いている棒（タブバー・ツールバー・ナビゲーションバー）の矩形（2026-11-11）。
+   * 見つけた部品がこれらの裏に隠れていないかを、押す前に見る。**読めなければ無い。**
+   */
+  readonly bars?: readonly Rect[];
 }
 
 /** 断られた理由ごと持ち運ぶ（セッションの作り直しの判断に要る）。 */
@@ -330,10 +343,20 @@ export function findBack(root: unknown): Navigation {
   const height = top.rect?.height ?? 0;
 
   const buttons: NonNullable<SourceNode['rect']>[] = [];
+  const bars: Rect[] = [];
   const walk = (node: SourceNode, inBar: boolean): void => {
     const bar = inBar || (node.type === 'NavigationBar' && isShown(node));
     if (inBar && node.type === 'Button' && isShown(node) && node.rect !== undefined) {
       buttons.push(node.rect);
+    }
+    // **浮いている棒は、裏の部品を隠す**（2026-11-11・iPhone 17 の席）。見えているものだけ数える。
+    if (
+      node.type !== undefined &&
+      BARS.has(node.type) &&
+      isShown(node) &&
+      node.rect !== undefined
+    ) {
+      bars.push(node.rect);
     }
     for (const child of node.children ?? []) walk(child, bar);
   };
@@ -343,8 +366,69 @@ export function findBack(root: unknown): Navigation {
     .filter((rect) => rect.width > 0 && rect.x + rect.width / 2 < width / 3)
     .sort((a, b) => a.x - b.x)[0];
   return left === undefined
-    ? { width, height }
-    : { back: { x: left.x + left.width / 2, y: left.y + left.height / 2 }, width, height };
+    ? { width, height, bars }
+    : { back: { x: left.x + left.width / 2, y: left.y + left.height / 2 }, width, height, bars };
+}
+
+/** 画面に浮いていて、裏の部品を隠す棒。 */
+const BARS: ReadonlySet<string> = new Set(['TabBar', 'Toolbar', 'NavigationBar']);
+
+/** 部品の矩形が棒に隠れていないか。棒は横いっぱいに在るので、**縦にだけ切る。** */
+export type Uncovered =
+  | { readonly kind: 'clear' }
+  | { readonly kind: 'partial'; readonly rect: Rect; readonly bar: 'above' | 'below' }
+  | { readonly kind: 'hidden'; readonly bar: 'above' | 'below' };
+
+/** これより低い残りは「見えている」と言わない（指で押せない）。ポイント。 */
+const MIN_SHOWN_PT = 6;
+
+/**
+ * **文字が読めても、棒と重なった所は押せる場所ではない**（C118・2026-11-11・iPhone 17 の席）。
+ *
+ * タブバーの裏に半分隠れた行の真ん中を押して、タブバーに当たっていた。
+ * 棒に隠れていない部分を返す。全部隠れていれば、棒が上か下かだけ返す（送る向きを決めるのに要る）。
+ */
+export function uncovered(rect: Rect, bars: readonly Rect[]): Uncovered {
+  let top = rect.y;
+  let bottom = rect.y + rect.height;
+  let side: 'above' | 'below' | undefined;
+  for (const bar of bars) {
+    const acrossX = bar.x < rect.x + rect.width && bar.x + bar.width > rect.x;
+    const barTop = bar.y;
+    const barBottom = bar.y + bar.height;
+    if (!acrossX || barBottom <= top || barTop >= bottom) continue;
+    if (barTop <= top && barBottom >= bottom) {
+      // 全部隠れている。棒の真ん中が部品の真ん中より下なら「下の棒」（送る向きを決めるだけ）。
+      const barMid = (barTop + barBottom) / 2;
+      const mid = (rect.y + rect.y + rect.height) / 2;
+      return { kind: 'hidden', bar: barMid >= mid ? 'below' : 'above' };
+    }
+    if (barTop <= top) {
+      top = barBottom;
+      side = 'above';
+    } else if (barBottom >= bottom) {
+      bottom = barTop;
+      side = 'below';
+    } else {
+      // 棒が部品の真ん中を横切る。**広いほうを残す。**
+      const upper = barTop - top;
+      const lower = bottom - barBottom;
+      if (upper >= lower) {
+        bottom = barTop;
+        side = 'below';
+      } else {
+        top = barBottom;
+        side = 'above';
+      }
+    }
+  }
+  if (side === undefined) return { kind: 'clear' };
+  if (bottom - top < MIN_SHOWN_PT) return { kind: 'hidden', bar: side };
+  return {
+    kind: 'partial',
+    rect: { x: rect.x, y: top, width: rect.width, height: bottom - top },
+    bar: side,
+  };
 }
 
 /** 画素の座標をポイントへ。 */

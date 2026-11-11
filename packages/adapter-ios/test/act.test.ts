@@ -109,6 +109,113 @@ describe('iosAct', () => {
     expect(reads).toBe(3);
   });
 
+  /**
+   * **タブバーの裏に半分隠れた行の真ん中を押して、タブバーに当たっていた**（C118・2026-11-11・iPhone 17 の席）。
+   * 「回線の設定」（y 777〜830 pt）が、下に浮くタブバー（y 790〜850 pt）と重なっていた。
+   * 文字が読めても、棒と重なった所は押せる場所ではない。**見えている側の真ん中を押す。**
+   */
+  it('見つけた部品が棒（タブバー）と重なっていれば、見えている側の真ん中を押す', async () => {
+    const { done, deps } = fake();
+    const covered = {
+      ...deps,
+      wda: {
+        ...deps.wda,
+        navigation: () =>
+          Promise.resolve({
+            width: 402,
+            height: 874,
+            bars: [{ x: 0, y: 790, width: 402, height: 60 }],
+          }),
+      },
+      // 「回線の設定」：真ん中 (201, 803) pt・高さ 53 pt → 画素 ×3
+      look: () => Promise.resolve('回線の設定\t603\t2409\t1110\t159'),
+    };
+
+    const report = await iosAct(
+      { kind: 'tap', target: { at: 'element', ref: '回線の設定' } },
+      covered,
+    );
+
+    // 見えているのは y 776.5〜790 pt → 真ん中 783
+    expect(done).toEqual(['tap 201,783']);
+    expect(report.detail).toContain('下の棒と重なっていたので、見えている上側を押した');
+  });
+
+  it('見つけた部品が棒に全部隠れていれば、1 回だけ送って読み直してから押す', async () => {
+    const { done, deps } = fake();
+    const frames = [
+      '回線の設定\t603\t2460\t1110\t159', // y 793.5〜846.5 pt → タブバー（790〜850）の裏
+      '回線の設定\t603\t2460\t1110\t159',
+      '回線の設定\t603\t1800\t1110\t159', // 送った後：y 573.5〜626.5 pt
+      '回線の設定\t603\t1800\t1110\t159',
+    ];
+    let reads = 0;
+    const hidden = {
+      ...deps,
+      wda: {
+        ...deps.wda,
+        navigation: () =>
+          Promise.resolve({
+            width: 402,
+            height: 874,
+            bars: [{ x: 0, y: 790, width: 402, height: 60 }],
+          }),
+      },
+      look: () => Promise.resolve(frames[Math.min(reads++, frames.length - 1)] ?? ''),
+    };
+
+    const report = await iosAct(
+      { kind: 'tap', target: { at: 'element', ref: '回線の設定' } },
+      hidden,
+    );
+
+    expect(done[0]).toMatch(/^swipe 201,\d+→201,\d+ \d+ms$/);
+    expect(done[1]).toBe('tap 201,600');
+    expect(report.detail).toContain('下の棒に隠れていたので、1 回送ってから押した');
+  });
+
+  it('送っても棒に隠れたままなら、押さずに理由を言う', async () => {
+    const { done, deps } = fake();
+    const stuck = {
+      ...deps,
+      wda: {
+        ...deps.wda,
+        navigation: () =>
+          Promise.resolve({
+            width: 402,
+            height: 874,
+            bars: [{ x: 0, y: 790, width: 402, height: 60 }],
+          }),
+      },
+      look: () => Promise.resolve('回線の設定\t603\t2460\t1110\t159'),
+    };
+
+    await expect(
+      iosAct({ kind: 'tap', target: { at: 'element', ref: '回線の設定' } }, stuck),
+    ).rejects.toThrow(/隠れていて押せない/);
+    expect(done.filter((one) => one.startsWith('tap'))).toEqual([]);
+  });
+
+  it('棒と重なっていなければ、今までどおり真ん中を押す', async () => {
+    const { done, deps } = fake();
+    const clear = {
+      ...deps,
+      wda: {
+        ...deps.wda,
+        navigation: () =>
+          Promise.resolve({
+            width: 402,
+            height: 874,
+            bars: [{ x: 0, y: 790, width: 402, height: 60 }],
+          }),
+      },
+    };
+
+    await iosAct({ kind: 'tap', target: { at: 'element', ref: '設定' } }, clear);
+
+    expect(done).toEqual(['tap 201,437']);
+  });
+
   it('画面が落ち着いていれば、読むのは 2 回で済む', async () => {
     const { deps } = fake();
     let reads = 0;

@@ -18,7 +18,15 @@ import type {
 } from '@git-qa/core';
 
 import { framesFrom, iosArgs, parseIosToolDevices, type IosDevice } from './tool.js';
-import { countByText, createWdaClient, pickByText, toPoints, type WdaClient } from './wda.js';
+import {
+  countByText,
+  createWdaClient,
+  pickByText,
+  toPoints,
+  uncovered,
+  type Rect,
+  type WdaClient,
+} from './wda.js';
 import { encodeFrames, mjpegFrames } from './frames.js';
 
 /**
@@ -232,6 +240,29 @@ async function goBack(wda: WdaClient, deps: IosActDeps): Promise<ActReport> {
 }
 
 /**
+ * **棒に隠れた部品を、棒から離れる向きへ 1 回だけ送る**（2026-11-11）。
+ * 下の棒（タブバー）なら中身を上へ、上の棒（ナビゲーションバー）なら中身を下へ。
+ * 送る量は棒と部品の高さぶん（画面の 3 割を上限）。真ん中の列をなぞる。
+ */
+async function nudgeAwayFrom(
+  wda: WdaClient,
+  nav: { width: number; height: number; bars?: readonly Rect[] },
+  bar: 'above' | 'below',
+  itemHeight: number,
+): Promise<void> {
+  const barHeight = Math.max(0, ...(nav.bars ?? []).map((one) => one.height));
+  const delta = Math.round(Math.min(nav.height * 0.3, barHeight + itemHeight));
+  const x = Math.round(nav.width / 2);
+  if (bar === 'below') {
+    const from = Math.round(nav.height * 0.6);
+    await wda.swipe({ x, y: from }, { x, y: from - delta }, 300);
+  } else {
+    const from = Math.round(nav.height * 0.4);
+    await wda.swipe({ x, y: from }, { x, y: from + delta }, 300);
+  }
+}
+
+/**
  * **押す・打つを WebDriverAgent に頼む**（C99）。何をどう押したかを返す（証跡の手順に付く）。
  *
  * **口が無ければ、理由を言って止まる**（C20）。見つからない文字は押さない。
@@ -275,16 +306,71 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
     if (target.at === 'point') {
       return { pt: toPoints(target, scale), label: '座標', note: '' };
     }
-    const text = await stableLook();
-    const found = pickByText(text, target.ref);
-    if (found === undefined) {
-      throw new AdapterError(KIND, `画面に「${target.ref}」が見つからない（画面の文字で探した）`);
+    const by = scale > 0 ? scale : 1;
+    const find = async (): Promise<{
+      text: string;
+      found: NonNullable<ReturnType<typeof pickByText>>;
+    }> => {
+      const text = await stableLook();
+      const found = pickByText(text, target.ref);
+      if (found === undefined) {
+        throw new AdapterError(KIND, `画面に「${target.ref}」が見つからない（画面の文字で探した）`);
+      }
+      return { text, found };
+    };
+    const asRectPt = (found: { x: number; y: number; width: number; height: number }): Rect => ({
+      x: (found.x - found.width / 2) / by,
+      y: (found.y - found.height / 2) / by,
+      width: found.width / by,
+      height: found.height / by,
+    });
+
+    let { text, found } = await find();
+    /**
+     * **文字が読めても、棒と重なった所は押せる場所ではない**（C118・2026-11-11・iPhone 17 の席）。
+     * タブバーの裏に半分隠れた行の真ん中を押して、タブバーに当たっていた。
+     * 隠れていない側の真ん中を押す。全部隠れていれば、棒から離れる向きに 1 回だけ送って読み直す。
+     */
+    const nav = await wda.navigation();
+    const bars = nav.bars ?? [];
+    let shown = uncovered(asRectPt(found), bars);
+    let moved = '';
+    if (shown.kind === 'hidden') {
+      const where = shown.bar === 'below' ? '下' : '上';
+      await nudgeAwayFrom(wda, nav, shown.bar, asRectPt(found).height);
+      await settle();
+      ({ text, found } = await find());
+      shown = uncovered(asRectPt(found), bars);
+      if (shown.kind === 'hidden') {
+        throw new AdapterError(
+          KIND,
+          `「${target.ref}」は画面の${where}の棒（タブバーなど）に隠れていて押せない（1 回送っても出てこなかった）。` +
+            'シートで、先にもう 1 回「下へスクロールする」を入れてください',
+        );
+      }
+      moved = `${where}の棒に隠れていたので、1 回送ってから押した`;
     }
     // **足跡から原因を追える形で残す**：見つけた部品の大きさ（ポイント）と、同じ文字が何件あったか。
-    const by = scale > 0 ? scale : 1;
     const size = `幅 ${String(Math.round(found.width / by))} × 高さ ${String(Math.round(found.height / by))} pt`;
-    const note = `（画面の文字から・${size}・同じ文字 ${String(countByText(text, target.ref))} 件）`;
-    return { pt: toPoints(found, scale), label: `「${target.ref}」`, note };
+    const reasons = [
+      `画面の文字から`,
+      size,
+      `同じ文字 ${String(countByText(text, target.ref))} 件`,
+    ];
+    if (moved !== '') reasons.push(moved);
+    let pt = toPoints(found, scale);
+    if (shown.kind === 'partial') {
+      const seen = shown.rect;
+      pt = { x: Math.round(seen.x + seen.width / 2), y: Math.round(seen.y + seen.height / 2) };
+      if (moved === '') {
+        reasons.push(
+          shown.bar === 'below'
+            ? '下の棒と重なっていたので、見えている上側を押した'
+            : '上の棒と重なっていたので、見えている下側を押した',
+        );
+      }
+    }
+    return { pt, label: `「${target.ref}」`, note: `（${reasons.join('・')}）` };
   };
   if (action.kind === 'tap') {
     const { pt, label, note } = await aim(action.target);
