@@ -32,6 +32,11 @@ export interface McpServerOptions {
    * **文書を読むのは呼び側**。ここはファイルの場所を知らない。
    */
   readonly readSheetGuide?: () => Promise<string>;
+  /**
+   * git-qa **自身の画面**の専用カーソルを動かす（`screen`・C120）。
+   * 届け先を探して置くのは呼び側（`agent-screen.ts`）。
+   */
+  readonly sendToScreen?: (body: unknown) => Promise<{ ok: boolean; text: string }>;
 }
 
 export function createMcpServer(tools: DeviceTools, options: McpServerOptions = {}): McpServer {
@@ -283,6 +288,45 @@ export function createMcpServer(tools: DeviceTools, options: McpServerOptions = 
         inputSchema: {},
       },
       async () => ok(await readSheetGuide()),
+    );
+  }
+
+  /**
+   * **git-qa 自身の画面を、専用カーソルで指す・押す・打つ**（C120・2026-11-12）。
+   *
+   * 端末（検証の相手）ではなく、人が開いている git-qa の窓。人のマウスは使わない。
+   * **判定のキーと名乗りの欄は、画面側が断る**（C1 / C17）。ここから近道は作らない。
+   */
+  if (options.sendToScreen !== undefined) {
+    const sendToScreen = options.sendToScreen;
+    server.registerTool(
+      'screen',
+      {
+        title: 'git-qa 自身の画面を専用カーソルで操作する',
+        description:
+          '人が開いている **git-qa の窓**（検証の相手の端末ではない）に、エージェント専用のカーソルを出して、' +
+          '指す（point）・押す（click）・欄に打つ（type）・画面の中の場所へ移る（go・# だけ）・一言を出す（say）。' +
+          'target は画面に見えている言葉（ボタンの文字・見出し）。座標は使わない。人のマウスとキーボードは使わない。' +
+          '**判定（合格・不合格）のキーと、名乗り（ハンドル）の欄は押せない・打てない**（人だけが置く）。' +
+          '見つからなければ画面に「見つからない」と出る。画面が開いていなければ理由を返す。',
+        inputSchema: {
+          action: z.enum(['point', 'click', 'type', 'go', 'say']),
+          target: z.string().optional().describe('画面に見えている言葉（point / click / type）'),
+          value: z.string().optional().describe('打つ文字（type）'),
+          hash: z.string().optional().describe('画面の中の場所。# で始まる（go）'),
+          message: z.string().optional().describe('吹き出しの一言（say は必須）。500 文字まで'),
+          seconds: z
+            .number()
+            .min(1)
+            .max(60)
+            .optional()
+            .describe('一言を出しておく秒数（1〜60）。省くと文の長さで決まる'),
+        },
+      },
+      async (args) => {
+        const said = await sendToScreen(args);
+        return { content: [{ type: 'text' as const, text: said.text }], isError: !said.ok };
+      },
     );
   }
 

@@ -24,6 +24,9 @@ import {
 import { createWebAdapter, listWebElements, readWebScreenText } from '@git-qa/adapter-web';
 import type { TargetSession } from '@git-qa/core';
 
+import { findScreens, forgetScreen } from '@git-qa/host';
+
+import { postJson, sendToScreens } from './agent-screen.js';
 import { findIosTool, findOcrTool } from './ios-tool.js';
 import { mcpTargetFrom, targetHint } from './target.js';
 
@@ -263,5 +266,11 @@ await serveOverStdio(
     ...(captureWindow === undefined ? {} : { captureWindow }),
     readAbout,
     readSheetGuide,
+    // git-qa 自身の画面の専用カーソル（C120）。開いている画面は名乗り（~/.git-qa/screens）から探す。
+    sendToScreen: (body) =>
+      sendToScreens(
+        { findScreens: () => findScreens(), post: postJson, forget: (s) => forgetScreen(s.pid) },
+        body,
+      ),
   }),
 );

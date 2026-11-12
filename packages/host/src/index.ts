@@ -25,5 +25,9 @@ export type {
   StartSetupServerOptions,
   StartedRun,
 } from './setup-server.js';
+export { AGENT_ACTIONS, AgentActionError, parseAgentAction } from './agent-action.js';
+export type { AgentAction } from './agent-action.js';
+export { announceScreen, findScreens, forgetScreen, pidAlive, screensDir } from './screens.js';
+export type { ScreenRecord } from './screens.js';
 export { findSheets, keepRunnableSheets } from './find-sheets.js';
 export type { FindSheetsOptions } from './find-sheets.js';

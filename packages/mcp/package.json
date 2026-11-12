@@ -17,6 +17,7 @@
     "@git-qa/adapter-ios": "workspace:*",
     "@git-qa/adapter-web": "workspace:*",
     "@git-qa/core": "workspace:*",
+    "@git-qa/host": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.5.4"
   },

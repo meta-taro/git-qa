@@ -47,6 +47,8 @@ import { startRunSession } from './run-session.js';
 import { gitQaWindowRecording } from './window-recording.js';
 import { imageTools } from './image-tools.js';
 import type { RunSession } from './run-session.js';
+import { runnerOf } from './release.js';
+import { announceScreen } from './screens.js';
 import { startSetupServer } from './setup-server.js';
 import { stopServing } from './stop-serving.js';
 import { watchParent } from './watch-parent.js';
@@ -398,6 +400,18 @@ const setup = await startSetupServer({
 });
 
 console.log(`[git-qa] 画面から始める: ${setup.url}`);
+
+/**
+ * **この画面を、MCP（別のプロセス）が見つけられるようにする**（C120・専用カーソル）。
+ * 名乗りはホームの下に 1 枚。終わるときに外す（`exit` は `process.exit` のどの道でも通る）。
+ */
+const unannounce = announceScreen({
+  url: setup.agentUrl,
+  pid: process.pid,
+  release: runnerOf().version,
+  startedAt: new Date().toISOString(),
+});
+process.on('exit', unannounce);
 
 if (serveOnly) {
   // 画面は既に出ている。**ここは待つだけ。**親（アプリ）が終わればここも終わる。

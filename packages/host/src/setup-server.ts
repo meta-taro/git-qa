@@ -1,3 +1,4 @@
+import { AgentActionError, parseAgentAction } from './agent-action.js';
 import { runnerOf } from './release.js';
 import { checkRelease, type ReleaseCheck } from './update.js';
 import { randomBytes } from 'node:crypto';
@@ -166,6 +167,8 @@ export interface SetupServer {
   /** 画面が読む URL（無作為の文字列を含む）。`?setup=` に渡す。 */
   readonly url: string;
   readonly port: number;
+  /** エージェントの専用カーソルへ置く口（C120）。入口とは別の文字列。名乗りに出すのはこれ。 */
+  readonly agentUrl: string;
   close(): Promise<void>;
 }
 
@@ -351,8 +354,81 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
       });
   };
 
+  /**
+   * **エージェントの専用カーソルへの口**（C120）。
+   *
+   * 繋いでいる画面（SSE）。MCP の `screen` が `POST …/agent` に置いた指示を、検査してから全部へ流す。
+   * **置いたらすぐ返す。**画面の動きは待たない —— 待つと、ある席の遅い呼びがほかの席の呼びを止める。
+   */
+  // **置く口には別の無作為の文字列**。名乗り（~/.git-qa/screens）に出すのはこちらだけで、
+  // 入口（/state・/start）の文字列は渡さない。置く口を読めても、始める・判定の口へは辿れない。
+  const agentToken = randomBytes(16).toString('hex');
+  const agentBase = `/agent/${agentToken}`;
+  const screens = new Set<ServerResponse>();
+  const openScreen = (res: ServerResponse, cors: Record<string, string>): void => {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-store',
+      connection: 'keep-alive',
+      ...cors,
+    });
+    // ヘッダを先に送り出す（橋と同じ。書くものが無いうちは Node が溜める）。
+    res.flushHeaders();
+    res.write(': open\n\n');
+    screens.add(res);
+    res.on('close', () => screens.delete(res));
+  };
+
   const server: Server = createServer((req, res) => {
     const cors = corsHeaders(req.headers.origin);
+
+    if (req.url === `${base}/agent/events`) {
+      openScreen(res, cors);
+      return;
+    }
+
+    if (req.url === agentBase) {
+      if (req.method === 'OPTIONS') {
+        res
+          .writeHead(204, {
+            ...cors,
+            'access-control-allow-methods': 'POST, OPTIONS',
+            'access-control-allow-headers': 'content-type',
+            'access-control-max-age': '600',
+          })
+          .end();
+        return;
+      }
+      if (req.method !== 'POST') {
+        res.writeHead(405, cors).end();
+        return;
+      }
+      readJson(req, res, cors, (body) => {
+        let action: ReturnType<typeof parseAgentAction>;
+        try {
+          action = parseAgentAction(body);
+        } catch (error: unknown) {
+          if (!(error instanceof AgentActionError)) throw error;
+          // **断るなら理由を返す。**呼んだ側（エージェント）が直せる形で。
+          res
+            .writeHead(400, { ...cors, 'content-type': 'text/plain; charset=utf-8' })
+            .end(error.message);
+          return;
+        }
+        if (screens.size === 0) {
+          res
+            .writeHead(409, { ...cors, 'content-type': 'text/plain; charset=utf-8' })
+            .end('画面を開いてから（繋がっている git-qa の画面が無い）');
+          return;
+        }
+        const frame = `event: agent\ndata: ${JSON.stringify(action)}\n\n`;
+        for (const screen of screens) screen.write(frame);
+        res
+          .writeHead(202, { ...cors, 'content-type': 'application/json' })
+          .end(JSON.stringify({ screens: screens.size }));
+      });
+      return;
+    }
 
     if (req.url === `${base}/state`) {
       void state()
@@ -505,6 +581,7 @@ export async function startSetupServer(options: StartSetupServerOptions): Promis
 
   return {
     url: `http://127.0.0.1:${String(address.port)}${base}`,
+    agentUrl: `http://127.0.0.1:${String(address.port)}${agentBase}`,
     port: address.port,
     async close() {
       server.closeAllConnections();

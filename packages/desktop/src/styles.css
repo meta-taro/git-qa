@@ -1840,3 +1840,178 @@ body[data-stage='setup'] .setup-resume-list {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* ---- エージェントの専用カーソル（C120・DESIGN.md「エージェントの専用カーソル」） ----
+ * 人のマウスは使わない。色は tadori と揃える（紫の矢印・黄色の吹き出し）。
+ * **モーダルやトーストより上**に出し、`pointer-events: none` で人のクリックを邪魔しない。 */
+.agent-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  pointer-events: none;
+  transition: transform 0.65s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.agent-cursor[hidden] {
+  display: none;
+}
+
+.agent-cursor svg {
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 50%));
+}
+
+.agent-cursor svg path {
+  fill: #5e6ad2;
+  stroke: #ffffff;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.agent-cursor-tag {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  background: #5e6ad2;
+  border-radius: 999px;
+}
+
+.agent-cursor::after {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  width: 28px;
+  height: 28px;
+  content: '';
+  border: 2px solid #5e6ad2;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.agent-cursor.click::after {
+  animation: agent-ripple 0.6s ease-out;
+}
+
+@keyframes agent-ripple {
+  from {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* 指した所を囲む枠。中身の列だけが動く作りなので、窓に対して置く。 */
+.agent-frame {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  border: 2px solid #ffd166;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgb(255 209 102 / 18%);
+  animation: agent-in 0.25s ease-out;
+}
+
+.agent-frame[hidden] {
+  display: none;
+}
+
+/* 一言の吹き出し。置き場所は agent/cursor.ts が窓の中に決め、しっぽ（--tail）は指した所を向く。 */
+.agent-bubble {
+  position: fixed;
+  z-index: 56;
+  box-sizing: border-box;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 26px 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: #1a1405;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  cursor: pointer;
+  background: #ffd166;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 35%);
+  animation: agent-in 0.25s ease-out;
+}
+
+.agent-bubble[hidden] {
+  display: none;
+}
+
+.agent-bubble-close {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: #1a1405;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  opacity: 0.6;
+}
+
+.agent-bubble-close:hover {
+  opacity: 1;
+  background: rgb(0 0 0 / 8%);
+}
+
+.agent-bubble::after {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  content: '';
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.agent-bubble[data-side='above']::after {
+  bottom: -5px;
+  left: calc(var(--tail) - 5px);
+}
+
+.agent-bubble[data-side='below']::after {
+  top: -5px;
+  left: calc(var(--tail) - 5px);
+}
+
+.agent-bubble[data-side='right']::after {
+  top: calc(var(--tail) - 5px);
+  left: -5px;
+}
+
+.agent-bubble[data-side='left']::after {
+  top: calc(var(--tail) - 5px);
+  right: -5px;
+}
+
+@keyframes agent-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

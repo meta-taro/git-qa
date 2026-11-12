@@ -54,6 +54,8 @@ import {
 import type { CaseFilter } from './session/view.js';
 import { renderCaseStrip } from './session/strip.js';
 import { renderTopbar } from './topbar.js';
+import { watchAgentEvents } from './agent/client.js';
+import { createAgentCursor } from './agent/cursor.js';
 import { createLivePlayer } from './live/player.js';
 import { createImagePlayer } from './live/images.js';
 import {
@@ -390,6 +392,12 @@ if (liveUrl !== undefined) {
     if (url === undefined) return;
 
     const setupUrl = url;
+    /**
+     * **エージェントの専用カーソル**（C120）。入口の口に繋ぎ、届いた指示を順に動かす。
+     * 実行へ移っても同じページなので、線はそのまま生きる。
+     */
+    const agentCursor = createAgentCursor({ doc: document, win: window, t });
+    watchAgentEvents(setupUrl, (command) => agentCursor.run(command));
     /** 人が自分で選んだ検証シート。一覧に無くてもこれで始められる。 */
     let pickedSheet: string | undefined;
     /**

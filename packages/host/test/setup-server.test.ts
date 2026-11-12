@@ -758,3 +758,127 @@ describe('startSetupServer — 数える所が返ってこなくても state は
     expect(state['sheets']).toEqual([]);
   });
 });
+
+/**
+ * **エージェントの専用カーソルへの口**（C120）。
+ *
+ * MCP の `screen` がここへ指示を置き、画面は SSE で受けて専用カーソルを動かす。
+ * **置いたらすぐ返す。**画面の動きを待たない（ある席の遅い呼びが、ほかの席の呼びを止めない）。
+ */
+describe('startSetupServer — エージェントの専用カーソル（/agent）', () => {
+  /** 画面のつもりで SSE を開き、最初に流れてきた `agent` の指示を読む口。 */
+  const openScreen = async (
+    url: string,
+  ): Promise<{ next: () => Promise<string>; close: () => void }> => {
+    const controller = new AbortController();
+    const res = await fetch(`${url}/agent/events`, { signal: controller.signal });
+    expect(res.headers.get('content-type')).toBe('text/event-stream');
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    const decoder = new TextDecoder();
+    let buffered = '';
+    const next = async (): Promise<string> => {
+      for (;;) {
+        const at = buffered.indexOf('\n\n');
+        if (at >= 0) {
+          const frame = buffered.slice(0, at);
+          buffered = buffered.slice(at + 2);
+          if (frame.startsWith(':')) continue;
+          return frame;
+        }
+        const { value, done } = await reader.read();
+        if (done) throw new Error('画面への線が閉じた');
+        buffered += decoder.decode(value, { stream: true });
+      }
+    };
+    return { next, close: () => controller.abort() };
+  };
+
+  const post = (url: string, body: unknown): Promise<Response> =>
+    fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('画面が繋いでいれば、検査した指示をそのまま流し、届けた画面の数を返す', async () => {
+    server = await startSetupServer(options());
+    const screen = await openScreen(server.url);
+    try {
+      const res = await post(server.agentUrl, { action: 'point', target: '始める', extra: 'x' });
+
+      expect(res.status).toBe(202);
+      expect(await res.json()).toEqual({ screens: 1 });
+      expect(await screen.next()).toBe(
+        `event: agent\ndata: ${JSON.stringify({ action: 'point', target: '始める' })}`,
+      );
+    } finally {
+      screen.close();
+    }
+  });
+
+  it('画面が 1 つも繋いでいなければ、「画面を開いてから」と断る', async () => {
+    server = await startSetupServer(options());
+
+    const res = await post(server.agentUrl, { action: 'say', message: 'こんにちは' });
+
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain('画面を開いてから');
+  });
+
+  it('形のおかしい指示は、理由を言って断る（画面へは流さない）', async () => {
+    server = await startSetupServer(options());
+    const screen = await openScreen(server.url);
+    try {
+      const res = await post(server.agentUrl, { action: 'filter', value: 'qa' });
+
+      expect(res.status).toBe(400);
+      expect(await res.text()).toContain('人で絞る欄');
+      // 流れていないことを、次の正しい指示が先頭で届くことで確かめる。
+      await post(server.agentUrl, { action: 'say', message: 'ok' });
+      expect(await screen.next()).toContain('"message":"ok"');
+    } finally {
+      screen.close();
+    }
+  });
+
+  it('画面が読まなくても、置いた側はすぐ返る（遅い画面が、別の席の呼びを止めない）', async () => {
+    server = await startSetupServer(options());
+    const url = server.agentUrl;
+    // 開くだけで、一度も読まない画面（画面の線は入口の下）。
+    const controller = new AbortController();
+    await fetch(`${server.url}/agent/events`, { signal: controller.signal });
+    try {
+      const began = Date.now();
+      const results = await Promise.all(
+        Array.from({ length: 5 }, (_, i) =>
+          post(url, { action: 'say', message: `一言 ${String(i)}`.repeat(20) }),
+        ),
+      );
+      expect(results.map((r) => r.status)).toEqual([202, 202, 202, 202, 202]);
+      expect(Date.now() - began).toBeLessThan(1_000);
+    } finally {
+      controller.abort();
+    }
+  });
+
+  it('POST 以外は受けない', async () => {
+    server = await startSetupServer(options());
+
+    expect((await fetch(server.agentUrl)).status).toBe(405);
+  });
+
+  /**
+   * **名乗りに出す口から、入口へ辿れない。**名乗りはホームの下のファイルで、同じ機械の別のプロセスが読める。
+   * そこに入口の文字列を出すと、始める（/start・ハンドル付き）や判定の口（/state の controlUrl）へ辿れてしまう。
+   */
+  it('置く口は入口と別の文字列で、置く口から /state・/start へは辿れない', async () => {
+    server = await startSetupServer(options());
+
+    expect(server.agentUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/agent\/[0-9a-f]{32}$/);
+    expect(server.agentUrl).not.toContain(server.url.slice(-32));
+    expect((await fetch(`${server.agentUrl}/state`)).status).toBe(404);
+    expect((await fetch(`${server.agentUrl}/start`, { method: 'POST' })).status).toBe(404);
+    // 入口の文字列からも置けない（置く口は 1 つ）。
+    expect((await post(`${server.url}/agent`, { action: 'say', message: 'a' })).status).toBe(404);
+  });
+});
