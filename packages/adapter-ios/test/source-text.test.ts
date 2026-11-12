@@ -51,7 +51,8 @@ describe('sourceToLines', () => {
   it('見えている部品の名前を、画素の真ん中の座標で並べる', () => {
     const lines = sourceToLines(tree, 3).split('\n');
     expect(lines).toContain(
-      `一般\t${String(187.5 * 3)}\t${String(70 * 3)}\t${String(375 * 3)}\t${String(52 * 3)}`,
+      // ナビゲーションバーの題は棒の中なので、6 つ目の欄に印が付く（棒に隠れている扱いにしない）。
+      `一般\t${String(187.5 * 3)}\t${String(70 * 3)}\t${String(375 * 3)}\t${String(52 * 3)}\tbar`,
     );
     expect(lines).toContain(
       `情報\t${String(80 * 3)}\t${String(222 * 3)}\t${String(40 * 3)}\t${String(24 * 3)}`,

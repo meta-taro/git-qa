@@ -276,8 +276,11 @@ interface SourceNode {
 export function sourceToLines(root: unknown, scale: number): string {
   const by = scale > 0 ? scale : 1;
   const out: string[] = [];
-  const walk = (node: SourceNode): void => {
+  // **棒（タブバー等）の中の部品は、棒に隠れているのではなく棒そのもの**（2026-11-12・iPhone 17 の席）。
+  // C118 の判定に使えるよう、6 つ目の欄に印を付ける。
+  const walk = (node: SourceNode, inBar: boolean): void => {
     const { rect } = node;
+    const bar = inBar || (node.type !== undefined && BARS.has(node.type) && isShown(node));
     const placed =
       isShown(node) &&
       node.type !== 'Application' &&
@@ -311,13 +314,14 @@ export function sourceToLines(root: unknown, scale: number): string {
             (rect.y + rect.height / 2) * by,
             rect.width * by,
             rect.height * by,
+            ...(bar ? [IN_BAR] : []),
           ].join('\t'),
         );
       }
     }
-    for (const child of node.children ?? []) walk(child);
+    for (const child of node.children ?? []) walk(child, bar);
   };
-  if (typeof root === 'object' && root !== null) walk(root);
+  if (typeof root === 'object' && root !== null) walk(root, false);
   return out.join('\n');
 }
 
@@ -372,6 +376,8 @@ export function findBack(root: unknown): Navigation {
 
 /** 画面に浮いていて、裏の部品を隠す棒。 */
 const BARS: ReadonlySet<string> = new Set(['TabBar', 'Toolbar', 'NavigationBar']);
+/** 画面の文字の行で、その部品が棒の中に在ることを示す印（6 つ目の欄）。 */
+export const IN_BAR = 'bar';
 
 /** 部品の矩形が棒に隠れていないか。棒は横いっぱいに在るので、**縦にだけ切る。** */
 export type Uncovered =
@@ -456,19 +462,20 @@ export function countByText(ocr: string, ref: string): number {
 export function pickByText(
   ocr: string,
   ref: string,
-): { x: number; y: number; width: number; height: number } | undefined {
+): { x: number; y: number; width: number; height: number; inBar?: true } | undefined {
   const squeeze = (value: string): string => value.replace(/\s+/g, '');
   const want = squeeze(ref);
   const lines = ocr
     .split('\n')
     .map((line) => line.split('\t'))
     .filter((cells) => cells.length >= 5 && cells[0] !== '')
-    .map(([text = '', x, y, w, h]) => ({
+    .map(([text = '', x, y, w, h, mark]) => ({
       text,
       x: Number(x),
       y: Number(y),
       width: Number(w),
       height: Number(h),
+      inBar: mark === IN_BAR,
     }))
     .filter((one) => [one.x, one.y, one.width, one.height].every(Number.isFinite));
   const bySize = (a: { width: number; height: number }, b: { width: number; height: number }) =>
@@ -478,5 +485,12 @@ export function pickByText(
   const best = exact[0] ?? partial[0];
   return best === undefined
     ? undefined
-    : { x: best.x, y: best.y, width: best.width, height: best.height };
+    : {
+        x: best.x,
+        y: best.y,
+        width: best.width,
+        height: best.height,
+        // 印が無い行（絵から読んだ文字・古い形）は、棒の中ではない。
+        ...(best.inBar ? { inBar: true as const } : {}),
+      };
 }

@@ -324,3 +324,33 @@ describe('iosAct', () => {
     ).rejects.toThrow(/まだ送れない/);
   });
 });
+
+/**
+ * **タブバーの中の項目を「タブバーに隠れている」と見て押せなくなっていた**（2026-11-12・iPhone 17 の席）。
+ * C118 の直しの後、タブバーの「設定」が「下の棒に隠れていて押せない」で BLOCKED になった。
+ * 棒の中の部品は、棒に隠れているのではなく棒そのもの。**今までどおり真ん中を押す。**
+ */
+describe('iosAct — 棒の中の部品', () => {
+  it('タブバーの中の「設定」は、隠れている扱いにせず、送らずに真ん中を押す', async () => {
+    const { done, deps } = fake();
+    const inBar = {
+      ...deps,
+      wda: {
+        ...deps.wda,
+        navigation: () =>
+          Promise.resolve({
+            width: 402,
+            height: 874,
+            bars: [{ x: 0, y: 790, width: 402, height: 84 }],
+          }),
+      },
+      // 「設定」：真ん中 (328, 822) pt・高さ 48 pt、6 つ目の欄に「棒の中」の印
+      look: () => Promise.resolve('設定\t984\t2466\t240\t144\tbar'),
+    };
+
+    const report = await iosAct({ kind: 'tap', target: { at: 'element', ref: '設定' } }, inBar);
+
+    expect(done).toEqual(['tap 328,822']);
+    expect(report.detail).not.toContain('棒');
+  });
+});

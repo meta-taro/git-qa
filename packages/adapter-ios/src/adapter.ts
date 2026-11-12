@@ -333,14 +333,18 @@ export async function iosAct(action: Action, deps: IosActDeps): Promise<ActRepor
      */
     const nav = await wda.navigation();
     const bars = nav.bars ?? [];
-    let shown = uncovered(asRectPt(found), bars);
+    // **棒の中の部品（タブバーの項目など）は、棒に隠れているのではなく棒そのもの**（2026-11-12・iPhone 17 の席）。
+    // 直前の直し（C118）が、タブバーの「設定」を「タブバーに隠れている」と見て押せなくなっていた。
+    const shownOf = (one: typeof found): ReturnType<typeof uncovered> =>
+      one.inBar ? { kind: 'clear' } : uncovered(asRectPt(one), bars);
+    let shown = shownOf(found);
     let moved = '';
     if (shown.kind === 'hidden') {
       const where = shown.bar === 'below' ? '下' : '上';
       await nudgeAwayFrom(wda, nav, shown.bar, asRectPt(found).height);
       await settle();
       ({ text, found } = await find());
-      shown = uncovered(asRectPt(found), bars);
+      shown = shownOf(found);
       if (shown.kind === 'hidden') {
         throw new AdapterError(
           KIND,

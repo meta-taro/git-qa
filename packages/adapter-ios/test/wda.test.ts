@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createWdaClient, findBack, pickByText, toPoints } from '../src/wda.js';
+import { createWdaClient, findBack, pickByText, sourceToLines, toPoints } from '../src/wda.js';
 
 /**
  * **iPhone / iPad を押す口**（WebDriverAgent・2026-10-06 に作ると決めた・C99）。
@@ -282,5 +282,44 @@ describe('findBack', () => {
 
   it('棒が無ければ、bars は空', () => {
     expect(findBack(app([button('設定', 8)])).bars).toEqual([]);
+  });
+});
+
+/**
+ * **棒の中の部品には印を付ける**（2026-11-12・iPhone 17 の席）。
+ * C118 は棒に隠れた部品を見分けるが、棒の中の項目（タブバーの「設定」）まで隠れている扱いにしていた。
+ */
+describe('sourceToLines / pickByText — 棒の中の印', () => {
+  const node = (
+    type: string,
+    label: string,
+    rect: { x: number; y: number; width: number; height: number },
+    children: unknown[] = [],
+  ) => ({
+    type,
+    label,
+    rect,
+    isVisible: '1',
+    children,
+  });
+  const tree = node('Application', 'app', { x: 0, y: 0, width: 402, height: 874 }, [
+    node('Button', '回線の設定', { x: 0, y: 700, width: 402, height: 53 }),
+    node('TabBar', '', { x: 0, y: 790, width: 402, height: 84 }, [
+      node('Button', '設定', { x: 300, y: 798, width: 80, height: 48 }),
+    ]),
+  ]);
+
+  it('棒の中の部品の行には 6 つ目の欄に印が付き、外の部品には付かない', () => {
+    const lines = sourceToLines(tree, 1).split('\n');
+
+    expect(lines.find((l) => l.startsWith('設定\t'))).toBe('設定\t340\t822\t80\t48\tbar');
+    expect(lines.find((l) => l.startsWith('回線の設定\t'))).toBe('回線の設定\t201\t726.5\t402\t53');
+  });
+
+  it('pickByText は印を inBar として返す（印の無い行は false）', () => {
+    const text = sourceToLines(tree, 1);
+
+    expect(pickByText(text, '設定')?.inBar).toBe(true);
+    expect(pickByText(text, '回線の設定')?.inBar).toBeUndefined();
   });
 });
