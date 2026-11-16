@@ -36,6 +36,26 @@ export function foregroundChangeReason(
   );
 }
 
+/**
+ * **始める前に、空いているかを見る**（C121 の 2 つ目）。
+ *
+ * まだ何も覚えていない最初の操作の前に、前面が検証する相手でもホーム画面でもなければ、
+ * 誰かが使っている最中と見て始めない。相手を知らなければ見ない（途中の見張りだけ）。
+ * ホームが分からない相手では、相手のアプリでなければ始めない（空いていると決めつけない）。
+ */
+export function busyBeforeStartReason(
+  app: string | undefined,
+  now: string | undefined,
+  home: string | undefined,
+): string | undefined {
+  if (app === undefined || now === undefined) return undefined;
+  if (now === app || (home !== undefined && now === home)) return undefined;
+  return (
+    `始める前に、前面に居るのが「${now}」で、検証する相手（${app}）でもホーム画面でもない` +
+    `（別の人が端末を使っているかもしれない）。空いていることを確かめて、もう一度始める`
+  );
+}
+
 /** 読めなければ `undefined`。**見張りの口が落ちても、操作は止めない。** */
 const readForeground = async (session: TargetSession): Promise<string | undefined> => {
   try {
@@ -45,17 +65,36 @@ const readForeground = async (session: TargetSession): Promise<string | undefine
   }
 };
 
-export function createForegroundGuard(): ForegroundGuard {
+const readHome = async (session: TargetSession): Promise<string | undefined> => {
+  try {
+    return await session.homeApp?.();
+  } catch {
+    return undefined;
+  }
+};
+
+export interface ForegroundGuardOptions {
+  /** 検証する相手のアプリの識別子（シートの `# 対象:`）。無ければ、始める前の見張りはしない。 */
+  readonly app?: string;
+}
+
+export function createForegroundGuard(options: ForegroundGuardOptions = {}): ForegroundGuard {
   /** 最後に見た前面のアプリ。件をまたいで持つ（人が判定を置いている間に替わるのを見るため）。 */
   let last: string | undefined;
 
   return {
     async check(session, stepText) {
       const now = await readForeground(session);
-      const reason = foregroundChangeReason(stepText, last, now);
-      // 初めて見たとき（と、前が読めていなかったとき）は覚えるだけ。**止めたときは替えない。**
-      if (last === undefined) last = now;
-      return reason;
+      if (last === undefined) {
+        // **まだ何も覚えていない＝始める前。**空いていなければ始めず、覚えもしない（次の件でまた見る）。
+        const busy = busyBeforeStartReason(options.app, now, await readHome(session));
+        if (busy !== undefined) return busy;
+        // 初めて見たとき（と、前が読めていなかったとき）は覚えるだけ。
+        last = now;
+        return undefined;
+      }
+      // 替わっていれば止める。**止めたときは覚えを替えない。**
+      return foregroundChangeReason(stepText, last, now);
     },
 
     async remember(session) {

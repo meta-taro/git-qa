@@ -134,6 +134,12 @@ export interface TargetSession {
    * **言える相手だけが持つ**（ウェブ・デスクトップは持たない）。読めなければ `undefined`。
    */
   foreground?(): Promise<string | undefined>;
+  /**
+   * **ホーム画面のアプリの識別子**（C121）。iPhone は `com.apple.springboard`、Android は既定のランチャー。
+   * 始める前に「前面が検証する相手でもホームでもない＝誰かが使っている最中」を見分けるのに要る。
+   * 分からなければ `undefined`（そのときは、相手のアプリでなければ始めない）。
+   */
+  homeApp?(): Promise<string | undefined>;
   close(): Promise<void>;
 }
 

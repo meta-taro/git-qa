@@ -349,6 +349,8 @@ function createSession(deps: SessionDeps): TargetSession {
 
   /** 端末の実寸。読み直しが要らないので覚えておく。 */
   let cachedScreen: { width: number; height: number } | undefined;
+  /** 既定のランチャー。一度読んだら覚える。 */
+  let cachedHome: string | undefined;
 
   let recProcess: RunningProcess | undefined;
   let recFile: string | undefined;
@@ -600,6 +602,32 @@ function createSession(deps: SessionDeps): TargetSession {
         () => new Uint8Array(),
       );
       return parseForegroundPackage(new TextDecoder().decode(out));
+    },
+
+    /**
+     * **ホーム画面（既定のランチャー）のパッケージ**（C121）。端末ごとに違うので、端末に聞く。
+     * 始める前に「前面が相手でもホームでもない＝誰かが使っている最中」を見分けるのに要る。
+     */
+    async homeApp(): Promise<string | undefined> {
+      ensureOpen();
+      if (cachedHome !== undefined) return cachedHome;
+      const out = await adbRun(
+        [
+          'shell',
+          'cmd',
+          'package',
+          'resolve-activity',
+          '--brief',
+          '-a',
+          'android.intent.action.MAIN',
+          '-c',
+          'android.intent.category.HOME',
+        ],
+        serial,
+      ).catch(() => new Uint8Array());
+      const component = parseResolvedActivity(new TextDecoder().decode(out));
+      cachedHome = component?.split('/')[0];
+      return cachedHome;
     },
 
     async observe(): Promise<Observation> {

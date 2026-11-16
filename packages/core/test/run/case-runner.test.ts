@@ -623,6 +623,7 @@ describe('createSheetCaseRunner — 前面が替わったら触らない（C121�
       screenshot: () => session.screenshot(),
       close: () => session.close(),
       foreground: () => Promise.resolve(fronts[i++]),
+      homeApp: () => Promise.resolve('com.apple.springboard'),
     };
   };
   const cells = {
@@ -702,5 +703,42 @@ describe('createSheetCaseRunner — 前面が替わったら触らない（C121�
     const verdict = await runner('保存しました')(context(session, cells, []));
     expect(verdict.aiResult).toBe('PASS');
     expect(adapter.actions).toHaveLength(2);
+  });
+});
+
+/** **始める前に空いているかを見る**（C121 の 2 つ目）。前面が相手でもホームでもなければ、最初の手順から触らない。 */
+describe('createSheetCaseRunner — 始める前に空いているかを見る（C121）', () => {
+  it('前面が別のアプリなら、最初の手順も送らずに BLOCKED にする', async () => {
+    const { adapter, session } = await connect();
+    const busy: TargetSession = {
+      ...session,
+      act: (action) => session.act(action),
+      observe: () => session.observe(),
+      screenshot: () => session.screenshot(),
+      close: () => session.close(),
+      foreground: () => Promise.resolve('com.other.app'),
+      homeApp: () => Promise.resolve('com.apple.springboard'),
+    };
+    const run = createSheetCaseRunner({
+      readScreenText: () => Promise.resolve(''),
+      app: 'com.example.app',
+      expectation: { waitMs: 0, stepMs: 1 },
+    });
+
+    const verdict = await run(
+      context(
+        busy,
+        {
+          [STEPS_COLUMN]: '1. アプリを起動する',
+          [EXPECTATION_COLUMN]: '「ようこそ」と表示される',
+        },
+        [],
+      ),
+    );
+
+    expect(verdict.aiResult).toBe('BLOCKED');
+    expect(verdict.note).toContain('始める前に');
+    expect(verdict.note).toContain('com.other.app');
+    expect(adapter.actions).toEqual([]);
   });
 });

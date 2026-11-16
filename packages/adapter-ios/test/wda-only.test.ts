@@ -152,3 +152,16 @@ describe('createIosAdapter — 前面のアプリ', () => {
     await session.close();
   });
 });
+
+describe('createIosAdapter — ホーム画面のアプリ', () => {
+  it('SpringBoard を返す', async () => {
+    const session = await createIosAdapter({
+      wdaUrl: 'http://192.0.2.10:8100',
+      wda: wda(),
+      build: { source: 'ios', label: 'test' },
+    }).connect();
+
+    expect(await session.homeApp?.()).toBe('com.apple.springboard');
+    await session.close();
+  });
+});

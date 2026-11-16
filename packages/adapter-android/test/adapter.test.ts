@@ -951,3 +951,34 @@ describe('createAndroidAdapter — 前面のアプリ', () => {
     await session.close();
   });
 });
+
+describe('createAndroidAdapter — ホーム画面のアプリ', () => {
+  it('既定のランチャーを端末に聞き、パッケージを返す（一度読んだら覚える）', async () => {
+    const runner = fakeRunner({
+      'shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME':
+        {
+          code: 0,
+          stdout: new TextEncoder().encode(
+            'priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.google.android.apps.nexuslauncher/.NexusLauncherActivity\n',
+          ),
+          stderr: '',
+        },
+    });
+    const session = await createAndroidAdapter({ runner, build: { source: 'test' } }).connect();
+
+    expect(await session.homeApp?.()).toBe('com.google.android.apps.nexuslauncher');
+    expect(await session.homeApp?.()).toBe('com.google.android.apps.nexuslauncher');
+    expect(runner.ran.filter((args) => args.includes('resolve-activity'))).toHaveLength(1);
+    await session.close();
+  });
+
+  it('読めなければ undefined（ホームを決めつけない）', async () => {
+    const runner = fakeRunner({
+      'shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME':
+        { code: 0, stdout: new TextEncoder().encode('No activity found\n'), stderr: '' },
+    });
+    const session = await createAndroidAdapter({ runner, build: { source: 'test' } }).connect();
+    expect(await session.homeApp?.()).toBeUndefined();
+    await session.close();
+  });
+});

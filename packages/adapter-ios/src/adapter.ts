@@ -71,6 +71,8 @@ import { encodeFrames, mjpegFrames } from './frames.js';
  * - **他のアプリが掴んでいないこと**（QuickTime の「ムービー収録」は閉じる）
  */
 
+/** ホーム画面のアプリ（WDA の activeAppInfo がホームで返す Bundle ID）。 */
+const IOS_HOME_APP = 'com.apple.springboard';
 const KIND = 'ios' as const;
 
 /**
@@ -750,6 +752,11 @@ function createIosSession(deps: SessionDeps): TargetSession {
           foreground(): Promise<string | undefined> {
             ensureOpen();
             return wda.activeApp();
+          },
+
+          /** ホーム画面は SpringBoard。始める前に「空いているか」を見分けるのに要る（C121）。 */
+          homeApp(): Promise<string | undefined> {
+            return Promise.resolve(IOS_HOME_APP);
           },
         }),
 

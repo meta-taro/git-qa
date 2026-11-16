@@ -207,7 +207,7 @@ export function createSheetCaseRunner(
    * **共有の実機の見張り**（C121）。件をまたいで持つ —— 人が判定を置いている間に
    * 別の人が端末を使い始めても、次の件の最初の操作の前に気づける。
    */
-  const guard = createForegroundGuard();
+  const guard = createForegroundGuard(options.app === undefined ? {} : { app: options.app });
 
   return async (ctx: CaseContext): Promise<CaseVerdict> => {
     /**
