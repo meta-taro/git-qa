@@ -6,6 +6,7 @@ import type { PlannedAction, PlannedSeek, PlannedStep, ValueSource } from './ste
 import { seekUntilVisible } from './seek.js';
 import { expandDates } from './dates.js';
 import { alreadyThereMessage, wasAlreadyThere } from './already-there.js';
+import { createForegroundGuard, type ForegroundGuard } from './foreground-guard.js';
 import { judgeExpectation, planExpectation, planSteps } from './steps.js';
 import { rowWait } from './wait.js';
 
@@ -162,9 +163,16 @@ async function actAll(
   ctx: CaseContext,
   steps: (PlannedAction | PlannedSeek)[],
   options: SheetCaseRunnerOptions,
+  guard: ForegroundGuard,
 ): Promise<string | undefined> {
   for (const step of steps) {
     ctx.step(step.text);
+    /**
+     * **触る前に、前面が替わっていないかを見る**（C121）。
+     * 別の人が端末を使い始めていれば、その上でこちらの手順を押さない。触らずに人へ渡す。
+     */
+    const taken = await guard.check(ctx.session, step.text);
+    if (taken !== undefined) return taken;
     try {
       if (step.kind === 'seek') {
         // **見えるまで送る**（C109）。何回送って見えたかを足跡へ。
@@ -174,16 +182,18 @@ async function actAll(
             ...(options.seek?.pauseMs === undefined ? {} : { pauseMs: options.seek.pauseMs }),
           }),
         );
-        continue;
+      } else {
+        const report = await ctx.session.act(step.action);
+        // **何をどう押したか**を足跡へ（#42）。言えない相手は何も返さない。
+        // **外から入れた値は、相手の報告ごと伏せる**（打ったあとの値を言う相手がいる・C113）。
+        if (step.secret === true) ctx.note?.('値は外から入れた（証跡には書かない）');
+        else if (report !== undefined) ctx.note?.(report.detail);
       }
-      const report = await ctx.session.act(step.action);
-      // **何をどう押したか**を足跡へ（#42）。言えない相手は何も返さない。
-      // **外から入れた値は、相手の報告ごと伏せる**（打ったあとの値を言う相手がいる・C113）。
-      if (step.secret === true) ctx.note?.('値は外から入れた（証跡には書かない）');
-      else if (report !== undefined) ctx.note?.(report.detail);
     } catch (error: unknown) {
       return `「${step.text}」で止まった: ${errorMessage(error)}`;
     }
+    // 自分の操作で前面が替わった分（起動・別アプリへ飛ぶリンク）は、ここで追い付く。
+    await guard.remember(ctx.session);
   }
   return undefined;
 }
@@ -193,6 +203,11 @@ export function createSheetCaseRunner(
 ): (ctx: CaseContext) => Promise<CaseVerdict> {
   const stepsColumn = options.stepsColumn ?? STEPS_COLUMN;
   const expectationColumn = options.expectationColumn ?? EXPECTATION_COLUMN;
+  /**
+   * **共有の実機の見張り**（C121）。件をまたいで持つ —— 人が判定を置いている間に
+   * 別の人が端末を使い始めても、次の件の最初の操作の前に気づける。
+   */
+  const guard = createForegroundGuard();
 
   return async (ctx: CaseContext): Promise<CaseVerdict> => {
     /**
@@ -254,7 +269,7 @@ export function createSheetCaseRunner(
      */
     const before = await options.readScreenText(ctx.session).catch(() => undefined);
 
-    const failure = await actAll(ctx, actions, options);
+    const failure = await actAll(ctx, actions, options, guard);
     if (failure !== undefined) {
       return withDates({ aiResult: 'BLOCKED', note: failure });
     }

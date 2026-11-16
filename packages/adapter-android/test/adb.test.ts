@@ -8,6 +8,7 @@ import {
   inputCommands,
   keycode,
   parseDeviceList,
+  parseForegroundPackage,
   parseResolvedActivity,
   parseScreenSize,
   parseWakefulness,
@@ -327,5 +328,33 @@ describe('findElementCenter — 押せるものを先に（#41）', () => {
     const xml = node({ text: 'ログイン', bounds: '[0,0][100,50]' });
 
     expect(findElementCenter(xml, 'ログイン')).toEqual({ x: 50, y: 25 });
+  });
+});
+
+/**
+ * **前面のアプリ**（C121）。共有の実機を別の人が使い始めていないかを、操作の前後で見比べるのに要る。
+ * `dumpsys window` の `mCurrentFocus=Window{… u0 パッケージ/アクティビティ}` から読む。
+ */
+describe('parseForegroundPackage — 前面に居るアプリのパッケージ', () => {
+  it('mCurrentFocus のパッケージを返す', () => {
+    const out = [
+      'WINDOW MANAGER WINDOWS (dumpsys window windows)',
+      '  mCurrentFocus=Window{a1b2c3 u0 com.example.app/com.example.app.MainActivity}',
+      '  mFocusedApp=ActivityRecord{d4e5f6 u0 com.example.app/.MainActivity t12}',
+    ].join('\n');
+    expect(parseForegroundPackage(out)).toBe('com.example.app');
+  });
+
+  it('mCurrentFocus が無ければ mFocusedApp から読む（ダイアログや IME が焦点を持つ間）', () => {
+    const out = [
+      '  mCurrentFocus=null',
+      '  mFocusedApp=ActivityRecord{d4e5f6 u0 com.android.settings/.Settings t7}',
+    ].join('\n');
+    expect(parseForegroundPackage(out)).toBe('com.android.settings');
+  });
+
+  it('どちらも読めなければ undefined（当てずっぽうを返さない）', () => {
+    expect(parseForegroundPackage('なにか')).toBeUndefined();
+    expect(parseForegroundPackage('')).toBeUndefined();
   });
 });

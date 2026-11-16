@@ -22,6 +22,7 @@ import {
   focusedField,
   inputCommands,
   parseDeviceList,
+  parseForegroundPackage,
   parseResolvedActivity,
   parseScreenSize,
   parseWakefulness,
@@ -587,6 +588,18 @@ function createSession(deps: SessionDeps): TargetSession {
       }
       cachedScreen = { width: size.x, height: size.y };
       return cachedScreen;
+    },
+
+    /**
+     * **前面に居るアプリのパッケージ**（C121）。共有の実機を別の人が使い始めていないかを、
+     * コアが操作の前後で見比べる。読めなければ `undefined`（見張りの口が落ちても、操作は止めない）。
+     */
+    async foreground(): Promise<string | undefined> {
+      ensureOpen();
+      const out = await adbRun(['shell', 'dumpsys', 'window'], serial).catch(
+        () => new Uint8Array(),
+      );
+      return parseForegroundPackage(new TextDecoder().decode(out));
     },
 
     async observe(): Promise<Observation> {

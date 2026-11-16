@@ -323,3 +323,32 @@ describe('sourceToLines / pickByText — 棒の中の印', () => {
     expect(pickByText(text, '回線の設定')?.inBar).toBeUndefined();
   });
 });
+
+/**
+ * **前面に居るアプリ**（C121）。共有の実機を別の人が使い始めていないかを、操作の前後で見比べるのに要る。
+ */
+describe('createWdaClient — 前面のアプリ', () => {
+  it('activeAppInfo の bundleId を返す', async () => {
+    const { sent, fetchImpl } = fakeWda();
+    const asking = (url: string, init?: { method?: string; body?: string }) => {
+      if (new URL(url).pathname === '/wda/activeAppInfo') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ value: { bundleId: 'com.apple.Preferences', pid: 12 } }),
+        });
+      }
+      return fetchImpl(url, init);
+    };
+    const wda = createWdaClient('http://127.0.0.1:8100', asking);
+
+    expect(await wda.activeApp()).toBe('com.apple.Preferences');
+    expect(sent.some((one) => one.path === '/wda/activeAppInfo')).toBe(false);
+  });
+
+  it('bundleId が無ければ undefined（読めなかったことを、どこかのアプリと言わない）', async () => {
+    const { fetchImpl } = fakeWda();
+    const wda = createWdaClient('http://127.0.0.1:8100', fetchImpl);
+    expect(await wda.activeApp()).toBeUndefined();
+  });
+});

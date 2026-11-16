@@ -597,3 +597,110 @@ describe('値を外から入れる（C113）', () => {
     expect(JSON.stringify({ steps, notes })).not.toContain('ABCD-1234');
   });
 });
+
+/**
+ * **共有の実機を、別の人が使い始めていないかを見張る**（C121）。
+ *
+ * 2026-11-12、別の席が同じ iPhone を使っている最中に、git-qa がアプリを何度も前面へ出して邪魔した。
+ * 操作の前に前面のアプリを読み、自分が最後に見たものと違えば、**触らずに BLOCKED で人へ渡す。**
+ */
+describe('createSheetCaseRunner — 前面が替わったら触らない（C121）', () => {
+  /** 前面のアプリを、聞かれた順に返すセッション。 */
+  const withForeground = (
+    session: TargetSession,
+    fronts: (string | undefined)[],
+  ): TargetSession => {
+    let i = 0;
+    return {
+      target: session.target,
+      liveView: session.liveView,
+      recording: session.recording,
+      get isClosed() {
+        return session.isClosed;
+      },
+      act: (action) => session.act(action),
+      observe: () => session.observe(),
+      screenshot: () => session.screenshot(),
+      close: () => session.close(),
+      foreground: () => Promise.resolve(fronts[i++]),
+    };
+  };
+  const cells = {
+    [STEPS_COLUMN]: '1. 保存をタップする\n2. 完了をタップする',
+    [EXPECTATION_COLUMN]: '「保存しました」と表示される',
+  };
+
+  it('手順の途中で前面が替わっていたら、その手順を送らずに BLOCKED にする', async () => {
+    const { adapter, session } = await connect();
+    // 1 つ目の前・1 つ目のあと・2 つ目の前。2 つ目の前に別のアプリが前に出ている。
+    const front = withForeground(session, ['com.example.app', 'com.example.app', 'com.other.app']);
+
+    const verdict = await runner('保存しました')(context(front, cells, []));
+
+    expect(verdict.aiResult).toBe('BLOCKED');
+    expect(verdict.note).toContain('「完了をタップする」の前に、前面のアプリが替わっていた');
+    expect(verdict.note).toContain('別の人が端末を使っているかもしれない');
+    expect(verdict.note).toContain('com.example.app → com.other.app');
+    // **2 つ目は送っていない。**
+    expect(adapter.actions).toEqual([{ kind: 'tap', target: { at: 'element', ref: '保存' } }]);
+  });
+
+  it('自分の起動で前面が替わった分は、止めない', async () => {
+    const { adapter, session } = await connect();
+    const front = withForeground(session, [
+      'com.apple.springboard', // 起動の前（ホーム）
+      'com.example.app', // 起動のあと
+      'com.example.app', // 保存の前
+      'com.example.app', // 保存のあと
+    ]);
+    let asked = 0;
+    const run = createSheetCaseRunner({
+      // 押す前は空、押したあとに出る（押す前から在る文字は確かめにならないので）。
+      readScreenText: () => Promise.resolve(asked++ === 0 ? '' : '保存しました'),
+      app: 'com.example.app',
+      expectation: { waitMs: 0, stepMs: 1 },
+    });
+
+    const verdict = await run(
+      context(
+        front,
+        {
+          [STEPS_COLUMN]: '1. アプリを起動する\n2. 保存をタップする',
+          [EXPECTATION_COLUMN]: '「保存しました」と表示される',
+        },
+        [],
+      ),
+    );
+
+    expect(verdict.aiResult).not.toBe('BLOCKED');
+    expect(adapter.actions).toHaveLength(2);
+  });
+
+  it('件をまたいでも見ている。前の件のあとに替わっていれば、次の件は最初の手順から触らない', async () => {
+    const { adapter, session } = await connect();
+    // 1 件目：前・あと・前・あと。2 件目の最初の前に、別のアプリ。
+    const front = withForeground(session, [
+      'com.example.app',
+      'com.example.app',
+      'com.example.app',
+      'com.example.app',
+      'com.other.app',
+    ]);
+    const run = runner('保存しました');
+
+    const first = await run(context(front, cells, []));
+    const second = await run(context(front, cells, []));
+
+    expect(first.aiResult).toBe('PASS');
+    expect(second.aiResult).toBe('BLOCKED');
+    expect(second.note).toContain('「保存をタップする」の前に');
+    expect(adapter.actions).toHaveLength(2);
+  });
+
+  it('前面を言えない相手では、今までどおり動く', async () => {
+    const { adapter, session } = await connect();
+    const verdict = await runner('保存しました')(context(session, cells, []));
+    expect(verdict.aiResult).toBe('PASS');
+    expect(adapter.actions).toHaveLength(2);
+  });
+});

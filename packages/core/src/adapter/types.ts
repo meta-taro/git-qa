@@ -126,6 +126,14 @@ export interface TargetSession {
    * クエリの値を伏せるのは core の仕事（`case-url.ts`）。ここは有りのままを返す。
    */
   url?(): Promise<string | undefined>;
+  /**
+   * **いま前面に居るアプリの識別子**（C121）。iPhone なら Bundle ID、Android ならパッケージ名。
+   *
+   * 共有の実機を、別の人が使い始めていないかを見張るのに使う（`run/foreground-guard.ts`）。
+   * 操作の前後で見比べ、替わっていれば触らずに止める。
+   * **言える相手だけが持つ**（ウェブ・デスクトップは持たない）。読めなければ `undefined`。
+   */
+  foreground?(): Promise<string | undefined>;
   close(): Promise<void>;
 }
 

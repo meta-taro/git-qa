@@ -741,6 +741,16 @@ function createIosSession(deps: SessionDeps): TargetSession {
             };
             return cachedScreen;
           },
+
+          /**
+           * **前面に居るアプリ**（C121）。共有の実機を別の人が使い始めていないかを、
+           * コアが操作の前後で見比べる。2026-11-12、別の席が使っている iPhone で
+           * アプリを何度も前面へ出してしまった件の守り。聞けなければ `undefined`。
+           */
+          foreground(): Promise<string | undefined> {
+            ensureOpen();
+            return wda.activeApp();
+          },
         }),
 
     /**

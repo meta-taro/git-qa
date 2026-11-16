@@ -33,6 +33,7 @@ const fake = (scale = 3) => {
     texts: () => Promise.resolve(''),
     windowSize: () => Promise.resolve({ width: 402, height: 874 }),
     navigation: () => Promise.resolve({ width: 402, height: 874 }),
+    activeApp: () => Promise.resolve('com.example.app'),
     swipe: (from, to, ms) => {
       done.push(
         `swipe ${String(from.x)},${String(from.y)}→${String(to.x)},${String(to.y)} ${String(ms)}ms`,

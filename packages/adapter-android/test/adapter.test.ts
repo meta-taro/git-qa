@@ -920,3 +920,34 @@ describe('画面が消えていたら、そう言う', () => {
     ).resolves.toBeUndefined();
   });
 });
+
+/**
+ * **前面に居るアプリ**（C121）。共有の実機を別の人が使い始めていないかを、コアが操作の前後で見比べる。
+ */
+describe('createAndroidAdapter — 前面のアプリ', () => {
+  it('dumpsys window の mCurrentFocus からパッケージを返す', async () => {
+    const runner = fakeRunner({
+      'shell dumpsys window': {
+        code: 0,
+        stdout: new TextEncoder().encode(
+          '  mCurrentFocus=Window{a1b2c3 u0 com.example.app/com.example.app.MainActivity}\n',
+        ),
+        stderr: '',
+      },
+    });
+    const session = await createAndroidAdapter({ runner, build: { source: 'test' } }).connect();
+
+    expect(await session.foreground?.()).toBe('com.example.app');
+    await session.close();
+  });
+
+  it('読めなければ undefined（見張りの口が落ちても、操作は止めない）', async () => {
+    const runner = fakeRunner({
+      'shell dumpsys window': { code: 1, stdout: new Uint8Array(), stderr: 'error' },
+    });
+    const session = await createAndroidAdapter({ runner, build: { source: 'test' } }).connect();
+
+    expect(await session.foreground?.()).toBeUndefined();
+    await session.close();
+  });
+});

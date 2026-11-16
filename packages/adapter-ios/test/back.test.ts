@@ -35,6 +35,7 @@ const fake = (opts: { back?: { x: number; y: number }; app?: string; screens: st
       return Promise.resolve();
     },
     windowSize: () => Promise.resolve({ width: 402, height: 874 }),
+    activeApp: () => Promise.resolve(opts.app ?? 'com.apple.Preferences'),
     navigation: () =>
       Promise.resolve({
         ...(opts.back === undefined ? {} : { back: opts.back }),

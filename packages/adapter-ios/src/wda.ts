@@ -35,6 +35,11 @@ export interface WdaClient {
   /** ホーム画面へ戻る。 */
   home(): Promise<void>;
   /**
+   * **前面に居るアプリの Bundle ID**（C121）。ホーム画面は `com.apple.springboard`。
+   * 共有の実機を別の人が使い始めていないかを、操作の前後で見比べるのに要る。**聞けなければ `undefined`。**
+   */
+  activeApp(): Promise<string | undefined>;
+  /**
    * 画面の部品の名前と位置を、**絵から読んだ文字と同じ形**で返す（`sourceToLines`）。
    * 絵から読む道具（macOS だけ）が無いときに使う（2026-10-13）。
    */
@@ -214,6 +219,12 @@ export function createWdaClient(baseUrl: string, fetchImpl: WdaFetch = fetch): W
 
     async home() {
       await call('POST', '/wda/homescreen');
+    },
+
+    async activeApp() {
+      const front = (await call('GET', '/wda/activeAppInfo')) as { value?: { bundleId?: unknown } };
+      const app = front.value?.bundleId;
+      return typeof app === 'string' && app !== '' ? app : undefined;
     },
 
     async texts() {

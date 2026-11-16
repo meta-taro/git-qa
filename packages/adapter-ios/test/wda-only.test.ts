@@ -23,6 +23,7 @@ const wda = (ready = true): WdaClient => ({
   swipe: () => Promise.resolve(),
   texts: () => Promise.resolve('一般\t300\t600\t120\t60'),
   navigation: () => Promise.resolve({ width: 402, height: 874 }),
+  activeApp: () => Promise.resolve('com.apple.Preferences'),
   windowSize: () => Promise.resolve({ width: 402, height: 874 }),
   info: () => Promise.resolve({ model: 'iPhone', osVersion: '17.5.1', id: 'ABCDEF' }),
 });
@@ -132,6 +133,22 @@ describe('createIosAdapter — WebDriverAgent だけで', () => {
 
     expect(opened).toEqual(['http://192.0.2.10:9100/']);
     expect(got).toEqual([encodeFrame(jpeg)]);
+    await session.close();
+  });
+});
+
+/**
+ * **前面に居るアプリ**（C121）。共有の実機を別の人が使い始めていないかを、コアが操作の前後で見比べる。
+ */
+describe('createIosAdapter — 前面のアプリ', () => {
+  it('口（WDA）に聞いた Bundle ID を返す', async () => {
+    const session = await createIosAdapter({
+      wdaUrl: 'http://192.0.2.10:8100',
+      wda: wda(),
+      build: { source: 'ios', label: 'test' },
+    }).connect();
+
+    expect(await session.foreground?.()).toBe('com.apple.Preferences');
     await session.close();
   });
 });

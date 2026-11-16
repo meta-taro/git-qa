@@ -11,6 +11,7 @@ export {
   keycode,
   listElementNames,
   parseDeviceList,
+  parseForegroundPackage,
   parseResolvedActivity,
   parseScreenSize,
   parseWakefulness,

@@ -249,6 +249,21 @@ export function parseWakefulness(stdout: string): Wakefulness {
 }
 
 /**
+ * `dumpsys window` から、**前面に居るアプリのパッケージ**を読む（C121）。
+ *
+ * 共有の実機を別の人が使い始めていないかを、操作の前後で見比べるのに要る。
+ * `mCurrentFocus=Window{… u0 パッケージ/アクティビティ}` を先に見る。ダイアログや IME が焦点を
+ * 持っていて `null` のときは `mFocusedApp=ActivityRecord{… u0 パッケージ/…}` で補う。
+ * **読めなければ `undefined`**（どこかのアプリと決めつけて「替わっていない」と言わない）。
+ */
+export function parseForegroundPackage(stdout: string): string | undefined {
+  const focus = /mCurrentFocus=Window\{\S+ u\d+ ([\w.]+)\//.exec(stdout);
+  if (focus?.[1] !== undefined) return focus[1];
+  const app = /mFocusedApp=ActivityRecord\{\S+ u\d+ ([\w.]+)\//.exec(stdout);
+  return app?.[1];
+}
+
+/**
  * `cmd package resolve-activity --brief <パッケージ>` の出力から起動先を取る。
  *
  * 最後の行が `com.example.app/.MainActivity`。**端末に無ければ `No activity found`。**
