@@ -4,6 +4,8 @@ import { createAndroidAdapter, readAndroidScreenText } from '@git-qa/adapter-and
 import { parseTestSpecTsv, sheetDigest, verdictKeyHint, saveRunProgress } from '@git-qa/core';
 
 import { installSaveOnExit } from './save-on-exit.js';
+import { claimingAdapter, deviceKey } from './device-claims.js';
+import { runnerOf } from './release.js';
 import { headlessExitCode, headlessSummary, runHeadless } from './headless.js';
 import { startRunSession } from './run-session.js';
 import { runHomeFor } from './paths.js';
@@ -47,17 +49,25 @@ try {
 }
 const sheet = parseTestSpecTsv(text);
 
-const adapter = createAndroidAdapter({
-  build: {
-    source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-    label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+// **同じ機械の別の席が同じ端末を掴んでいれば、触る前に断る**（C121）。
+const adapter = claimingAdapter(
+  createAndroidAdapter({
+    build: {
+      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+    },
+    // 枠の中に描く方式（C27 の方式 A / C32）。別窓ではない。
+    liveView: { mode: 'h264-stream' },
+    ...(process.env['GIT_QA_ANDROID_SERIAL'] === undefined
+      ? {}
+      : { serial: process.env['GIT_QA_ANDROID_SERIAL'] }),
+  }),
+  {
+    device: deviceKey('android', process.env['GIT_QA_ANDROID_SERIAL']),
+    seat: `検証の実行（${sheet.meta['タイトル'] ?? resolvedSheet}）`,
+    release: runnerOf().version,
   },
-  // 枠の中に描く方式（C27 の方式 A / C32）。別窓ではない。
-  liveView: { mode: 'h264-stream' },
-  ...(process.env['GIT_QA_ANDROID_SERIAL'] === undefined
-    ? {}
-    : { serial: process.env['GIT_QA_ANDROID_SERIAL'] }),
-});
+);
 
 const sheetRef = {
   path: home.sheetRefPath,

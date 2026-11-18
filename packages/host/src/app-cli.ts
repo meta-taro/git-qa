@@ -49,6 +49,7 @@ import { imageTools } from './image-tools.js';
 import type { RunSession } from './run-session.js';
 import { runnerOf } from './release.js';
 import { announceScreen } from './screens.js';
+import { claimingAdapter, deviceKey } from './device-claims.js';
 import { startSetupServer } from './setup-server.js';
 import { stopServing } from './stop-serving.js';
 import { watchParent } from './watch-parent.js';
@@ -331,14 +332,22 @@ const setup = await startSetupServer({
                       ? {}
                       : { browser: chromium }),
                   })
-                : createAndroidAdapter({
-                    build: {
-                      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-                      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                : // **同じ機械の別の席が同じ端末を掴んでいれば、触る前に断る**（C121）。
+                  claimingAdapter(
+                    createAndroidAdapter({
+                      build: {
+                        source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+                        label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+                      },
+                      liveView: { mode: 'h264-stream' },
+                      serial,
+                    }),
+                    {
+                      device: deviceKey('android', serial),
+                      seat: `検証の実行（${sheet.meta['タイトル'] ?? sheetPath}）`,
+                      release: runnerOf().version,
                     },
-                    liveView: { mode: 'h264-stream' },
-                    serial,
-                  }),
+                  ),
       sheet,
       sheetRef: {
         // **家からの相対。**絶対パスだと、証跡に個人名が混ざる（§25）。

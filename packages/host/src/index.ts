@@ -29,5 +29,14 @@ export { AGENT_ACTIONS, AgentActionError, parseAgentAction } from './agent-actio
 export type { AgentAction } from './agent-action.js';
 export { announceScreen, findScreens, forgetScreen, pidAlive, screensDir } from './screens.js';
 export type { ScreenRecord } from './screens.js';
+export {
+  claimDevice,
+  claimingAdapter,
+  deviceClaimsDir,
+  deviceKey,
+  heldByReason,
+} from './device-claims.js';
+export type { ClaimResult, ClaimingAdapterOptions, DeviceClaim } from './device-claims.js';
+export { runnerOf } from './release.js';
 export { findSheets, keepRunnableSheets } from './find-sheets.js';
 export type { FindSheetsOptions } from './find-sheets.js';

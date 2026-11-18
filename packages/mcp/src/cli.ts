@@ -24,7 +24,7 @@ import {
 import { createWebAdapter, listWebElements, readWebScreenText } from '@git-qa/adapter-web';
 import type { TargetSession } from '@git-qa/core';
 
-import { findScreens, forgetScreen } from '@git-qa/host';
+import { claimingAdapter, deviceKey, findScreens, forgetScreen, runnerOf } from '@git-qa/host';
 
 import { postJson, sendToScreens } from './agent-screen.js';
 import { findIosTool, findOcrTool } from './ios-tool.js';
@@ -133,25 +133,35 @@ const connect = (): Promise<TargetSession> => {
       );
     }
     return (keeper === undefined ? Promise.resolve() : keeper.ready(180_000)).then(() =>
-      createIosAdapter({
-        ...(toolPath === undefined ? {} : { toolPath }),
-        ...(target.device === undefined ? {} : { device: target.device }),
-        ...(ocrPath === undefined ? {} : { ocrPath }),
-        // **押す口**（WebDriverAgent・C99）。無ければ見る・読むだけ。
-        ...(wdaUrl === undefined ? {} : { wdaUrl }),
-        build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
-      }).connect(),
+      // **同じ機械の別の席が同じ端末を掴んでいれば、触る前に断る**（C121）。
+      claimingAdapter(
+        createIosAdapter({
+          ...(toolPath === undefined ? {} : { toolPath }),
+          ...(target.device === undefined ? {} : { device: target.device }),
+          ...(ocrPath === undefined ? {} : { ocrPath }),
+          // **押す口**（WebDriverAgent・C99）。無ければ見る・読むだけ。
+          ...(wdaUrl === undefined ? {} : { wdaUrl }),
+          build: { source: process.env['GIT_QA_APP_SOURCE'] ?? 'ios', label },
+        }),
+        { device: deviceKey('ios', target.device), seat: MCP_SEAT, release: runnerOf().version },
+      ).connect(),
     );
   }
 
-  return createAndroidAdapter({
-    build: {
-      source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
-      label,
-    },
-    ...(target.serial === undefined ? {} : { serial: target.serial }),
-  }).connect();
+  return claimingAdapter(
+    createAndroidAdapter({
+      build: {
+        source: process.env['GIT_QA_APP_SOURCE'] ?? 'example/sample-notes-app',
+        label,
+      },
+      ...(target.serial === undefined ? {} : { serial: target.serial }),
+    }),
+    { device: deviceKey('android', target.serial), seat: MCP_SEAT, release: runnerOf().version },
+  ).connect();
 };
+
+/** 掴みの名乗りに書く、この席の呼び名（人が読む）。 */
+const MCP_SEAT = 'MCP の席（エージェントが端末を見て・触っている）';
 
 /** **画面の文字の読み方は相手ごとに違う。**ここで取り違えると、AI は空の画面を見る。 */
 const readScreenText =

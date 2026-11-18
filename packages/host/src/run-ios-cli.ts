@@ -24,6 +24,8 @@ import { runHomeFor } from './paths.js';
 import { positional } from './argv.js';
 import { spawnDesktop, tauriDevArgs, assertDesktopPortFree, killTree } from './app.js';
 import { installSaveOnExit } from './save-on-exit.js';
+import { claimingAdapter, deviceKey } from './device-claims.js';
+import { runnerOf } from './release.js';
 
 /**
  * iPhone / iPad で検証シートを 1 本走らせる（2026-09-19・人の指示）。
@@ -117,20 +119,28 @@ if (devices !== undefined && devices.length === 0) {
 const wanted = positional(process.argv, 1) ?? process.env['GIT_QA_IOS_DEVICE'];
 const ocrPath = onlyWda ? undefined : await findOcr();
 
-const adapter = createIosAdapter({
-  ...(toolPath === undefined ? {} : { toolPath }),
-  ...(wanted === undefined ? {} : { device: wanted }),
-  ...(ocrPath === undefined ? {} : { ocrPath }),
-  // **押す口**（WebDriverAgent・C99）。人が端末で起こし、その URL を渡す。無ければ見る・読むだけ。
-  ...(wdaUrl === undefined ? {} : { wdaUrl }),
-  build: {
-    source: sheetSubject(sheet.meta) ?? sheetDestination(sheet.meta) ?? 'ios',
-    label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+// **同じ機械の別の席が同じ端末を掴んでいれば、触る前に断る**（C121）。
+const adapter = claimingAdapter(
+  createIosAdapter({
+    ...(toolPath === undefined ? {} : { toolPath }),
+    ...(wanted === undefined ? {} : { device: wanted }),
+    ...(ocrPath === undefined ? {} : { ocrPath }),
+    // **押す口**（WebDriverAgent・C99）。人が端末で起こし、その URL を渡す。無ければ見る・読むだけ。
+    ...(wdaUrl === undefined ? {} : { wdaUrl }),
+    build: {
+      source: sheetSubject(sheet.meta) ?? sheetDestination(sheet.meta) ?? 'ios',
+      label: process.env['GIT_QA_APP_LABEL'] ?? 'dev',
+    },
+    ...(sheetDestination(sheet.meta) === undefined
+      ? {}
+      : { destination: sheetDestination(sheet.meta) as string }),
+  }),
+  {
+    device: deviceKey('ios', wanted),
+    seat: `検証の実行（${sheet.meta['タイトル'] ?? sheetPath}）`,
+    release: runnerOf().version,
   },
-  ...(sheetDestination(sheet.meta) === undefined
-    ? {}
-    : { destination: sheetDestination(sheet.meta) as string }),
-});
+);
 
 const runIdFrom = (at: Date): string =>
   at
