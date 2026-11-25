@@ -32,6 +32,57 @@ on Android, web, desktop or iPhone. It can run the sheet unattended overnight (`
 in the morning you review the failures. **The pass is still yours to give.**
 The server is listed in the official MCP registry as `io.github.meta-taro/git-qa`; it runs from this clone (there is no npm package).
 
+## One test, start to finish
+
+This is the sample that ships in the repo: a three-row sheet (`sheets/web-sample-ja.tsv`) run against a
+page served on your own machine (`node sheets/sample-page/serve.mjs`). Its first row:
+
+| No. | Case | Step | Expected |
+|---|---|---|---|
+| 1 | Pressing the button changes the text | Click 「押す」 | 「押された」 is shown |
+
+**1. The AI runs the step.** It opens the page in Chrome, clicks the button, reads the screen and marks
+where it found the expected text. Its own result is `AUTO_PASS`: it passed the case, nobody has looked yet.
+The right pane waits for you.
+
+![Case 1 after the AI ran it: the live page shows 「押された」 with a red marker on it; the right pane says AUTO_PASS and offers D / F / A](./docs/images/step-ai-done.png)
+
+**2. You look, and press one key.** `D` means "I saw it, pass". The case turns `VERIFIED` with your handle
+next to it, and the AI starts the next case on its own. You never touch the page.
+
+![After D: case 1 reads VERIFIED · qa in the case list, and the AI has already run case 2 and marked 「まだ押されていない」](./docs/images/step-verified.png)
+
+**3. The record stays.** When the last case is placed, the run says how many a person verified, and
+`runs/<run id>/run.json` keeps every case as it was judged: the AI's result, your verdict, your handle,
+the time, and the screen at that moment (`case-001/screen.webp`).
+
+```json
+{
+  "no": 1,
+  "title": "ボタンを押すと表示が変わる",
+  "aiResult": "PASS",
+  "humanResult": "VERIFIED",
+  "verifiedBy": "qa",
+  "verifiedAt": "2026-11-25T06:24:08.169Z",
+  "result": "VERIFIED",
+  "screenshot": { "state": "saved", "file": "case-001/screen.webp" },
+  "note": "画面の文字に「押された」が在ることだけを見た"
+}
+```
+
+![The run is over: 3 of 3 verified by a person; AUTO_PASS, FAIL, BLOCKED and SKIP are all 0](./docs/images/step-finished.png)
+
+So the split is:
+
+| | Who | What |
+|---|---|---|
+| Run | **The AI** | Opens the target, follows each step of the sheet, finds the expected text and points at it |
+| Judge | **You** | Watch the live view and press one key per case. Only you can place `VERIFIED` or `FAIL` |
+| Remember | **The record** | Per case: the AI's result, your verdict, your handle, the time, the screen |
+
+The same loop runs against an Android device, a desktop app or an iPhone. Only the first choice,
+what to look at, changes.
+
 ## Try it
 
 1. Download the app from the [distribution page](https://meta-taro.github.io/git-qa/en/) (macOS, Windows x64 / ARM64) and install **Node 22+**
@@ -40,10 +91,6 @@ The server is listed in the official MCP registry as `io.github.meta-taro/git-qa
 3. Start, watch, and press `D` / `F` per case
 
 ![Picking what to look at: a web page URL, a desktop app by name, or an adb device](./docs/images/setup-target.png)
-
-A run, case by case — the AI runs each step (press the button, reopen the page, press it again), you press `D`, the case turns `VERIFIED / qa` and the next one starts:
-
-![A run: the AI presses the button and finds the result, reopens the page and finds it reset, presses again; each case is verified with D](./docs/images/flow.gif)
 
 A test sheet is a TSV you can write in any spreadsheet — samples are in [`sheets/`](./sheets/).
 From source instead: `git clone … && pnpm install && pnpm app` (see [Install](#install)).
@@ -97,7 +144,7 @@ tool that exists to save effort expensive to use.
 | **Android devices** | Real devices and emulators over `adb` — tap, swipe, type |
 | **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare |
 | **Desktop apps** | macOS (Accessibility + Vision OCR) and Windows (UI Automation) |
-| **iPhone / iPad** | Watch, read and record over USB. **Tap, type, swipe and launch apps** through WebDriverAgent, which you sign and install on the device yourself ([guide](./docs/ios-press.md)). Tried on a real iPhone (iOS 17.5.1) |
+| **iPhone / iPad** | Watch, read and record over USB. **Tap, type, swipe and launch apps** through WebDriverAgent, which you sign and install on the device yourself ([guide](./docs/ios-press.md)). Tried on real iPhones (iOS 17.5.1 and iOS 27), **from a Mac only — driving an iPhone from Windows has not been tried** |
 | **Mobile browsers** | Android Chrome over `adb forward` + CDP — tried on a real phone (Android 15, Chrome 156): open, type, tap, screenshot and read all work; text inside input fields is not part of what it reads. iOS Safari through the iPhone path above (**not yet tried**) |
 | **From an AI agent** | Over MCP — screenshot, read the screen, **list the names you can press**, tap by name. Android, web, desktop, or iPhone / iPad |
 
@@ -167,6 +214,7 @@ never replaces itself.
 
 **Stable since v0.2.0 (2026-11-11).** Three products use it in real verification
 work on Windows and macOS, against web, desktop, Android and iPhone targets.
+**iPhone targets have only been driven from a Mac; Windows to iPhone is untried** and is not promised.
 Rough edges are listed in each release's notes, and **nothing fails silently** — where a step cannot run, it is recorded
 as "a person needs to do this," not as a pass.
 
