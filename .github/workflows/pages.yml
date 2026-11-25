@@ -31,6 +31,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read # 上げた成果物が一覧に出たかを、配る前に見るため
 
 # 走っている途中のものは止めてよい（配るのは常に最新の 1 つ）。
 concurrency:
@@ -59,6 +60,23 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
+
+      # **上げ終えた直後は、成果物が一覧に出ないことがある。**その 0.3 秒後に deploy が
+      # 「github-pages という成果物が無い」で落ちた（2026-11-25・3 回中 2 回。action の版を
+      # 上げても同じ）。一覧に出るまで待ってから配る。再実行は同じ run に成果物が 2 つ
+      # 残って別の理由で落ちるので、使わない。
+      - name: 成果物が一覧に出るまで待つ
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 30); do
+            n=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+                  --jq '[.artifacts[] | select(.name == "github-pages")] | length')
+            if [ "$n" = "1" ]; then echo "github-pages が一覧に出た（${i} 回目）"; exit 0; fi
+            sleep 2
+          done
+          echo "github-pages が一覧に出ない（${n} 個）"
+          exit 1
 
       - id: deploy
         uses: actions/deploy-pages@v5
