@@ -230,6 +230,82 @@
         </div>
       </section>
 
+      <section id="one-test">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">1 本のテスト</span>
+            <h2>AI が流し、人が見て、記録が残る</h2>
+            <p>
+              リポに入っている見本そのままです。3
+              行の検証シートを、手元で出したウェブページに当てました。1
+              行目は「『押す』をクリックする → 『押された』と表示される」。
+            </p>
+          </div>
+
+          <div class="feature">
+            <div class="feature-text">
+              <h3>1. AI が手順を流す</h3>
+              <p>
+                Chrome
+                でページを開き、ボタンを押し、画面を読んで、期待した文字を見つけた所に赤い印を付けます。AI
+                自身の結果は
+                <span class="chip wait">AUTO_PASS</span
+                >（通した。まだ誰も見ていない）。右の欄は人を待ちます。
+              </p>
+            </div>
+            <figure class="shot">
+              <img
+                src="img/step-ai-done.png"
+                width="1280"
+                height="800"
+                loading="lazy"
+                alt="AI が #01 を流し終えた画面。中央のライブビューに「押された」が出て赤い印が付き、右の判定の欄は AUTO_PASS で D / F / A を待っている"
+              />
+            </figure>
+          </div>
+
+          <div class="feature flip">
+            <div class="feature-text">
+              <h3>2. 人が見て、キーを 1 つ押す</h3>
+              <p>
+                <kbd>D</kbd> は「見た。合格」。ケースは
+                <span class="chip ok">VERIFIED</span> になって横にハンドルが付き、AI
+                は次のケースを勝手に始めます。人はページに触りません。
+              </p>
+            </div>
+            <figure class="shot">
+              <img
+                src="img/step-verified.png"
+                width="1280"
+                height="800"
+                loading="lazy"
+                alt="D を押したあとの画面。左の一覧で #01 が VERIFIED・人 qa になり、AI はもう #02 を流して「まだ押されていない」に印を付けている"
+              />
+            </figure>
+          </div>
+
+          <div class="feature">
+            <div class="feature-text">
+              <h3>3. 記録が残る</h3>
+              <p>
+                最後のケースを置くと、人が見て確かめた数が出ます。<code>runs/</code> の
+                <code>run.json</code> には、ケースごとに AI
+                の結果・人の判定・ハンドル・時刻と、そのときの画面が、判定したときのまま残ります。
+              </p>
+            </div>
+            <figure class="shot">
+              <img
+                src="img/step-finished.png"
+                width="1280"
+                height="800"
+                loading="lazy"
+                alt="検証が終わった画面。人が見て確かめた 3 / 3。AUTO_PASS・FAIL・BLOCKED・SKIP はどれも 0"
+              />
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <section class="soft" id="features">
         <div class="wrap">
           <div class="section-head">

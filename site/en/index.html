@@ -235,6 +235,80 @@
         </div>
       </section>
 
+      <section id="one-test">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">One test</span>
+            <h2>The AI runs it, you judge it, the record stays</h2>
+            <p>
+              The sample that ships in the repo: a three-row sheet against a page served on your own
+              machine. Row 1 says "click 押す, expect 押された".
+            </p>
+          </div>
+
+          <div class="feature">
+            <div class="feature-text">
+              <h3>1. The AI runs the step</h3>
+              <p>
+                It opens the page in Chrome, clicks the button, reads the screen and marks in red
+                where it found the expected text. Its own result is
+                <span class="chip wait">AUTO_PASS</span>: it passed the case, nobody has looked yet.
+                The right pane waits for you.
+              </p>
+            </div>
+            <figure class="shot">
+              <img
+                src="../img/step-ai-done.png"
+                width="1280"
+                height="800"
+                loading="lazy"
+                alt="Case 1 after the AI ran it: the live page shows 押された with a red marker; the right pane says AUTO_PASS and offers D / F / A"
+              />
+            </figure>
+          </div>
+
+          <div class="feature flip">
+            <div class="feature-text">
+              <h3>2. You look, and press one key</h3>
+              <p>
+                <kbd>D</kbd> means "I saw it, pass". The case turns
+                <span class="chip ok">VERIFIED</span> with your handle next to it, and the AI starts
+                the next case on its own. You never touch the page.
+              </p>
+            </div>
+            <figure class="shot">
+              <img
+                src="../img/step-verified.png"
+                width="1280"
+                height="800"
+                loading="lazy"
+                alt="After D: case 1 reads VERIFIED · qa in the case list, and the AI has already run case 2 and marked まだ押されていない"
+              />
+            </figure>
+          </div>
+
+          <div class="feature">
+            <div class="feature-text">
+              <h3>3. The record stays</h3>
+              <p>
+                When the last case is placed, the run says how many a person verified.
+                <code>run.json</code> under <code>runs/</code> keeps every case as it was judged:
+                the AI's result, your verdict, your handle, the time, and the screen at that moment.
+              </p>
+            </div>
+            <figure class="shot">
+              <img
+                src="../img/step-finished.png"
+                width="1280"
+                height="800"
+                loading="lazy"
+                alt="The run is over: 3 of 3 verified by a person; AUTO_PASS, FAIL, BLOCKED and SKIP are all 0"
+              />
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <section class="soft" id="features">
         <div class="wrap">
           <div class="section-head">
