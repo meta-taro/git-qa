@@ -77,6 +77,11 @@ export interface FirefoxAdapterOptions {
   /** 使う Firefox。省略すると、入っているものを探す。 */
   readonly firefoxPath?: string;
   readonly size?: { readonly width: number; readonly height: number };
+  /**
+   * **ページの表示領域の大きさ**（CSS 画素・C122）。窓（`size`）とは別。
+   * BiDi の `browsingContext.setViewport` で合わせる。証跡の `target.viewport` に残る。
+   */
+  readonly viewport?: { readonly width: number; readonly height: number };
   readonly settleMs?: number;
   readonly loadTimeoutMs?: number;
   readonly startTimeoutMs?: number;
@@ -228,6 +233,14 @@ export function createFirefoxAdapter(options: FirefoxAdapterOptions): TargetAdap
           throw new AdapterError(KIND, 'Firefox に見る画面が 1 枚も無い');
         }
 
+        // **表示領域を先に合わせてから開く**（C122）。開いた後に変えると、最初の描画が別の幅になる。
+        if (options.viewport !== undefined) {
+          await bidi.send('browsingContext.setViewport', {
+            context,
+            viewport: { width: options.viewport.width, height: options.viewport.height },
+          });
+        }
+
         const start = options.url ?? options.build.source;
         // **行き先はシートが宣言したものだけ**（C40）。
         await bidi.send('browsingContext.navigate', { context, url: start, wait: 'complete' });
@@ -355,6 +368,8 @@ function createSession(deps: SessionDeps): TargetSession {
     target: {
       kind: KIND,
       browser: deps.label,
+      // **どの大きさで見たか**（C122）。合わせたときだけ。
+      ...(deps.options.viewport === undefined ? {} : { viewport: deps.options.viewport }),
       build: deps.options.build,
       ...(deps.options.destination === undefined ? {} : { destination: deps.options.destination }),
     },

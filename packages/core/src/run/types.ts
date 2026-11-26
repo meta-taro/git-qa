@@ -100,6 +100,13 @@ export interface Target {
    * 古い証跡には無いので、任意にしてある。
    */
   profile?: BrowserProfileKind;
+  /**
+   * **ページの表示領域の大きさ**（CSS 画素・2026-11-26・C122）。
+   *
+   * シートの `# 画面:` か `--viewport` で決めたもの。**無ければ既定の窓で見た。**
+   * スマホ幅の崩れは、この値が無いと「どの幅で見たか」を証跡から復元できない。
+   */
+  viewport?: { width: number; height: number };
   build: TargetBuild;
 }
 

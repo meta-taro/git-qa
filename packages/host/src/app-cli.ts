@@ -33,6 +33,8 @@ import {
   sheetDestination,
   sheetDigest,
   sheetSubject,
+  sheetViewports,
+  viewportLabel,
   sheetPathIn,
 } from '@git-qa/core';
 import type { Run } from '@git-qa/core';
@@ -205,6 +207,17 @@ const setup = await startSetupServer({
     // **何処を見るか**は `行き先` → 無ければ `対象`。**何を検証したか**は `対象` のまま。
     const url = web ? (sheetDestination(sheet.meta) ?? serial) : undefined;
     const subject = sheetSubject(sheet.meta);
+    /**
+     * **ページの表示領域の大きさは、シートの `# 画面:` が決める**（C122）。
+     * 画面から始める道は 1 回で 1 つの大きさ。複数書かれていれば最初のものを使い、そう言う。
+     */
+    const viewports = sheetViewports(sheet.meta);
+    const viewport = viewports?.[0];
+    if (viewports !== undefined && viewports.length > 1 && viewport !== undefined) {
+      console.log(
+        `[git-qa] シートの「# 画面:」に ${String(viewports.length)} つあるので、画面からは最初の ${viewportLabel(viewport)} で見る（全部回すなら pnpm run:sheet:web）`,
+      );
+    }
     /** `app:計算機` の形で来たら、デスクトップアプリ（Issue 016）。 */
     const app = serial.startsWith('app:') ? serial.slice(4) : undefined;
 
@@ -281,6 +294,7 @@ const setup = await startSetupServer({
                 url,
                 destination: url,
                 size: { width: 1280, height: 900 },
+                ...(viewport === undefined ? {} : { viewport }),
               })
             : web && url !== undefined && browser === 'safari'
               ? createSafariAdapter({
@@ -304,6 +318,8 @@ const setup = await startSetupServer({
                     destination: url,
                     // 同じ幅で見ないと、崩れの有無を比べられない。
                     size: { width: 1280, height: 900 },
+                    // **表示領域はシートの `# 画面:`**（C122）。無ければ窓のまま。
+                    ...(viewport === undefined ? {} : { viewport }),
                     /**
                      * **ログイン済みの状態で見る**（外部レビュー meta-taro/git-qa#26）。
                      * 渡すと、そのプロファイルを使い**終わりに消さない。**

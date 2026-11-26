@@ -142,7 +142,7 @@ tool that exists to save effort expensive to use.
 | | |
 |---|---|
 | **Android devices** | Real devices and emulators over `adb` — tap, swipe, type |
-| **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare |
+| **Web pages** | Chrome / Edge / Firefox / Safari. Same viewport every run, so you can compare. **Phone widths too:** `# 画面: 390x844` in the sheet header (or `--viewport 390x844,1440x900`) sets the page's viewport itself, one evidence folder per width; Chrome and Firefox |
 | **Desktop apps** | macOS (Accessibility + Vision OCR) and Windows (UI Automation) |
 | **iPhone / iPad** | Watch, read and record over USB. **Tap, type, swipe and launch apps** through WebDriverAgent, which you sign and install on the device yourself ([guide](./docs/ios-press.md)). Tried on real iPhones (iOS 17.5.1 and iOS 27), **from a Mac only — driving an iPhone from Windows has not been tried** |
 | **Mobile browsers** | Android Chrome over `adb forward` + CDP — tried on a real phone (Android 15, Chrome 156): open, type, tap, screenshot and read all work; text inside input fields is not part of what it reads. iOS Safari through the iPhone path above (**not yet tried**) |

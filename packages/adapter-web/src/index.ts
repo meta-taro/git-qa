@@ -12,6 +12,7 @@ export type { BrowserArgsOptions, BrowserKind } from './launch.js';
 export { createScreencast } from './screencast.js';
 export type { Screencast, ScreencastOptions } from './screencast.js';
 export { createWebAdapter } from './adapter.js';
+export { deviceMetricsParams } from './emulation.js';
 export type { WebAdapterOptions } from './adapter.js';
 export { launchBrowser, findBrowser } from './browser.js';
 export type { LaunchBrowserOptions, RunningBrowser } from './browser.js';

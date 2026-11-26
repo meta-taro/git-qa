@@ -31,6 +31,7 @@ import {
   parseViewport,
   viewportScript,
 } from './find.js';
+import { deviceMetricsParams } from './emulation.js';
 import { browserLabel, httpOriginFromWs, parseBrowserVersion, pickPageTarget } from './launch.js';
 import type { BrowserKind, BrowserTarget } from './launch.js';
 import { createScreencast } from './screencast.js';
@@ -94,6 +95,13 @@ export interface WebAdapterOptions {
   readonly browser?: BrowserKind;
   /** 窓の大きさ。**同じ幅で見ないと、崩れの有無を比べられない。** */
   readonly size?: { readonly width: number; readonly height: number };
+  /**
+   * **ページの表示領域の大きさ**（CSS 画素・C122）。シートの `# 画面:` か `--viewport`。
+   *
+   * 窓（`size`）とは別。窓で 390 を作ろうとするとブラウザの最小幅で止まるので、
+   * `Emulation.setDeviceMetricsOverride` で表示領域を直接合わせる。証跡の `target.viewport` に残る。
+   */
+  readonly viewport?: { readonly width: number; readonly height: number };
   /**
    * 操作のあと、画面が落ち着くのを待つ時間（ms）。
    *
@@ -207,6 +215,14 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
         await cdp.send('Page.enable');
         await cdp.send('Runtime.enable');
 
+        // **表示領域を先に合わせてから開く**（C122）。開いた後に変えると、最初の描画が別の幅になる。
+        if (options.viewport !== undefined) {
+          await cdp.send(
+            'Emulation.setDeviceMetricsOverride',
+            deviceMetricsParams(options.viewport),
+          );
+        }
+
         /**
          * **何で見たかを証跡に残す。**同じ画面でも版が違えば結果が変わる。
          * 後から「どのブラウザのどの版で見たか」が読めないと、証跡として弱い。
@@ -227,6 +243,7 @@ export function createWebAdapter(options: WebAdapterOptions): TargetAdapter {
           ...(options.destination === undefined ? {} : { destination: options.destination }),
           browserLabel: label,
           profile: profileKind(options.userDataDir),
+          ...(options.viewport === undefined ? {} : { viewport: options.viewport }),
           ...(options.onPointed === undefined ? {} : { onPointed: options.onPointed }),
           ...(options.settleMs === undefined ? {} : { settleMs: options.settleMs }),
           ...(options.loadTimeoutMs === undefined ? {} : { loadTimeoutMs: options.loadTimeoutMs }),
@@ -252,6 +269,8 @@ interface SessionDeps {
   readonly browserLabel: string;
   /** **どのプロファイルで見たか**（外部レビュー meta-taro/git-qa#35）。 */
   readonly profile?: BrowserProfileKind;
+  /** **どの大きさで見たか**（C122）。合わせたときだけ。 */
+  readonly viewport?: { readonly width: number; readonly height: number };
   /** 触った場所・見る場所を画面へ流す（要望シート No.1・2026-09-24）。 */
   readonly onPointed?: (at: {
     x: number;
@@ -339,6 +358,8 @@ function createSession(deps: SessionDeps): TargetSession {
        * 読む人に分からないと、証跡として弱い。
        */
       ...(deps.profile === undefined ? {} : { profile: deps.profile }),
+      // **どの大きさで見たか**（C122）。スマホ幅の崩れは、これが無いと復元できない。
+      ...(deps.viewport === undefined ? {} : { viewport: deps.viewport }),
       build,
       // **何処を見に行ったか**（シートの `行き先`・外部レビュー #22）。
       ...(deps.destination === undefined ? {} : { destination: deps.destination }),

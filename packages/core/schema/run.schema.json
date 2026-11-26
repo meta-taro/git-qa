@@ -98,6 +98,22 @@
           "description": "どのプロファイルで見たか。fresh = 毎回まっさら / provided = 検証用に用意されたもの（ログイン済みの可能性がある） / personal = 普段使いのブラウザの置き場所にあるもの（その人の私物）— 外部レビュー meta-taro/git-qa#35。",
           "enum": ["fresh", "provided", "personal"]
         },
+        "viewport": {
+          "description": "ページの表示領域の大きさ（CSS 画素）。シートの「# 画面:」か --viewport で決めたもの。無ければ既定の窓（1280x900）で見た — 2026-11-26 C122。",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
         "build": {
           "description": "どのビルドを見たか。分からない検証結果は後から使えないので必須。",
           "type": "object",

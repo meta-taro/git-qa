@@ -285,3 +285,29 @@ describe('target.kind に ios が在る', () => {
     expectInvalid({ ...run, target: { ...run.target, kind: 'ipados' } }, /kind/);
   });
 });
+
+/**
+ * **ページの表示領域の大きさ**（2026-11-26・C122）。
+ *
+ * スマホ幅で見た崩れは、**どの幅で見たか**が証跡に無いと復元できない。
+ */
+describe('target.viewport（どの大きさで見たか）', () => {
+  const withViewport = (viewport: unknown): unknown => {
+    const run = validRun();
+    return { ...run, target: { ...run.target, viewport } };
+  };
+
+  it('幅と高さを残せる', () => {
+    expectValid(withViewport({ width: 390, height: 844 }));
+  });
+
+  it('片方だけ・0・小数は受け取らない', () => {
+    expectInvalid(withViewport({ width: 390 }), /height/);
+    expectInvalid(withViewport({ width: 0, height: 844 }), /width/);
+    expectInvalid(withViewport({ width: 390.5, height: 844 }), /width/);
+  });
+
+  it('古い証跡には無いので、無くても通る', () => {
+    expectValid(validRun());
+  });
+});
